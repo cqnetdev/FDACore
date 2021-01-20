@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "FDACore": {
+      "commandName": "Project",
+      "commandLineArgs": "-show"
+    }
+  }
+}

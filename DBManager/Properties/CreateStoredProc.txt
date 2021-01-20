@@ -1,0 +1,426 @@
+﻿CREATE PROCEDURE [dbo].[CalcStats]
+	@StartTime varchar(100),
+	@EndTime varchar(100),
+	@ReturnResults bit = 0,
+	@Description varchar(200) = null,
+	@connection varchar(100) = null,
+	@device varchar(100) = null,
+	@outputTable varchar(100) = null,
+	@saveOutput bit = 1
+AS
+BEGIN
+	BEGIN TRY
+	-- SET NOCOUNT ON added to prevent extra result sets from
+		-- interfering with SELECT statements.
+		SET NOCOUNT ON;
+		DECLARE @error VARCHAR(max)
+
+		-- get the time that this proc was run
+		DECLARE @runTime DATETIME
+		set @runtime = GETDATE();
+
+		-- just in case the temp table is still hanging around from the last stats calculation
+	   IF OBJECT_ID('tempdb..#trans') IS NOT NULL DROP TABLE #trans
+
+	
+	   -- find the name of the output table (default is CommsStats)
+		   declare @output VARCHAR(100) = 'CommsStats'
+		   -- if output table name was supplied in parameters, use that
+		   if (@outputTable IS NOT NULL)
+		   BEGIN
+				SET @output = @outputTable
+		   END
+		   ELSE
+		   BEGIN
+			-- check the FDAConfig table for an alternate output table
+			if (select count(1) from FDASystem..FDAConfig where ConfigType = 0 and OptionName = 'CommsStats') = 1
+				select @output = (select OptionValue from FDASystem..FDAConfig where ConfigType = 0 and OptionName = 'CommsStats')
+		   END
+
+		   -- make sure the output table name is valid (starts with a letter and doesn't contain illegal characters)
+		   if (@output like  '%[^_A-Z0-9@$#]%' COLLATE Latin1_General_CI_AI or @output NOT LIKE '[A-Z]%' COLLATE Latin1_General_CI_AI)
+		   BEGIN
+		    SET @output = REPLACE(@output,'''','''''')
+			SET @error = 'Invalid table name ''' + @output + ''''
+			RAISERROR(@error,1,1)
+			RETURN
+		   END
+		   set @output = '[' + @output + ']'
+
+		   -- escape any single quotes in the description or turn NULL into empty string
+		   if (@Description IS NOT NULL)
+		   BEGIN
+			  SET @Description = REPLACE(@Description,'''','''''');
+		   END
+		   ELSE
+		   BEGIN
+			  SET @Description = '';
+		   END
+
+	   
+	    -- make sure the supplied dates and times are valid
+		DECLARE @dtTest Datetime
+		BEGIN TRY
+			set @dtTest = CONVERT(datetime,@StartTime)
+		END TRY
+		BEGIN CATCH
+			set @error = 'Invalid timestamp ''' + @StartTime + ''''
+			RAISERROR(@error,1,1)
+			RETURN
+		END CATCH
+		
+		BEGIN TRY
+			set @dtTest = CONVERT(datetime,@EndTime)
+		END TRY
+		BEGIN CATCH
+			set @error = 'Invalid timestamp ''' + @EndTime + ''''
+			RAISERROR(@error,1,1)
+			RETURN
+		END CATCH
+
+
+		------------------ first, create a temp table of all transaction events (TransCode=1) in the timeframe-------------------------
+		------------------ if a connection or device was specified, filter out transactions from other connections ------------------------------
+		SELECT row_number() over (order by TimestampUTC1)  as rowid,ConnectionID,DeviceAddress,Attempt,TransStatus as Success,ElapsedPeriod, Details01 as Request, RxSize, [Protocol]
+		INTO #trans
+		FROM CommsLog
+		WHERE TransCode = 1 and TimestampUTC1 BETWEEN @StartTime AND @EndTime
+		order by Protocol
+
+		if (@connection IS NOT NULL)
+		BEGIN
+			delete from #trans where ConnectionID <> @connection
+		END
+
+
+
+		-- speed up lookups by Protocol, this helps with device id extraction below
+		--CREATE INDEX tempidx1 on #trans (Protocol) INCLUDE (Request)
+
+		---------next pick out the device ID from the bytes of each request (protocol dependent!) and update the device ID field in the temp table-----------------
+		
+			-- MODBUS and ENRON MODBUS (address in byte 1, characters 5 and 6)
+		--	update #trans set DeviceAddress = 
+		--			   CASE
+		--				  WHEN SUBSTRING(Request,5,2) <> 'FF' THEN CONVERT(int,CONVERT(binary(1),SUBSTRING(Request,5,2),2)) 
+		--				  ELSE CONVERT(int, -- convert binary to int
+		--						CONVERT(binary(2), -- convert hex string to binary
+		--							CONCAT(
+		--							SUBSTRING(Request,8,2),  -- high byte
+		--							SUBSTRING(Request ,11,2) -- low byte
+		--							)
+		--						 ,2)
+		--						)
+		--				END
+		--				where Protocol = 'MODBUS' or Protocol = 'ENRONMODBUS'				
+	
+
+		
+	
+		--	-- MODBUSTCP (address in byte 7, characters 23 and 24)
+		--	update #trans set DeviceAddress = 
+		--		CASE 
+		--			WHEN SUBSTRING(Request,23,2) <> 'FF' THEN CONVERT(int,CONVERT(binary(1),SUBSTRING(Request,23,2),2)) -- standard addressing
+		--			ELSE CONVERT(binary(2),  -- extended addressing
+		--					CONCAT(
+		--						SUBSTRING(Request,26,2),  -- high byte
+		--						SUBSTRING(Request,29,2)   -- low byte
+		--						  )
+		--				  ,2)
+		--	   END
+		--	   where Protocol = 'MODBUSTCP' 	
+		
+		--	-- ROC (device in byte 1, group in byte 2, characters 5-9)
+		--	update #trans set DeviceAddress = 
+		--	   CONCAT(
+		--			CONVERT(int,CONVERT(binary(1),SUBSTRING(Request,8,2),2)), -- group
+		--			':',
+		--			CONVERT(int,CONVERT(binary(1),SUBSTRING(Request,5,2),2)) -- device
+		--			)
+		--	 where Protocol = 'ROC'
+
+		--	-- BSAP (address in byte 3, characters 11 and 12)
+		--	update #trans set DeviceAddress = CONVERT(int,CONVERT(binary(1),SUBSTRING(Request,11,2),2)) where Protocol = 'BSAP'
+		 
+		--	-- BSAPUDP (address in bytes 21 and 22, characters 65-69
+		--	update #trans set DeviceAddress = 
+		--	   CONVERT(int, -- convert binary to int
+		--		 CONVERT(binary(2), -- convert hex string to binary
+		--		  CONCAT(
+		--			SUBSTRING(Request,71,2),  -- high byte
+		--			SUBSTRING(Request,68,2)   -- low byte
+		--		),2))
+		--	where Protocol = 'BSAPUDP'
+		
+		--------------------------- if restricted to a single device, remove transactions associated with other devices -----------------------------
+		if (@connection IS NOT NULL and @device IS NOT NULL)
+		BEGIN
+			delete from #trans where ConnectionID <> @connection or DeviceAddress <> @device
+		END
+
+		-- create an index on the temp table to speed up queries for statistics calculations
+		CREATE INDEX tempidx2 on #trans (ConnectionID,DeviceAddress) INCLUDE (RowID,Attempt,ElapsedPeriod,Success,RxSize)
+
+		------------------------ get a list of distinct connectionIDs/DeviceAddresss and loop through it, calculating a set of statistics for each --------------
+		DECLARE @connID uniqueidentifier
+		DECLARE @devAddr varchar(50)
+		DECLARE @noRespPct float
+		DECLARE @badRespPct float;
+		DECLARE @fastfiveAvgTime float;
+		DECLARE @slowfiveAvgTime float;
+		DECLARE @midRangeAvgTime float;
+		DECLARE @attempt1successPct float;
+		DECLARE @attempt2successPct float
+		DECLARE @attempt3ormoresuccessPct float
+		DECLARE @transCount float;
+		DECLARE @goodPct float;
+		DECLARE @divisor float
+		DECLARE @goodTransCount int
+
+		DECLARE @sql nvarchar(1000) -- dynamic sql for inserting into the temp table with a variable table name
+
+		-- Create the temp output table
+		CREATE TABLE #outputTemp(
+					[CalculationTimestamp] [nvarchar](50) NOT NULL,
+					[CalculationDescription] [nvarchar](200) NOT NULL,
+					[ConnectionID] [nvarchar](36) NOT NULL,
+					[ConnDescription] [nvarchar](50) NOT NULL,
+					[ConnDetails] [nvarchar](50) NOT NULL,
+					[DeviceAddress] [nvarchar](50) NOT NULL,
+					[TotalTransactions] [nvarchar](10) NOT NULL,
+					[SuccessPct] [float] NOT NULL,
+					[IncorrectResponsePct] [float] NOT NULL,
+					[NoResponsePct] [float] NOT NULL,
+					[FastOutlierAvgTime] [float] NOT NULL,
+					[SlowOutlierAvgTime] [float] NOT NULL,
+					[AverageTime] [float] NOT NULL,
+					[Attempt1SuccessPct] [float] NOT NULL,
+					[Attempt2SuccessPct] [float] NOT NULL,
+					[Attempt3orMoreSuccessPct] [float] NOT NULL);
+
+		DECLARE devices CURSOR FOR select distinct ConnectionID,DeviceAddress from #trans where DeviceAddress is not null
+		OPEN devices
+
+		
+		FETCH NEXT FROM devices into @connID,@devAddr
+		WHILE @@FETCH_STATUS = 0
+		BEGIN
+			set @transCount = (select count(1) from #trans where ConnectionID = @connID and DeviceAddress = @devAddr)
+
+
+			-- good response %
+			SET @goodPct = 100*(select CASE
+								   WHEN @transCount=0 THEN 0 
+								   ELSE noResp/@transCount 
+								   END as pctfail 
+								   from 
+								   (select count(1) as noResp from #trans where ConnectionID = @connID and DeviceAddress = @devAddr and Success = 1) A)
+			SET @goodPct = ROUND(@goodPct,1) 
+
+			-- no response %
+			SET @noRespPct = 100*(select CASE
+								   WHEN @transCount=0 THEN 0 
+								   ELSE noResp/@transCount 
+								   END as pctfail 
+								   from 
+								   (select count(1) as noResp from #trans where ConnectionID = @connID and DeviceAddress = @devAddr and Success = 0 and  RxSize = 0) A)
+			SET @noRespPct = ROUND(@noRespPct,1)					
+
+
+
+			-- bad response %
+			SET @badRespPct = 100*(select CASE	
+									WHEN @transCount=0 THEN 0
+									ELSE badResp/@transCount
+									END 
+									from
+									(select count(1) as badResp from #trans where ConnectionID = @connid and DeviceAddress = @devAddr and Success = 0 and RxSize > 0) A)
+			SET @badRespPct = ROUND(@badRespPct,1)
+
+			select @goodTransCount = COUNT(1) from #trans where ConnectionID = @connID and DeviceAddress = @devAddr and Success = 1
+
+			-- remove the 'no response' and 'bad response' transactions for this device from the temp table so they aren't counted in the other stats
+			delete from #trans where ConnectionID = @connID and DeviceAddress = @devAddr and  Success = 0
+
+			
+			-- fast outliers
+			if (@goodTransCount >=15)
+			BEGIN
+			set @fastfiveAvgTime = (select AVG(ElapsedPeriod) from 
+			 (select top 5 ElapsedPeriod from #trans where ConnectionID = @connID and DeviceAddress = @devAddr order by ElapsedPeriod) A)
+			END
+			ELSE
+			BEGIN
+			-- not enough records for outliers
+			set @fastfiveAvgTime = 0;
+			END
+
+
+
+
+			-- average of slowest 5 transactions
+			if (@goodTransCount >= 15)
+			BEGIN
+			set @slowfiveAvgTime = (select AVG(ElapsedPeriod) from
+			(select top 5 ElapsedPeriod from #trans where ConnectionID = @connID and DeviceAddress = @devAddr order by ElapsedPeriod desc) A)
+			END
+			ELSE
+			BEGIN
+			-- not enough records for outliers
+			set @slowfiveAvgTime = 0
+			END
+
+
+			
+			-- average of transactions not including 5 fasted and 5 slowest
+			if (@goodTransCount >= 15)
+			BEGIN
+			set @midRangeAvgTime = (SELECT AVG(ElapsedPeriod) from 
+			(
+				select ElapsedPeriod from #trans 
+				   where ConnectionID = @connID and DeviceAddress = @devAddr and
+					  rowid not in (select top 5 rowid from #trans where ConnectionID = @connID and DeviceAddress = @devAddr order by ElapsedPeriod) and
+					  rowid not in (select top 5 rowid from #trans where ConnectionID = @connID and DeviceAddress = @devAddr order by ElapsedPeriod desc)
+			) A)
+			END
+			ELSE
+			BEGIN
+				-- not enough records for outliers, just calulate the average of all transactions for this device
+				IF (@goodTransCount > 0)
+				BEGIN
+				 set @midRangeAvgTime = (select AVG(ElapsedPeriod) from #trans where ConnectionID = @connID and DeviceAddress = @devAddr)
+				END
+				ELSE
+				BEGIN
+					set @midRangeAvgTime = 0;
+				END
+			END
+
+
+
+			-- % success in 1 try
+			set @attempt1successPct = 100*(SELECT CASE
+										WHEN @goodTransCount = 0 THEN 0.0
+										ELSE CAST(attemptsuccess as float)/@goodTransCount END
+										from
+										(select count(1) as attemptsuccess from #trans where ConnectionID = @connID and DeviceAddress = @devAddr and  Success=1 and Attempt=1) A)			
+			set @attempt1successPct = ROUND(@attempt1successPct,1)
+
+			-- % success in 2 tries
+			set @attempt2successPct = 100*(SELECT CASE
+										WHEN @goodTransCount = 0 then 0.0
+										ELSE CAST(attemptsuccess as float)/@goodTransCount END
+										from
+										(select count(1) as attemptsuccess from #trans where ConnectionID = @connID and DeviceAddress = @devAddr and  Success=1 and Attempt=2) A)
+			set @attempt2successPct = ROUND(@attempt2successPct,1)
+
+
+			-- % success in 3+ tries
+			set @attempt3ormoresuccessPct = 100*(SELECT CASE
+										WHEN @goodTransCount = 0 THEN 0.0
+										ELSE cast(attemptsuccess as float)/@goodTransCount END
+										from
+										(select count(1) as attemptsuccess from #trans where ConnectionID = @connID and DeviceAddress = @devAddr and  Success=1 and Attempt>=3) A)
+			set @attempt3ormoresuccessPct = ROUND(@attempt3ormoresuccessPct,1)
+
+
+			BEGIN TRANSACTION
+			--store the results in the temporary output table
+			set @sql = N'insert into #outputTemp (CalculationTimestamp,CalculationDescription,ConnectionID,ConnDescription,ConnDetails,DeviceAddress,[TotalTransactions],SuccessPct,NoResponsePct,IncorrectResponsePct,FastOutlierAvgTime,SlowOutlierAvgTime,AverageTime,Attempt1SuccessPct,Attempt2SuccessPct,Attempt3orMoreSuccessPct) 
+					select 
+					''' + CONVERT(NVARCHAR(50),@runtime,21) + ''',
+					''' + @Description + ''',
+					''' + CONVERT(NVARCHAR(50),@connID) + ''',
+					ISNULL([Description],''''),
+					ISNULL(SCDetail01,''''),
+					''' + @devAddr + ''',' + 
+					CONVERT(NVARCHAR(50),@transcount) + ',' + 
+					CONVERT(NVARCHAR(50),@goodPct) + ',' + 
+					CONVERT(NVARCHAR(50),@noRespPct) + ',' + 
+					CONVERT(NVARCHAR(50),@badRespPct) + ',' + 
+					CONVERT(NVARCHAR(50),@fastfiveAvgTime) +',' +
+					CONVERT(NVARCHAR(50),@slowfiveAvgTime) + ',' + 
+					CONVERT(NVARCHAR(50),@midRangeAvgTime )+ ',' + 
+					CONVERT(NVARCHAR(50),@attempt1successPct) + ',' + 
+					CONVERT(NVARCHAR(50),@attempt2successPct) + ',' + 
+					CONVERT(NVARCHAR(50),@attempt3ormoresuccessPct) + 
+					' from FDASourceConnections where SCUID = ''' + CONVERT(NVARCHAR(50),@connID) + ''''
+		
+			EXECUTE sp_executesql @sql
+			COMMIT TRANSACTION
+
+			-- move to the next device
+			FETCH NEXT FROM devices into @connID,@devAddr
+		END
+
+		-- save the results in the permament output table (if requested)
+		if (@saveOutput = 1)
+		BEGIN
+			-- create the final output table if it doesn't exist
+			IF OBJECT_ID(@output) IS NULL 
+		    BEGIN
+			print 'creating output table'
+				set @sql = 'CREATE TABLE [dbo].' + @output + '(
+					[CalculationTimestamp] [nvarchar](50) NOT NULL,
+					[CalculationDescription] [nvarchar](200) NOT NULL,
+					[ConnectionID] [nvarchar](36) NOT NULL,
+					[ConnDescription] [nvarchar](50) NOT NULL,
+					[ConnDetails] [nvarchar](50) NOT NULL,
+					[DeviceAddress] [nvarchar](50) NOT NULL,
+					[TotalTransactions] [nvarchar](10) NOT NULL,
+					[SuccessPct] [float] NOT NULL,
+					[IncorrectResponsePct] [float] NOT NULL,
+					[NoResponsePct] [float] NOT NULL,
+					[FastOutlierAvgTime] [float] NOT NULL,
+					[SlowOutlierAvgTime] [float] NOT NULL,
+					[AverageTime] [float] NOT NULL,
+					[Attempt1SuccessPct] [float] NOT NULL,
+					[Attempt2SuccessPct] [float] NOT NULL,
+					[Attempt3orMoreSuccessPct] [float] NOT NULL)'
+					print @sql
+				EXECUTE sp_executesql @sql	
+				print 'output table created'
+			END
+
+			-- copy the temp output table to the final table
+			set @sql  = 'INSERT into ' + @output + ' select * from #outputTemp';
+			EXECUTE sp_executesql @sql
+		END
+			
+		-- return the results of this calculation (if requested)
+		if (@ReturnResults = 1)
+		BEGIN
+		   SET @sql = 'select * from #outputTemp';
+		   EXECUTE sp_executesql @sql
+		END
+
+	
+		-- clean up
+		CLOSE devices
+		DEALLOCATE devices
+		--DROP INDEX #trans.tempidx1
+		DROP INDEX #trans.tempidx2 
+		DROP TABLE #trans
+		DROP TABLE #outputTemp
+
+	END TRY
+	BEGIN CATCH		
+		SET @error = 'Error on line ' + CONVERT(VARCHAR(10),ERROR_LINE()) + ': ' + ERROR_MESSAGE()
+		if XACT_STATE() = -1 ROLLBACK TRANSACTION
+		if XACT_STATE() = 1 COMMIT TRANSACTION
+	END CATCH
+
+	-- cleanup
+		BEGIN TRY
+			CLOSE devices
+			DEALLOCATE devices
+			DROP TABLE #trans
+			DROP INDEX #trans.tempidx1
+			DROP INDEX #trans.tempidx2 
+		END TRY
+		BEGIN CATCH	
+		END CATCH
+	
+	-- report any error that occured
+	if (@error <> '') RAISERROR(@error,1,1)
+END

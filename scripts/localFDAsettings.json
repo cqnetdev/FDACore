@@ -1,0 +1,10 @@
+{
+  "AppSettings": {
+  	"FDAID": "FDA1234",
+	"SQLServerInstance": "localhost",
+	"SystemDBName": "FDASystem",
+	"SystemDBPass": "Intricate2790!",
+	"SystemLogin": "Intricatesql",
+	"MQTT": "/bMS2XF6rshgMjbeEpOZQA=="
+  }
+}
