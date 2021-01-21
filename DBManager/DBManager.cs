@@ -32,7 +32,7 @@ namespace FDA
         private Dictionary<Guid, FDARequestGroupScheduler> _schedConfig;
         private Dictionary<Guid, FDADataBlockRequestGroup> _requestgroupConfig;
         private Dictionary<Guid, FDADataPointDefinitionStructure> _dataPointConfig;
-        private Dictionary<Guid, FDASourceConnections> _connectionsConfig;
+        private Dictionary<Guid, FDASourceConnection> _connectionsConfig;
         private Dictionary<Guid, FDADevice> _deviceConfig;
         private Dictionary<Guid, FDATask> _taskConfig;
 
@@ -54,6 +54,14 @@ namespace FDA
         SqlTableDependency<FDADevice> _deviceDefMonitor;
         SqlTableDependency<FDATask> _taskDefMonitor;
         */
+
+        PostgreSQLListener<FDARequestGroupScheduler> _schedMonitor;
+        PostgreSQLListener<FDARequestGroupDemand> _demandMonitor;
+        PostgreSQLListener<FDADataBlockRequestGroup> _requestGroupDefMonitor;
+        PostgreSQLListener<FDADataPointDefinitionStructure> _dataPointDefMonitor;
+        PostgreSQLListener<FDASourceConnection> _connectionDefMonitor;
+        PostgreSQLListener<FDADevice> _deviceDefMonitor;
+        PostgreSQLListener<FDATask> _taskDefMonitor;
 
         public delegate void ConfigChangeHandler(object sender, ConfigEventArgs e);
         public event ConfigChangeHandler ConfigChange;
@@ -79,7 +87,7 @@ namespace FDA
             _schedConfig = new Dictionary<Guid, FDARequestGroupScheduler>();
             _requestgroupConfig = new Dictionary<Guid, FDADataBlockRequestGroup>();
             _dataPointConfig = new Dictionary<Guid, FDADataPointDefinitionStructure>();
-            _connectionsConfig = new Dictionary<Guid, FDASourceConnections>();
+            _connectionsConfig = new Dictionary<Guid, FDASourceConnection>();
             _deviceConfig = new Dictionary<Guid, FDADevice>();
             _taskConfig = new Dictionary<Guid, FDATask>();
 
@@ -103,10 +111,10 @@ namespace FDA
             _cacheManager.CacheFlush += _cacheMananger_CacheFlush;
 
             // check if device table exists
-            _devicesTableExists =(ExecuteSQL("SELECT cast(count(1) as integer) from information_schema.tables where table_name = '" + Globals.SystemManager.GetTableName("fdadevices") + "';","scalar") > 0);
+            _devicesTableExists =(PG_ExecuteScalar("SELECT cast(count(1) as integer) from information_schema.tables where table_name = '" + Globals.SystemManager.GetTableName("fdadevices") + "';") > 0);
 
             // check if tasks table exists
-            _tasksTableExists = (ExecuteSQL("SELECT cast(count(1) as integer) from information_schema.tables where table_name = '" + Globals.SystemManager.GetTableName("fdatasks") + "';", "scalar") > 0);
+            _tasksTableExists = (PG_ExecuteScalar("SELECT cast(count(1) as integer) from information_schema.tables where table_name = '" + Globals.SystemManager.GetTableName("fdatasks") + "';") > 0);
         }
 
         public void UpdateCacheSize(int cacheLimit)
@@ -123,7 +131,7 @@ namespace FDA
 
         private void _cacheMananger_CacheFlush(object sender, CacheManager.CacheFlushEventArgs e)
         {
-            ExecuteSQL(e.Query);
+            PG_ExecuteNonQuery(e.Query);
 
         }
 
@@ -153,17 +161,19 @@ namespace FDA
                 _databaseConnectionDownTime = 0;
                 Initialize();
                 LoadConfig();
-                //StartChangeMonitoring();
+                StartChangeMonitoring();
 
                 if (_writeQueue.Count > 0 && !_dataWriter.IsBusy)
                     _dataWriter.RunWorkerAsync();
             }
         }
 
-        public int ExecuteSQL(string sql,string mode="command")
+
+          
+
+        private int PG_ExecuteNonQuery(string sql)
         {
             int rowsaffected = 0;
-            int scalarResult = -1;
             int result = -1;
             bool success = false;
             Exception sqlException = null;
@@ -191,10 +201,7 @@ namespace FDA
                         {
                             tries++;
                             sqlCommand.CommandText = sql;
-                            if (mode=="command")
-                                rowsaffected = sqlCommand.ExecuteNonQuery();
-                            if (mode == "scalar")
-                                scalarResult = (int)sqlCommand.ExecuteScalar();
+                            rowsaffected = sqlCommand.ExecuteNonQuery();                       
                         }
                         success = true;
                     }
@@ -212,20 +219,99 @@ namespace FDA
                 Globals.SystemManager.LogApplicationError(Globals.FDANow(), sqlException, "Failed to execute query = " + sql);
             else
             {
-                if (mode == "command")
-                {
                     Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "DBManager", "Query successful: " + rowsaffected + " rows affected, " + tries + " tries : " + sql.Substring(0, 30) + "...", false, true);
                     result = rowsaffected;
+            }
+            return result;
+        }
+        
+        private int PG_ExecuteScalar(string sql)
+        {
+            int scalarResult = -1;
+            int result = -1;
+            bool success = false;
+            NpgsqlException sqlException = null;
+            int tries = 0;
+            using (NpgsqlConnection conn = new NpgsqlConnection(ConnectionString))
+            {
+                try
+                {
+                    conn.Open();
+                }
+                catch (Exception ex)
+                {
+                    Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Failed to connect to database");
+                    return 0;
                 }
 
-                if (mode == "scalar")
+                while (!success && tries < 3)
                 {
-                    Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "DBManager", "Scalar query successful: returned value of " + scalarResult + ", " + tries + " tries : " + sql.Substring(0, 30) + "...", false, true);
-                    result = scalarResult;
+                    try
+                    {
+                        using (NpgsqlCommand sqlCommand = conn.CreateCommand())
+                        {
+                            tries++;
+                            sqlCommand.CommandText = sql;
+                         
+                            scalarResult = (int)sqlCommand.ExecuteScalar();
+                        }
+                        success = true;
+                    }
+                    catch (NpgsqlException ex)
+                    {
+                        sqlException = ex;
+                        success = false;
+                        Thread.Sleep(200);
+                    }
                 }
+                conn.Close();
+            }
+
+            if (!success)
+                Globals.SystemManager.LogApplicationError(Globals.FDANow(), sqlException, "Failed to execute query = " + sql);
+            else
+            {         
+                Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "DBManager", "Scalar query successful: returned value of " + scalarResult + ", " + tries + " tries : " + sql.Substring(0, 30) + "...", false, true);
+                result = scalarResult;
             }
 
             return result;
+        }
+
+        // this doesn't work because the connection gets automatically closed when the function exits (because of the 'using' keyword), making the datareader unusable
+        private NpgsqlDataReader PG_ExecuteDataReader(string sql)
+        {
+            NpgsqlDataReader reader;
+            using (NpgsqlConnection conn = new NpgsqlConnection(ConnectionString))
+            {
+                try
+                {
+                    conn.Open();
+                }
+                catch (Exception ex)
+                {
+                    Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Failed to connect to database while retrieving values to write to device");
+                    return null;
+                }
+
+
+
+                try
+                {
+                    using (NpgsqlCommand sqlCommand = conn.CreateCommand())
+                    {
+                        sqlCommand.CommandText = sql;
+                        reader = sqlCommand.ExecuteReader();
+                    }
+                }
+                catch (NpgsqlException ex)
+                {
+                    Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Failed to execute query = " + sql);
+                    return null;
+                }
+            }
+
+            return reader;
         }
 
         public void WriteDataToDB(DataRequest completedRequest)
@@ -245,81 +331,82 @@ namespace FDA
 
         public void GetLastValues(string table, Dictionary<Guid, double> values)
         {
-            StringBuilder query = new StringBuilder("select A.DPDUID,A.Value FROM ");
-            query.Append(table);
-            query.Append(" A inner join (select DPDUID, MAX(Timestamp) as LastEntry FROM ");
-            query.Append(table);
-            query.Append(" Group by DPDUID having DPDUID in (");
-            bool first = true;
-            foreach (Guid id in values.Keys)
-            {
-                if (!first)
-                    query.Append(",");
-                else
-                    first = false;
-
-                query.Append("'");
-                query.Append(id);
-                query.Append("'");
-            }
-            query.Append(")) B on A.DPDUID = B.DPDUID and A.Timestamp = B.LastEntry");
-
-            using (NpgsqlConnection conn = new NpgsqlConnection(ConnectionString))
-            {
-                try
+                StringBuilder query = new StringBuilder("select A.DPDUID,A.Value FROM ");
+                query.Append(table);
+                query.Append(" A inner join (select DPDUID, MAX(Timestamp) as LastEntry FROM ");
+                query.Append(table);
+                query.Append(" Group by DPDUID having DPDUID in (");
+                bool first = true;
+                foreach (Guid id in values.Keys)
                 {
-                    conn.Open();
+                    if (!first)
+                        query.Append(",");
+                    else
+                        first = false;
+
+                    query.Append("'");
+                    query.Append(id);
+                    query.Append("'");
                 }
-                catch (Exception ex)
+                query.Append(")) B on A.DPDUID = B.DPDUID and A.Timestamp = B.LastEntry");
+
+                using (NpgsqlConnection conn = new NpgsqlConnection(ConnectionString))
                 {
-                    Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Failed to connect to database while retrieving values to write to device");
-                    return;
-                }
-
-
-
-                try
-                {
-                    using (NpgsqlCommand sqlCommand = conn.CreateCommand())
+                    try
                     {
-                        sqlCommand.CommandText = query.ToString();
-                        using (NpgsqlDataReader reader = sqlCommand.ExecuteReader())
+                        conn.Open();
+                    }
+                    catch (Exception ex)
+                    {
+                        Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Failed to connect to database while retrieving values to write to device");
+                        return;
+                    }
+
+
+
+                    try
+                    {
+                        using (NpgsqlCommand sqlCommand = conn.CreateCommand())
                         {
-                            Guid key;
-                            while (reader.Read())
+                            sqlCommand.CommandText = query.ToString();
+                            using (NpgsqlDataReader reader = sqlCommand.ExecuteReader())
                             {
-                                key = reader.GetGuid(reader.GetOrdinal("DPDUID"));
-                                values[key] = reader.GetDouble(reader.GetOrdinal("Value"));
+                                Guid key;
+                                while (reader.Read())
+                                {
+                                    key = reader.GetGuid(reader.GetOrdinal("DPDUID"));
+                                    values[key] = reader.GetDouble(reader.GetOrdinal("Value"));
+                                }
                             }
+
                         }
-
                     }
-                }
-                catch (Exception ex)
-                {
-                    Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Failed to retrieve values to write to field device: query = " + query);
-                    return;
-                }
-
-                // look for any tags that did not get a value, mention them in an event message
-                StringBuilder errorList = new StringBuilder();
-                foreach (KeyValuePair<Guid, double> kvp in values)
-                {
-                    if (double.IsNaN(kvp.Value))
+                    catch (Exception ex)
                     {
-                        errorList.Append(kvp.Key);
-                        errorList.Append(",");
+                        Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Failed to retrieve values to write to field device: query = " + query);
+                        return;
                     }
+
+                    // look for any tags that did not get a value, mention them in an event message
+                    StringBuilder errorList = new StringBuilder();
+                    foreach (KeyValuePair<Guid, double> kvp in values)
+                    {
+                        if (double.IsNaN(kvp.Value))
+                        {
+                            errorList.Append(kvp.Key);
+                            errorList.Append(",");
+                        }
+                    }
+
+                    if (errorList.Length > 0)
+                    {
+                        Globals.SystemManager.LogApplicationEvent(this, "", "The tag(s) " + errorList + " were not found in the table " + table + " while looking for values to be written to the device. This/these tag(s) will be dropped from the write request ");
+                    }
+
                 }
 
-                if (errorList.Length > 0)
-                {
-                    Globals.SystemManager.LogApplicationEvent(this, "", "The tag(s) " + errorList + " were not found in the table " + table + " while looking for values to be written to the device. This/these tag(s) will be dropped from the write request ");
-                }
-
-            }
-
-            return;
+                return;
+            
         }
 
         private void _dataWriter_DoWork(object sender, DoWorkEventArgs e)
@@ -572,17 +659,43 @@ namespace FDA
             // start the remote query manager (handles queries from FDAManagers)
             Globals.SystemManager.LogApplicationEvent(this, "", "Starting Remote Query Manager");
             RemoteQueryManager = new RemoteQueryManager(ConnectionString);
+           
 
             Globals.SystemManager.LogApplicationEvent(this, "", "FDA initialization complete");
+
+
+            // PostgreSQL table monitors
+            _schedMonitor = new PostgreSQLListener<FDARequestGroupScheduler>(ConnectionString, Globals.SystemManager.GetTableName("FDARequestGroupScheduler"));
+            _demandMonitor = new PostgreSQLListener<FDARequestGroupDemand>(ConnectionString, Globals.SystemManager.GetTableName("FDARequestGroupDemand"));
+            _requestGroupDefMonitor = new PostgreSQLListener<FDADataBlockRequestGroup>(ConnectionString, Globals.SystemManager.GetTableName("FDADataBlockRequestGroup"));
+            _dataPointDefMonitor = new PostgreSQLListener<FDADataPointDefinitionStructure>(ConnectionString, Globals.SystemManager.GetTableName("DataPointDefinitionStructures"));
+            _connectionDefMonitor = new PostgreSQLListener<FDASourceConnection>(ConnectionString, Globals.SystemManager.GetTableName("FDASourceConnections"));
+            if (_devicesTableExists)
+                _deviceDefMonitor = new PostgreSQLListener<FDADevice>(ConnectionString, Globals.SystemManager.GetTableName("FDADevices"));
+
+            if (_tasksTableExists)
+                _taskDefMonitor = new PostgreSQLListener<FDATask>(ConnectionString, Globals.SystemManager.GetTableName("FDATasks"));
+
+            _demandMonitor.Notification += _demandMonitor_Notification;
+            _schedMonitor.Notification += _schedMonitor_Notification;
+            _requestGroupDefMonitor.Notification += _requestGroupDefMonitor_Notification;
+            _connectionDefMonitor.Notification += _connectionDefMonitor_Notification;
+            _dataPointDefMonitor.Notification += _dataPointDefMonitor_Notification;
+            if (_deviceDefMonitor != null)
+                _deviceDefMonitor.Notification += _deviceDefMonitor_Notification;
+            if (_taskDefMonitor != null)
+                _taskDefMonitor.Notification += _taskDefMonitor_Notification;
+
+            StartChangeMonitoring();
 
             // SQlTableDependency objects (one per table), monitor for changes/additions/deletions and raise event when changes detects
 
 
-            // clean up any triggers that my be hanging around from the last run (not needed, SQLTableDependency doesn't support postgres
+            // clean up any triggers that my be hanging around from the last run (SQL Server only)
             //TriggerCleanup();
 
 
-            // build SqlTableDependency Objects (not needed, SQLTableDependency doesn't support postgres)
+            // build SqlTableDependency Objects (SQL Server Only)
             /*
             try
             {
@@ -730,7 +843,9 @@ namespace FDA
 
         }
 
-     
+ 
+
+
         /* not needed, no triggers because SQlTableDependency doesn't support postgres
         void TriggerCleanup()
         {
@@ -1171,68 +1286,63 @@ namespace FDA
                 //bool MQTTColumnExists;
                 string ID; // a temporary place to store the ID (as a string) of whatever we're trying to parse, so we can include it in the error message if parsing fails 
                 string query = "";
-                try
+
+                // load connections
+                tableName = Globals.SystemManager.GetTableName("FDASourceConnections");
+                query = "select * from " + tableName;
+                using (NpgsqlCommand sqlCommand = conn.CreateCommand())
                 {
-                    // load connections
-                    tableName = Globals.SystemManager.GetTableName("FDASourceConnections");
-                    query = "select * from " + tableName;
-                    using (NpgsqlCommand sqlCommand = conn.CreateCommand())
+                    sqlCommand.CommandText = query;
+                    using (NpgsqlDataReader reader = sqlCommand.ExecuteReader())
                     {
-                        sqlCommand.CommandText = query;
-
-                        using (NpgsqlDataReader sqlDataReader = sqlCommand.ExecuteReader())
+                        //MQTTColumnExists = HasColumn(sqlDataReader, "MQTTEnabled");
+                        FDASourceConnection newConnConfig;
+                        while (reader.Read())
                         {
-                            //MQTTColumnExists = HasColumn(sqlDataReader, "MQTTEnabled");
-                            FDASourceConnections newConnConfig;
-                            while (sqlDataReader.Read())
+                            ID = "(unknown)";
+                            try
                             {
-                                ID = "(unknown)";
-                                try
+                                ID = reader.GetGuid(reader.GetOrdinal("SCUID")).ToString();
+                                newConnConfig = new FDASourceConnection()
                                 {
-                                    ID = sqlDataReader.GetGuid(sqlDataReader.GetOrdinal("SCUID")).ToString();
-                                    newConnConfig = new FDASourceConnections()
-                                    {
-                                        SCUID = sqlDataReader.GetGuid(sqlDataReader.GetOrdinal("SCUID")),
-                                        SCType = sqlDataReader.GetString(sqlDataReader.GetOrdinal("SCType")),
-                                        SCDetail01 = sqlDataReader.GetString(sqlDataReader.GetOrdinal("SCDetail01")),
-                                        SCDetail02 = sqlDataReader.GetString(sqlDataReader.GetOrdinal("SCDetail02")),
-                                        Description = sqlDataReader.GetString(sqlDataReader.GetOrdinal("Description")),
-                                        RequestRetryDelay = sqlDataReader.GetInt32(sqlDataReader.GetOrdinal("RequestRetryDelay")),
-                                        SocketConnectionAttemptTimeout = sqlDataReader.GetInt32(sqlDataReader.GetOrdinal("SocketConnectionAttemptTimeout")),
-                                        MaxSocketConnectionAttempts = sqlDataReader.GetInt32(sqlDataReader.GetOrdinal("MaxSocketConnectionAttempts")),
-                                        SocketConnectionRetryDelay = sqlDataReader.GetInt32(sqlDataReader.GetOrdinal("SocketConnectionRetryDelay")),
-                                        PostConnectionCommsDelay = sqlDataReader.GetInt32(sqlDataReader.GetOrdinal("PostConnectionCommsDelay")),
-                                        InterRequestDelay = sqlDataReader.GetInt32(sqlDataReader.GetOrdinal("InterRequestDelay")),
-                                        MaxRequestAttempts = sqlDataReader.GetInt32(sqlDataReader.GetOrdinal("maxRequestAttempts")),
-                                        RequestResponseTimeout = sqlDataReader.GetInt32(sqlDataReader.GetOrdinal("RequestResponseTimeout")),
-                                        ConnectionEnabled = sqlDataReader.GetBoolean(sqlDataReader.GetOrdinal("ConnectionEnabled")),
-                                        CommunicationsEnabled = sqlDataReader.GetBoolean(sqlDataReader.GetOrdinal("CommunicationsEnabled")),
-                                        CommsLogEnabled = sqlDataReader.GetBoolean(sqlDataReader.GetOrdinal("CommsLogEnabled")),
-                                        //MQTTEnabled = false
-                                    };
+                                    SCUID = reader.GetGuid(reader.GetOrdinal("SCUID")),
+                                    SCType = reader.GetString(reader.GetOrdinal("SCType")),
+                                    SCDetail01 = reader.GetString(reader.GetOrdinal("SCDetail01")),
+                                    SCDetail02 = reader.GetString(reader.GetOrdinal("SCDetail02")),
+                                    Description = reader.GetString(reader.GetOrdinal("Description")),
+                                    RequestRetryDelay = reader.GetInt32(reader.GetOrdinal("RequestRetryDelay")),
+                                    SocketConnectionAttemptTimeout = reader.GetInt32(reader.GetOrdinal("SocketConnectionAttemptTimeout")),
+                                    MaxSocketConnectionAttempts = reader.GetInt32(reader.GetOrdinal("MaxSocketConnectionAttempts")),
+                                    SocketConnectionRetryDelay = reader.GetInt32(reader.GetOrdinal("SocketConnectionRetryDelay")),
+                                    PostConnectionCommsDelay = reader.GetInt32(reader.GetOrdinal("PostConnectionCommsDelay")),
+                                    InterRequestDelay = reader.GetInt32(reader.GetOrdinal("InterRequestDelay")),
+                                    MaxRequestAttempts = reader.GetInt32(reader.GetOrdinal("maxRequestAttempts")),
+                                    RequestResponseTimeout = reader.GetInt32(reader.GetOrdinal("RequestResponseTimeout")),
+                                    ConnectionEnabled = reader.GetBoolean(reader.GetOrdinal("ConnectionEnabled")),
+                                    CommunicationsEnabled = reader.GetBoolean(reader.GetOrdinal("CommunicationsEnabled")),
+                                    CommsLogEnabled = reader.GetBoolean(reader.GetOrdinal("CommsLogEnabled")),
+                                    //MQTTEnabled = false
+                                };
 
-                                    //if (MQTTColumnExists)
-                                    //    newConnConfig.MQTTEnabled = sqlDataReader.GetBoolean(sqlDataReader.GetOrdinal("MQTTEnabled"));
+                                //if (MQTTColumnExists)
+                                //    newConnConfig.MQTTEnabled = sqlDataReader.GetBoolean(sqlDataReader.GetOrdinal("MQTTEnabled"));
 
-                                    lock (_connectionsConfig)
-                                    {
-                                    _connectionsConfig.Add(newConnConfig.SCUID, newConnConfig);
+                                lock (_connectionsConfig)
+                                {
+                                _connectionsConfig.Add(newConnConfig.SCUID, newConnConfig);
                                         
-                                    }
                                 }
-                                catch
-                                {
-                                    Globals.SystemManager.LogApplicationEvent(this, "", "FDA Start, Config Error - SCUID '" + ID + "' rejected", true);
-                                }
+                            }
+                            catch
+                            {
+                                Globals.SystemManager.LogApplicationEvent(this, "", "FDA Start, Config Error - SCUID '" + ID + "' rejected", true);
                             }
                         }
                     }
+                    
                 }
-                catch (Exception ex)
-                {
-                    Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Query of table " + tableName + " failed: query = " + query);
-                }
-
+                  
+                
                 try
                 {
 
@@ -1842,7 +1952,7 @@ namespace FDA
 
 
 
-        public FDASourceConnections GetConnectionConfig(Guid ID)
+        public FDASourceConnection GetConnectionConfig(Guid ID)
         {
             if (_connectionsConfig.ContainsKey(ID))
                 return _connectionsConfig[ID];
@@ -1850,7 +1960,7 @@ namespace FDA
                 return null;
         }
 
-        public List<FDASourceConnections> GetAllConnectionconfigs()
+        public List<FDASourceConnection> GetAllConnectionconfigs()
         {
             return _connectionsConfig.Values.ToList();
         }
@@ -1869,45 +1979,45 @@ namespace FDA
 
 
         // start monitoring for config changes
-        //public void StartChangeMonitoring()
-        //{
-        //    try
-        //    {
-        //        _demandMonitor?.Start();
-        //        _schedMonitor?.Start();
-        //        _requestGroupDefMonitor?.Start();
-        //        _connectionDefMonitor?.Start();
-        //        _dataPointDefMonitor?.Start();
-        //        if (_devicesTableExists)
-        //            _deviceDefMonitor?.Start();
-        //        if (_tasksTableExists)
-        //            _taskDefMonitor?.Start();
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Error when starting Table Change Monitoring objects");
-        //    }
+        public void StartChangeMonitoring()
+        {
+            try
+            {
+                _demandMonitor?.StartListening();
+                _schedMonitor?.StartListening();
+                _requestGroupDefMonitor?.StartListening();
+                _connectionDefMonitor?.StartListening();
+                _dataPointDefMonitor?.StartListening();
+                if (_devicesTableExists)
+                    _deviceDefMonitor?.StartListening();
+                if (_tasksTableExists)
+                    _taskDefMonitor?.StartListening();
+            }
+            catch (Exception ex)
+            {
+                Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Error when starting Table Change Monitoring objects");
+            }
 
+            
+            // no need for this message now, each monitor object reports it's own status when it changes
+            // Globals.SystemManager.LogApplicationEvent(this, "", "Database change monitoring started");
 
-        //    // no need for this message now, each monitor object reports it's own status when it changes
-        //    // Globals.SystemManager.LogApplicationEvent(this, "", "Database change monitoring started");
+        }
 
-        //}
-
-        // pause monitoring for config changes
-        //public void PauseChangeMonitoring()
-        //{
-        //    _demandMonitor?.Stop();
-        //    _schedMonitor?.Stop();
-        //    _requestGroupDefMonitor?.Stop();
-        //    _connectionDefMonitor?.Stop();
-        //    _dataPointDefMonitor?.Stop();
-        //    if (_devicesTableExists)
-        //        _deviceDefMonitor?.Stop();
-        //    if (_tasksTableExists)
-        //        _deviceDefMonitor?.Stop();
-        //    Globals.SystemManager.LogApplicationEvent(this, "", "Database change monitoring stopped");
-        //}
+        //pause monitoring for config changes
+        public void PauseChangeMonitoring()
+        {
+            _demandMonitor?.StopListening();
+            _schedMonitor?.StopListening();
+            _requestGroupDefMonitor?.StopListening();
+            _connectionDefMonitor?.StopListening();
+            _dataPointDefMonitor?.StopListening();
+            if (_devicesTableExists)
+                _deviceDefMonitor?.StopListening();
+            if (_tasksTableExists)
+                _deviceDefMonitor?.StopListening();
+            Globals.SystemManager.LogApplicationEvent(this, "", "Database change monitoring stopped");
+        }
 
 
         private string[] FindNulls(object thing,List<string> exceptionList = null)
@@ -1935,508 +2045,20 @@ namespace FDA
             return nullProperties.ToArray();
         }
 
-        #region config change handlers 
-        /*****************************************************/
-        private void _connectionDefMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<FDASourceConnections> e)
+        #region PostgreSQL table change events
+        private void _taskDefMonitor_Notification(object sender, PostgreSQLListener<FDATask>.PostgreSQLNotification notifyEvent)
         {
-            ChangeType changeType = e.ChangeType;
-
-            if (changeType == ChangeType.None)
-                return;
-
-            // check for nulls
-            if (changeType == ChangeType.Insert || changeType == ChangeType.Update)
-            {
-                List<string> exceptions = new List<string> { "SCDetail02" };
-                string[] nulls = FindNulls(e.Entity,exceptions);
-                if (nulls.Length > 0)
-                {
-                    Globals.SystemManager.LogApplicationEvent(this, "", "SCUID " + e.Entity.SCUID + " " + changeType.ToString().ToLower() + " rejected, null values in field(s) " + string.Join(",", nulls));
-                    return;
-                }
-            }
-
-            string action = "";
-            lock (_connectionsConfig)
-            {
-                switch (changeType)
-                {
-                    case ChangeType.Insert:
-                        _connectionsConfig.Add(e.Entity.SCUID, e.Entity);
-                        action = "added";
-                        break;                    
-                    case ChangeType.Update:
-                        if (_connectionsConfig.ContainsKey(e.Entity.SCUID))
-                        {
-                            _connectionsConfig[e.Entity.SCUID] = e.Entity;
-                        }
-                        else
-                        {
-                            if (e.EntityOldValues != null)
-                            {
-                                if (e.EntityOldValues.SCUID != e.Entity.SCUID)
-                                {
-                                    Globals.SystemManager.LogApplicationEvent(this, "", "Changes to the SCUID are not permitted, update for connection " + e.EntityOldValues.SCUID + " rejected");
-                                    return;
-                                }
-                            }
-                            else
-                            {
-                                // record not found (not due to a change in the ID) so do an insert instead
-                                _connectionsConfig.Add(e.Entity.SCUID, e.Entity);
-                                action = "not found, adding it as a new connection";
-                                changeType = ChangeType.Insert;
-                                break;
-                            }
-                        }
-                        action = "updated";
-                        break;
-                    case ChangeType.Delete:
-                        _connectionsConfig.Remove(e.Entity.SCUID);
-                        action = "deleted";
-                        break;                     
-                }
-            }
-            Globals.SystemManager.LogApplicationEvent(this, "", "SCUID " + e.Entity.SCUID + " " + action);
-
-            RaiseConfigChangeEvent(changeType.ToString(),Globals.SystemManager.GetTableName("FDASourceConnections"), e.Entity.SCUID);          
-        }
-
-        private void _dataPointDefMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<FDADataPointDefinitionStructure> e)
-        {
-            ChangeType changeType = e.ChangeType;
-
-            if (changeType == ChangeType.None)
-                return;
-
-            // check for nulls
-            if (changeType == ChangeType.Insert || changeType == ChangeType.Update)
-            {
-                List<string> exceptionList = new List<string>(new string[] { "backfill_enabled", "backfill_dataID", "backfill_data_structure_type", "backfill_data_lapse_limit", "backfill_data_interval" });
-                string[] nulls = FindNulls(e.Entity, exceptionList);
-                if (nulls.Length > 0)
-                {
-                    Globals.SystemManager.LogApplicationEvent(this, "", "DPDUID " + e.Entity.DPDUID + " " + changeType.ToString().ToLower() + " rejected, null values in field(s) " + string.Join(",", nulls));
-                    return;
-                }
-            }
-
-            string action = "";
-            lock (_dataPointConfig)
-            {
-                switch (changeType)
-                {
-
-                    case ChangeType.Insert:
-                        _dataPointConfig.Add(e.Entity.DPDUID, e.Entity);
-                        action = "added";                       
-                        break;
-                    case ChangeType.Delete:
-                        _dataPointConfig.Remove(e.Entity.DPDUID); 
-                        action = "deleted";
-                        break;
-                    case ChangeType.Update:
-                        if (_dataPointConfig.ContainsKey(e.Entity.DPDUID))
-                        {
-                            _dataPointConfig[e.Entity.DPDUID] = e.Entity;
-                            action = "updated";
-                        }
-                        else
-                        {
-                            if (e.EntityOldValues != null)
-                            {
-                                if (e.EntityOldValues.DPDUID != e.Entity.DPDUID)
-                                {
-                                    Globals.SystemManager.LogApplicationEvent(this, "", "Changes to the DPDUID are not permitted, update for DataPointDefinitionStructure " + e.EntityOldValues.DPDUID + " rejected");
-                                    return;
-                                }
-                            }
-                            else
-                            {
-                                // record not found (not due to a change in the ID) so do an insert instead
-                                _dataPointConfig.Add(e.Entity.DPDUID, e.Entity);
-                                action = "not found, adding it as a new DataPointDefinitionStructure";
-                                changeType = ChangeType.Insert;
-                                break;
-                            }
-                           
-                        }
-
-                        
-                        break;
-
-                }
-
-            }
-
-            Globals.SystemManager.LogApplicationEvent(this, "", "DPDUID " + e.Entity.DPDUID + " " + action);
-
-            RaiseConfigChangeEvent(changeType.ToString(), Globals.SystemManager.GetTableName("DataPointDefinitionStructures"), e.Entity.DPDUID);
-            
-        }
-    
-        private void _DemandMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<FDARequestGroupDemand> e)
-        {
-            try
-            {
-                if (e.ChangeType == ChangeType.Insert || e.ChangeType == ChangeType.Update)
-                {
-                    RequestGroup newRequestGroup;
-                    if (e.Entity.FRGDEnabled)
-                    {
-                        Globals.SystemManager.LogApplicationEvent(this, "", "Demand Request Received: " + e.Entity.Description);
-
-                        // check for nulls
-                        string[] nulls = FindNulls(e.Entity);
-                        if (nulls.Length > 0)
-                        {
-                            Globals.SystemManager.LogApplicationEvent(this, "", "FRGDUID " + e.Entity.FRGDUID + " rejected, null values in field(s) " + string.Join(",", nulls));
-                            return;
-                        }
-
-                        List<RequestGroup> demandedGroupList = new List<RequestGroup>();
-
-                        string[] requestGroupConfigs = e.Entity.RequestGroupList.Split('|');
-
-                        Guid requestGroupID;
-                        foreach (string groupConfig in requestGroupConfigs)
-                        {
-                            if (groupConfig.StartsWith("^"))
-                            {
-                                // task reference
-                                Guid taskID;
-                                if (!Guid.TryParse(groupConfig.Remove(0, 1),out taskID))
-                                {
-                                    // cbad Guid
-                                    Globals.SystemManager.LogApplicationEvent(this, "", "Invalid Task ID in demand " + e.Entity.FRGDUID + ", the correct format is xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx", true);
-                                    continue;
-                                }
-                             
-                                FDATask task = GetTask(taskID);
-                                if (task != null)
-                                {
-                                    switch (task.task_type.ToUpper())
-                                    {
-                                        case "DATAACQ":
-                                            newRequestGroup = RequestGroupFromConfigString("Demand " + e.Entity.FRGDUID, task.task_details, e.Entity.Priority, e.Entity.CommsLogEnabled);
-                                            if (newRequestGroup != null)
-                                            {
-                                                demandedGroupList.Add(newRequestGroup);
-                                                requestGroupID = Guid.Parse(task.task_details.Split(':')[0]);
-                                                newRequestGroup.Protocol = GetRequestGroup(requestGroupID).DPSType;
-                                            }
-                                            break;
-                                        case "CALCCOMMSSTATS":
-                                            /* old way
-                                            string[] task_details = task.task_details.Split(':');
-                                            int hoursBack;
-                                            if (!int.TryParse(task_details[0], out hoursBack))
-                                            {
-                                                Globals.SystemManager.LogApplicationEvent(this, "", "unable to execute task id " + task.task_id + ", due to invalid entry in task_details[0]");
-                                                continue;
-                                            }
-                                            string alternateTable = "";
-                                            string connectionFilter = "";
-                                            string deviceFilter = "";
-                                            if (task_details.Length > 1)
-                                                connectionFilter = task_details[1];
-                                            if (task_details.Length > 2)
-                                                deviceFilter = task_details[2];
-                                            if (task_details.Length > 3)
-                                                alternateTable = task_details[3];
-
-                                            DateTime toTime = Globals.FDANow();
-                                            DateTime fromTime = toTime.AddHours(-1 * hoursBack);
-                                            */
-                                            string error;
-                                            List<object> calcParams = ParseStatsCalcParams(task.task_details,out error);
-                                            if (error == "" && calcParams != null)
-                                            {
-                                                Globals.SystemManager.LogApplicationEvent(this, "", "Calculating communications statistics (requested by demand " + e.Entity.FRGDUID);
-                                                RemoteQueryManager.DoCommsStats(calcParams);// fromTime, toTime, altOutput, connectionFilter, deviceFilter,description,altOutput);
-                                            }
-                                            else
-                                            {
-                                                Globals.SystemManager.LogApplicationEvent(this, "", "invalid task_details in task " + task.task_id + ": " + error + ". The task will not be executed");
-                                            }
-                                            break;
-                                        default:
-                                            Globals.SystemManager.LogApplicationEvent(this, "", "FDA Task id " + taskID + ", requested by demand " + e.Entity.FRGDUID + " has an unrecognized task type '" + task.task_type + "'. The task will not be executed");
-                                            continue;
-                                    }
-                                }
-                                else
-                                {
-                                    Globals.SystemManager.LogApplicationEvent(this, "", "Task " + taskID + " was not found. Task was requested by demand " + e.Entity.FRGDUID, true);
-                                }
-                            }
-                            else
-                            {
-                                newRequestGroup = RequestGroupFromConfigString("Demand " + e.Entity.FRGDUID, groupConfig, e.Entity.Priority, e.Entity.CommsLogEnabled); // if the demand object has comms logging enabled, override the comms log setting on the group
-
-                                if (newRequestGroup != null)
-                                {
-                                    demandedGroupList.Add(newRequestGroup);
-                                    requestGroupID = Guid.Parse(groupConfig.Split(':')[0]);
-                                    newRequestGroup.Protocol = GetRequestGroup(requestGroupID).DPSType;
-                                }
-                            }
-                        }
-
-                        if (demandedGroupList.Count > 0)
-                        {
-                            RaiseDemandRequestEvent(e.Entity, demandedGroupList);
-                            if (e.Entity.DestroyDRG)
-                                DeleteRequestGroup(demandedGroupList);
-
-                            if (e.Entity.DestroyFRGD)
-                                DeleteDemand(e.Entity.FRGDUID);
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Error while parsing demand request " + e.Entity.FRGDUID);
-            }
-        }
-   
-        private void _requestGroupMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<FDADataBlockRequestGroup> e)
-        {
-            ChangeType changeType = e.ChangeType;
-
-            if (changeType == ChangeType.None)
-                return;
-
-            if (changeType == ChangeType.Insert || changeType == ChangeType.Update)
-            {
-                // check for nulls
-                string[] nulls = FindNulls(e.Entity);
-                if (nulls.Length > 0)
-                {
-                    Globals.SystemManager.LogApplicationEvent(this, "", "DRGUID " + e.Entity.DRGUID + " " + changeType.ToString().ToLower() + " rejected, null values in field(s) " + string.Join(",", nulls));
-                    return;
-                }
-            }
-
-            string action = "";
-            lock (_requestgroupConfig)
-            {
-                switch (changeType)
-                {
-                    case ChangeType.Insert:
-                        _requestgroupConfig.Add(e.Entity.DRGUID, e.Entity); 
-                        action = "inserted";
-                        break;
-                                                
-                    case ChangeType.Update:
-
-                        if (_requestgroupConfig.ContainsKey(e.Entity.DRGUID))
-                        {
-                            _requestgroupConfig[e.Entity.DRGUID] = e.Entity;
-                            action = "updated";
-                        }
-                        else
-                        {
-                            if (e.EntityOldValues != null)
-                            {
-                                if (e.EntityOldValues.DRGUID != e.Entity.DRGUID)
-                                {
-                                    Globals.SystemManager.LogApplicationEvent(this, "", "Changes to the DRGUID are not permitted, update for FDADataBlockRequestGroup " + e.EntityOldValues.DRGUID + " rejected");
-                                    return;
-                                }
-                            }
-                            else
-                            {
-                                // record not found (not due to a change in the ID) so do an insert instead
-                                _requestgroupConfig.Add(e.Entity.DRGUID, e.Entity);
-                                action = "not found, adding it as a new FDADataBlockRequestGroup";
-                                changeType = ChangeType.Insert;
-                                break;
-
-                            }
-                        }
-                        
-                        
-                        break;
-                    case ChangeType.Delete:
-                        _requestgroupConfig.Remove(e.Entity.DRGUID);
-                        action = "deleted";
-                        break;                      
-                }
-            }
-             Globals.SystemManager.LogApplicationEvent(this, "", "DRGUID " + e.Entity.DRGUID + " " + action);
-
-            RaiseConfigChangeEvent(changeType.ToString(), Globals.SystemManager.GetTableName("FDADataBlockRequestGroup"), e.Entity.DRGUID);
-            
-        }
-
-        private void _SchedMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<FDARequestGroupScheduler> e)
-        {
-
-            ChangeType changeType = e.ChangeType;
-            if (changeType == ChangeType.None)
-                return;
-
-            string action = "";
+            string changeType = notifyEvent.Notification.operation;
+            FDATask affectedRow = notifyEvent.Notification.row;
 
 
             // check for nulls
-            if (changeType == ChangeType.Insert || changeType == ChangeType.Update)
+            if (changeType == "INSERT" || changeType == "UPDATE")
             {
-                string[] nulls = FindNulls(e.Entity);
+                string[] nulls = FindNulls(affectedRow);
                 if (nulls.Length > 0)
                 {
-                    Globals.SystemManager.LogApplicationEvent(this, "", "FRGSUID " + e.Entity.FRGSUID + " " + changeType.ToString().ToLower() + " rejected, null values in field(s) " + string.Join(",", nulls));
-                    return;
-
-                }
-            }
-
-
-            lock (_schedConfig)
-            {
-                switch (changeType)
-                {
-                    case ChangeType.Delete:
-                         _schedConfig.Remove(e.Entity.FRGSUID); 
-                        action = " deleted";
-                        break;
-                    case ChangeType.Insert:
-                        List<FDATask> taskList;
-                        e.Entity.RequestGroups = RequestGroupListToRequestGroups(e.Entity.FRGSUID, e.Entity.Priority, e.Entity.RequestGroupList,out taskList);
-                        e.Entity.Tasks = taskList;
-                         _schedConfig.Add(e.Entity.FRGSUID, e.Entity);
-                        action = " added";
-                        break;
-   
-                    case ChangeType.Update:
-
-                        if (_schedConfig.ContainsKey(e.Entity.FRGSUID))
-                        {                                                 
-                            action = " updated";
-                            lock (_schedConfig) { _schedConfig[e.Entity.FRGSUID] = e.Entity; }
-                            taskList = null;
-                            e.Entity.RequestGroups = RequestGroupListToRequestGroups(e.Entity.FRGSUID, e.Entity.Priority, e.Entity.RequestGroupList,out taskList);
-                            e.Entity.Tasks = taskList;
-                        }
-                        else
-                        {
-                            if (e.EntityOldValues != null)
-                            {
-                                if (e.EntityOldValues.FRGSUID != e.Entity.FRGSUID)
-                                {
-                                    Globals.SystemManager.LogApplicationEvent(this, "", "Changes to the FRGSUID are not permitted, update for FDARequestGroupScheduler " + e.EntityOldValues.FRGSUID + " rejected");
-                                    return;
-                                }
-                            }
-                            else
-                            {
-                                // record not found (not due to a change in the ID) so do an insert instead
-                                _schedConfig.Add(e.Entity.FRGSUID, e.Entity);
-                                action = "not found, adding it as a new FDARequestGroupScheduler";
-                                changeType = ChangeType.Insert;
-                                break;
-                            }
-                            
-                        }
-                        break;
-                }
-            }
-
-            Globals.SystemManager.LogApplicationEvent(this, "", "FRGSUID " + e.Entity.FRGSUID + " " + action);
-
-            RaiseConfigChangeEvent(changeType.ToString(), Globals.SystemManager.GetTableName("FDARequestGroupScheduler"), e.Entity.FRGSUID);
-         
-            
-        }
-
-      
-
-        private void _deviceDefMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<FDADevice> e)
-        {
-            ChangeType changeType = e.ChangeType;
-
-            if (changeType == ChangeType.None)
-                return;
-
-            // check for nulls
-            if (changeType == ChangeType.Insert || changeType == ChangeType.Update)
-            {
-                string[] nulls = FindNulls(e.Entity);
-                if (nulls.Length > 0)
-                {
-                    Globals.SystemManager.LogApplicationEvent(this, "", "device_id " + e.Entity.device_id + " " + changeType.ToString().ToLower() + " rejected, null values in field(s) " + string.Join(",", nulls));
-                    return;
-                }
-            }
-
-            string action = "";
-
-            lock (_deviceConfig)
-            {
-                switch (changeType)
-                {
-                    case ChangeType.Delete:
-                        _deviceConfig.Remove(e.Entity.device_id);
-                        action = "deleted";
-                        break;
-                    case ChangeType.Insert:
-                        _deviceConfig.Add(e.Entity.device_id, e.Entity);
-                        action = "added";
-                        break;
-                        
-                    case ChangeType.Update:
-
-                        if (_deviceConfig.ContainsKey(e.Entity.device_id))
-                        {
-                            action = "updated";
-                            _deviceConfig[e.Entity.device_id] = e.Entity;
-                        }
-                        else
-                        {
-                            if (e.EntityOldValues != null)
-                            {
-                                if (e.EntityOldValues.device_id != e.Entity.device_id)
-                                {
-                                    Globals.SystemManager.LogApplicationEvent(this, "", "Changes to the DeviceID are not permitted, update for FDADevice " + e.EntityOldValues.device_id + " rejected");
-                                    return;
-                                }
-                            }
-                            else
-                            {
-                                // record not found (not due to a change in the ID) so do an insert instead
-                                _deviceConfig.Add(e.Entity.device_id, e.Entity);
-                                action = "not found, adding it as a new FDADevice";
-                                changeType = ChangeType.Insert;
-                                break;
-                            }
-                        }
-                        break;
-                }
-            }
-
-            Globals.SystemManager.LogApplicationEvent(this, "", "device_id " + e.Entity.device_id + " " + action);
-
-            RaiseConfigChangeEvent(changeType.ToString(), Globals.SystemManager.GetTableName("FDADevices"), e.Entity.device_id);
-        }
-
-
-
-        private void _taskDefMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<FDATask> e)
-        {
-            ChangeType changeType = e.ChangeType;
-
-            if (changeType == ChangeType.None)
-                return;
-
-            // check for nulls
-            if (changeType == ChangeType.Insert || changeType == ChangeType.Update)
-            {
-                string[] nulls = FindNulls(e.Entity);
-                if (nulls.Length > 0)
-                {
-                    Globals.SystemManager.LogApplicationEvent(this, "", "task_id " + e.Entity.task_id + " " + changeType.ToString().ToLower() + " rejected, null values in field(s) " + string.Join(",", nulls));
+                    Globals.SystemManager.LogApplicationEvent(this, "", "task_id " + affectedRow.task_id + " " + changeType.ToString().ToLower() + " rejected, null values in field(s) " + string.Join(",", nulls));
                     return;
                 }
             }
@@ -2447,24 +2069,25 @@ namespace FDA
             {
                 switch (changeType)
                 {
-                    case ChangeType.Delete:
-                        _taskConfig.Remove(e.Entity.task_id);
+                    case "DELETE":
+                        _taskConfig.Remove(affectedRow.task_id);
                         action = "deleted";
                         break;
-                    case ChangeType.Insert:
-                        _taskConfig.Add(e.Entity.task_id, e.Entity);
+                    case "INSERT":
+                        _taskConfig.Add(affectedRow.task_id, affectedRow);
                         action = "added";
                         break;
 
-                    case ChangeType.Update:
+                    case "UPDATE":
 
-                        if (_taskConfig.ContainsKey(e.Entity.task_id))
+                        if (_taskConfig.ContainsKey(affectedRow.task_id))
                         {
                             action = "updated";
-                            _taskConfig[e.Entity.task_id] = e.Entity;
+                            _taskConfig[affectedRow.task_id] = affectedRow;
                         }
                         else
                         {
+                            /* not yet supported, old values not available.... might be able to add these to the stored proc output in the future
                             if (e.EntityOldValues != null)
                             {
                                 if (e.EntityOldValues.task_id != e.Entity.task_id)
@@ -2481,390 +2104,1414 @@ namespace FDA
                                 changeType = ChangeType.Insert;
                                 break;
                             }
+                            */
+                            // record not found, so do an insert instead
+                            _taskConfig.Add(affectedRow.task_id, affectedRow);
+                            action = "not found, adding it as a new FDA Task";
+                            changeType = "INSERT";
+                            break;
+
                         }
                         break;
                 }
             }
 
-            Globals.SystemManager.LogApplicationEvent(this, "", "task_id  " + e.Entity.task_id + " " + action);
+            Globals.SystemManager.LogApplicationEvent(this, "", "task_id  " + affectedRow.task_id + " " + action);
 
-            RaiseConfigChangeEvent(changeType.ToString(), Globals.SystemManager.GetTableName("FDATasks"), e.Entity.task_id);
+            RaiseConfigChangeEvent(changeType.ToString(), Globals.SystemManager.GetTableName("FDATasks"), affectedRow.task_id);
         }
+    
 
-        #endregion
-        /*****************************************************/
-
-
-
-
-        private void DeleteDemand(Guid DemandID)
+        private void _deviceDefMonitor_Notification(object sender, PostgreSQLListener<FDADevice>.PostgreSQLNotification notifyEvent)
         {
-            string sql = "delete from " + Globals.SystemManager.GetTableName("FDARequestGroupDemand") + " where FRGDUID  = '" + DemandID.ToString() + "';";
-            try
+            string changeType = notifyEvent.Notification.operation;
+            FDADevice affectedRow = notifyEvent.Notification.row;
+           
+            // check for nulls
+            if (changeType == "INSERT" || changeType == "UPDATE")
             {
-                using (NpgsqlConnection conn = new NpgsqlConnection(ConnectionString))
+                string[] nulls = FindNulls(affectedRow);
+                if (nulls.Length > 0)
                 {
-                    try
-                    {
-                        conn.Open();
-                        using (NpgsqlCommand sqlCommand = conn.CreateCommand())
-                        {
-                            sqlCommand.CommandText = sql;
-                            sqlCommand.ExecuteNonQuery();
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Query failed: " + sql);
-                    }
+                    Globals.SystemManager.LogApplicationEvent(this, "", "device_id " + affectedRow.device_id + " " + changeType.ToString().ToLower() + " rejected, null values in field(s) " + string.Join(",", nulls));
+                    return;
                 }
             }
-            catch (Exception ex)
+
+            string action = "";
+
+            lock (_deviceConfig)
             {
-                // failed to connect to DB, exit the DB write routine
-                Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Failed to connect to the database");
-                return;
-            }
-        }
-
-        private void DeleteRequestGroup(List<RequestGroup> groupsToDelete)
-        {
-            StringBuilder sb = new StringBuilder();
-            sb.Append("delete from ");
-            sb.Append(Globals.SystemManager.GetTableName("FDADataBlockRequestGroup"));
-            sb.Append(" where DRGUID in (");
-
-            if (groupsToDelete.Count == 0)
-                return;
-
-            //string sqlTemplate = "delete from " + Globals.SystemManager.GetTableName("FDADataBlockRequestGroup") + " where DRGUID  = '<ID>';";
-            //string sqlBatch = "";
-            try
-            {
-                using (NpgsqlConnection conn = new NpgsqlConnection(ConnectionString))
+                switch (changeType)
                 {
-                    try
-                    {
-                        conn.Open();
-                        using (NpgsqlCommand sqlCommand = conn.CreateCommand())
+                    case "DELETE":
+                        _deviceConfig.Remove(affectedRow.device_id);
+                        action = "deleted";
+                        break;
+                    case "INSERT":
+                        _deviceConfig.Add(affectedRow.device_id, affectedRow);
+                        action = "added";
+                        break;
+
+                    case "UPDATE":
+
+                        if (_deviceConfig.ContainsKey(affectedRow.device_id))
                         {
-                            foreach (RequestGroup group in groupsToDelete)
-                            {
-                                sb.Append("'");
-                                sb.Append(group.ID);
-                                sb.Append("',");
-                            }
-                            sb.Remove(sb.Length - 1, 1);
-                            sb.Append(");");
-                            sqlCommand.CommandText = sb.ToString();
-                            sqlCommand.ExecuteNonQuery();
+                            action = "updated";
+                            _deviceConfig[affectedRow.device_id] = affectedRow;
                         }
-                    }
-                    catch (Exception ex)
-                    {
-                        Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Query failed: " + sb.ToString());
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                // failed to connect to DB, exit the DB write routine
-                Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Failed to connect to the database");
-                return;
-            }
-        }
-
-        public void WriteAlarmsEvents(List<AlarmEventRecord> recordsList)
-        {
-            if (_alarmEventQueue == null)
-                _alarmEventQueue = new Queue<List<AlarmEventRecord>>();
-
-            if (_alarmsEventsWriter == null)
-            {
-                _alarmsEventsWriter = new BackgroundWorker();
-                _alarmsEventsWriter.DoWork += _alarmsEventsWriter_DoWork;
-            }
-
-            lock (_alarmEventQueue)
-            {
-                _alarmEventQueue.Enqueue(recordsList);
-            }
-
-            if (!_alarmsEventsWriter.IsBusy)
-                _alarmsEventsWriter.RunWorkerAsync();
-        }
-
-        private void _alarmsEventsWriter_DoWork(object sender, DoWorkEventArgs e)
-        {
-            string sql = "";
-            List<AlarmEventRecord> recordsList;
-
-
-            try
-            {
-                using (NpgsqlConnection conn = new NpgsqlConnection(ConnectionString))
-                {
-                    conn.Open();
-
-                    using (NpgsqlCommand sqlCommand = conn.CreateCommand())
-                    {
-                        while (_alarmEventQueue.Count > 0)
+                        else
                         {
-                            lock (_alarmEventQueue)
+                            /* OLD VALUES NOT YET SUPPORTED 
+                            if (e.EntityOldValues != null)
                             {
-                                recordsList = _alarmEventQueue.Dequeue();
-                            }
-
-                            if (recordsList.Count == 0)
-                                continue;
-
-                            foreach (AlarmEventRecord record in recordsList)
-                            {
-                                sql = record.GetWriteSQL();
-                                sqlCommand.CommandText = record.GetWriteSQL();
-
-                                if (sqlCommand.ExecuteNonQuery() > 0) // if the write was successful, update the last read record in the "HistoricReferences" Table
+                                if (e.EntityOldValues.device_id != e.Entity.device_id)
                                 {
-                                    sql = record.GetUpdateLastRecordSQL();
-                                    if (sql != "")
+                                    Globals.SystemManager.LogApplicationEvent(this, "", "Changes to the DeviceID are not permitted, update for FDADevice " + e.EntityOldValues.device_id + " rejected");
+                                    return;
+                                }
+                            }
+                            else
+                            {
+                                // record not found (not due to a change in the ID) so do an insert instead
+                                _deviceConfig.Add(e.Entity.device_id, e.Entity);
+                                action = "not found, adding it as a new FDADevice";
+                                changeType = ChangeType.Insert;
+                                break;
+                            }
+                            */
+                            _deviceConfig.Add(affectedRow.device_id, affectedRow);
+                            action = "not found, adding it as a new FDADevice";
+                            changeType = "INSERT";
+
+                        }
+                        break;
+                }
+            }
+
+            Globals.SystemManager.LogApplicationEvent(this, "", "device_id " + affectedRow.device_id + " " + action);
+
+            RaiseConfigChangeEvent(changeType.ToString(), Globals.SystemManager.GetTableName("FDADevices"), affectedRow.device_id);
+        }
+
+        private void _dataPointDefMonitor_Notification(object sender, PostgreSQLListener<FDADataPointDefinitionStructure>.PostgreSQLNotification notifyEvent)
+        {
+            string changeType = notifyEvent.Notification.operation;
+            FDADataPointDefinitionStructure affectedRow = notifyEvent.Notification.row;
+
+            // check for nulls
+            if (changeType == "INSERT" || changeType == "UPDATE")
+            {
+                List<string> exceptionList = new List<string>(new string[] { "backfill_enabled", "backfill_dataID", "backfill_data_structure_type", "backfill_data_lapse_limit", "backfill_data_interval" });
+                string[] nulls = FindNulls(affectedRow, exceptionList);
+                if (nulls.Length > 0)
+                {
+                    Globals.SystemManager.LogApplicationEvent(this, "", "DPDUID " + affectedRow.DPDUID + " " + changeType.ToString().ToLower() + " rejected, null values in field(s) " + string.Join(",", nulls));
+                    return;
+                }
+            }
+
+            string action = "";
+            lock (_dataPointConfig)
+            {
+                switch (changeType)
+                {
+
+                    case "INSERT":
+                        _dataPointConfig.Add(affectedRow.DPDUID, affectedRow);
+                        action = "added";
+                        break;
+                    case "DELETE":
+                        _dataPointConfig.Remove(affectedRow.DPDUID);
+                        action = "deleted";
+                        break;
+                    case "UPDATE":
+                        if (_dataPointConfig.ContainsKey(affectedRow.DPDUID))
+                        {
+                            _dataPointConfig[affectedRow.DPDUID] = affectedRow;
+                            action = "updated";
+                        }
+                        else
+                        {
+                            /* old values not yet supported
+                            if (e.entity.OldValues != null)
+                            {
+                                if (e.entityOldValues.DPDUID != affectedRow.DPDUID)
+                                {
+                                    Globals.SystemManager.LogApplicationEvent(this, "", "Changes to the DPDUID are not permitted, update for DataPointDefinitionStructure " + affectedRowOldValues.DPDUID + " rejected");
+                                    return;
+                                }
+                            }
+                            else
+                            {
+                                // record not found (not due to a change in the ID) so do an insert instead
+                                _dataPointConfig.Add(affectedRow.DPDUID, affectedRow);
+                                action = "not found, adding it as a new DataPointDefinitionStructure";
+                                changeType = ChangeType.Insert;
+                                break;
+                            }
+                            */
+
+                            // record not found so do an insert instead
+                            _dataPointConfig.Add(affectedRow.DPDUID, affectedRow);
+                            action = "not found, adding it as a new DataPointDefinitionStructure";
+                            changeType = "INSERT";
+                            break;
+
+                        }
+
+
+                        break;
+
+                }
+
+            }
+
+            Globals.SystemManager.LogApplicationEvent(this, "", "DPDUID " + affectedRow.DPDUID + " " + action);
+
+            RaiseConfigChangeEvent(changeType.ToString(), Globals.SystemManager.GetTableName("DataPointDefinitionStructures"), affectedRow.DPDUID);
+
+        }
+
+        private void _connectionDefMonitor_Notification(object sender, PostgreSQLListener<FDASourceConnection>.PostgreSQLNotification notifyEvent)
+        {
+            string changeType = notifyEvent.Notification.operation;
+            FDASourceConnection affectedRow = notifyEvent.Notification.row;
+
+            // check for nulls
+            if (changeType == "INSERT" || changeType == "UPDATE")
+            {
+                List<string> exceptions = new List<string> { "SCDetail02" };
+                string[] nulls = FindNulls(affectedRow, exceptions);
+                if (nulls.Length > 0)
+                {
+                    Globals.SystemManager.LogApplicationEvent(this, "", "SCUID " + affectedRow.SCUID + " " + changeType.ToString().ToLower() + " rejected, null values in field(s) " + string.Join(",", nulls));
+                    return;
+                }
+            }
+
+            string action = "";
+            lock (_connectionsConfig)
+            {
+                switch (changeType)
+                {
+                    case "INSERT":
+                        _connectionsConfig.Add(affectedRow.SCUID, affectedRow);
+                        action = "added";
+                        break;
+                    case "UPDATE":
+                        if (_connectionsConfig.ContainsKey(affectedRow.SCUID))
+                        {
+                            _connectionsConfig[affectedRow.SCUID] = affectedRow;
+                        }
+                        else
+                        {
+                            /* old values not yet supported
+                            if (e.entity.OldValues != null)
+                            {
+                                if (e.entity.OldValues.SCUID != affectedRow.SCUID)
+                                {
+                                    Globals.SystemManager.LogApplicationEvent(this, "", "Changes to the SCUID are not permitted, update for connection " + affectedRowOldValues.SCUID + " rejected");
+                                    return;
+                                }
+                            }
+                            else
+                            {
+                                // record not found (not due to a change in the ID) so do an insert instead
+                                _connectionsConfig.Add(affectedRow.SCUID, affectedRow);
+                                action = "not found, adding it as a new connection";
+                                changeType = ChangeType.Insert;
+                                break;
+                            }
+                            */
+                            // record not found (not due to a change in the ID) so do an insert instead
+                            _connectionsConfig.Add(affectedRow.SCUID, affectedRow);
+                            action = "not found, adding it as a new connection";
+                            changeType = "INSERT";
+
+                        }
+                        action = "updated";
+                        break;
+                    case "DELETE":
+                        _connectionsConfig.Remove(affectedRow.SCUID);
+                        action = "deleted";
+                        break;
+                }
+            }
+            Globals.SystemManager.LogApplicationEvent(this, "", "SCUID " + affectedRow.SCUID + " " + action);
+
+            RaiseConfigChangeEvent(changeType.ToString(), Globals.SystemManager.GetTableName("FDASourceConnections"), affectedRow.SCUID);
+        }
+
+        private void _requestGroupDefMonitor_Notification(object sender, PostgreSQLListener<FDADataBlockRequestGroup>.PostgreSQLNotification notifyEvent)
+        {
+            string changeType = notifyEvent.Notification.operation;
+            FDADataBlockRequestGroup affectedRow = notifyEvent.Notification.row;
+         
+
+            if (changeType =="INSERT" || changeType == "UPDATE")
+            {
+                // check for nulls
+                string[] nulls = FindNulls(affectedRow);
+                if (nulls.Length > 0)
+                {
+                    Globals.SystemManager.LogApplicationEvent(this, "", "DRGUID " + affectedRow.DRGUID + " " + changeType.ToString().ToLower() + " rejected, null values in field(s) " + string.Join(",", nulls));
+                    return;
+                }
+            }
+
+            string action = "";
+            lock (_requestgroupConfig)
+            {
+                switch (changeType)
+                {
+                    case "INSERT":
+                        _requestgroupConfig.Add(affectedRow.DRGUID, affectedRow);
+                        action = "inserted";
+                        break;
+
+                    case "UPDATE":
+
+                        if (_requestgroupConfig.ContainsKey(affectedRow.DRGUID))
+                        {
+                            _requestgroupConfig[affectedRow.DRGUID] = affectedRow;
+                            action = "updated";
+                        }
+                        else
+                        {
+                            /* old values not yet supported
+                            if (e.Entity.OldValues != null)
+                            {
+                                if (e.Entity.OldValues.DRGUID != affectedRow.DRGUID)
+                                {
+                                    Globals.SystemManager.LogApplicationEvent(this, "", "Changes to the DRGUID are not permitted, update for FDADataBlockRequestGroup " + affectedRowOldValues.DRGUID + " rejected");
+                                    return;
+                                }
+                            }
+                            else
+                            {
+                                // record not found (not due to a change in the ID) so do an insert instead
+                                _requestgroupConfig.Add(affectedRow.DRGUID, affectedRow);
+                                action = "not found, adding it as a new FDADataBlockRequestGroup";
+                                changeType = ChangeType.Insert;
+                                break;
+
+                            }
+                            */
+                            _requestgroupConfig.Add(affectedRow.DRGUID, affectedRow);
+                            action = "not found, adding it as a new FDADataBlockRequestGroup";
+                            changeType = "INSERT";
+                        }
+
+
+                        break;
+                    case "DELETE":
+                        _requestgroupConfig.Remove(affectedRow.DRGUID);
+                        action = "deleted";
+                        break;
+                }
+            }
+            Globals.SystemManager.LogApplicationEvent(this, "", "DRGUID " + affectedRow.DRGUID + " " + action);
+
+            RaiseConfigChangeEvent(changeType.ToString(), Globals.SystemManager.GetTableName("FDADataBlockRequestGroup"), affectedRow.DRGUID);
+
+        }
+
+        private void _schedMonitor_Notification(object sender, PostgreSQLListener<FDARequestGroupScheduler>.PostgreSQLNotification notifyEvent)
+        {
+            string changeType = notifyEvent.Notification.operation;
+            FDARequestGroupScheduler affectedRow = notifyEvent.Notification.row;
+                
+            string action = "";
+
+
+            // check for nulls
+            if (changeType =="INSERT" || changeType == "UPDATE")
+            {
+                string[] nulls = FindNulls(affectedRow);
+                if (nulls.Length > 0)
+                {
+                    Globals.SystemManager.LogApplicationEvent(this, "", "FRGSUID " + affectedRow.FRGSUID + " " + changeType.ToString().ToLower() + " rejected, null values in field(s) " + string.Join(",", nulls));
+                    return;
+
+                }
+            }
+
+
+            lock (_schedConfig)
+            {
+                switch (changeType)
+                {
+                    case "DELETE":
+                        _schedConfig.Remove(affectedRow.FRGSUID);
+                        action = " deleted";
+                        break;
+                    case "INSERT":
+                        List<FDATask> taskList;
+                        affectedRow.RequestGroups = RequestGroupListToRequestGroups(affectedRow.FRGSUID, affectedRow.Priority, affectedRow.RequestGroupList, out taskList);
+                        affectedRow.Tasks = taskList;
+                        _schedConfig.Add(affectedRow.FRGSUID, affectedRow);
+                        action = " added";
+                        break;
+
+                    case "UPDATE":
+
+                        if (_schedConfig.ContainsKey(affectedRow.FRGSUID))
+                        {
+                            action = " updated";
+                            lock (_schedConfig) { _schedConfig[affectedRow.FRGSUID] = affectedRow; }
+                            taskList = null;
+                            affectedRow.RequestGroups = RequestGroupListToRequestGroups(affectedRow.FRGSUID, affectedRow.Priority, affectedRow.RequestGroupList, out taskList);
+                            affectedRow.Tasks = taskList;
+                        }
+                        else
+                        {
+                            /* old values not yet supported
+                            if (e.entity.OldValues != null)
+                            {
+                                if (e.entity.OldValues.FRGSUID != affectedRow.FRGSUID)
+                                {
+                                    Globals.SystemManager.LogApplicationEvent(this, "", "Changes to the FRGSUID are not permitted, update for FDARequestGroupScheduler " + e.entity.OldValues.FRGSUID + " rejected");
+                                    return;
+                                }
+                            }
+                            else
+                            {
+                                // record not found (not due to a change in the ID) so do an insert instead
+                                _schedConfig.Add(affectedRow.FRGSUID, affectedRow);
+                                action = "not found, adding it as a new FDARequestGroupScheduler";
+                                changeType = ChangeType.Insert;
+                                break;
+                            }
+                            */
+                            _schedConfig.Add(affectedRow.FRGSUID, affectedRow);
+                            action = "not found, adding it as a new FDARequestGroupScheduler";
+                            changeType = "INSERT";
+
+                        }
+                        break;
+                }
+            }
+
+            Globals.SystemManager.LogApplicationEvent(this, "", "FRGSUID " + affectedRow.FRGSUID + " " + action);
+
+            RaiseConfigChangeEvent(changeType.ToString(), Globals.SystemManager.GetTableName("FDARequestGroupScheduler"), affectedRow.FRGSUID);
+
+        }
+
+        private void _demandMonitor_Notification(object sender, PostgreSQLListener<FDARequestGroupDemand>.PostgreSQLNotification notifyEvent)
+        {
+            string changeType = notifyEvent.Notification.operation;
+            FDARequestGroupDemand affectedRow = notifyEvent.Notification.row;
+            try
+            {
+                if (changeType =="INSERT" || changeType == "UPDATE")
+                {
+                    RequestGroup newRequestGroup;
+                    if (affectedRow.FRGDEnabled)
+                    {
+                        Globals.SystemManager.LogApplicationEvent(this, "", "Demand Request Received: " + affectedRow.Description);
+
+                        // check for nulls
+                        string[] nulls = FindNulls(affectedRow);
+                        if (nulls.Length > 0)
+                        {
+                            Globals.SystemManager.LogApplicationEvent(this, "", "FRGDUID " + affectedRow.FRGDUID + " rejected, null values in field(s) " + string.Join(",", nulls));
+                            return;
+                        }
+
+                        List<RequestGroup> demandedGroupList = new List<RequestGroup>();
+
+                        string[] requestGroupConfigs = affectedRow.RequestGroupList.Split('|');
+
+                        Guid requestGroupID;
+                        foreach (string groupConfig in requestGroupConfigs)
+                        {
+                            if (groupConfig.StartsWith("^"))
+                            {
+                                // task reference
+                                Guid taskID;
+                                if (!Guid.TryParse(groupConfig.Remove(0, 1), out taskID))
+                                {
+                                    // bad Guid
+                                    Globals.SystemManager.LogApplicationEvent(this, "", "Invalid Task ID in demand " + affectedRow.FRGDUID + ", the correct format is xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx", true);
+                                    continue;
+                                }
+
+                                FDATask task = GetTask(taskID);
+                                if (task != null)
+                                {
+                                    switch (task.task_type.ToUpper())
                                     {
-                                        sqlCommand.CommandText = sql;
-                                        sqlCommand.ExecuteNonQuery();
+                                        case "DATAACQ":
+                                            newRequestGroup = RequestGroupFromConfigString("Demand " + affectedRow.FRGDUID, task.task_details, affectedRow.Priority, affectedRow.CommsLogEnabled);
+                                            if (newRequestGroup != null)
+                                            {
+                                                demandedGroupList.Add(newRequestGroup);
+                                                requestGroupID = Guid.Parse(task.task_details.Split(':')[0]);
+                                                newRequestGroup.Protocol = GetRequestGroup(requestGroupID).DPSType;
+                                            }
+                                            break;
+                                        case "CALCCOMMSSTATS":
+                                            string error;
+                                            List<object> calcParams = ParseStatsCalcParams(task.task_details, out error);
+                                            if (error == "" && calcParams != null)
+                                            {
+                                                Globals.SystemManager.LogApplicationEvent(this, "", "Calculating communications statistics (requested by demand " + affectedRow.FRGDUID);
+                                                RemoteQueryManager.DoCommsStats(calcParams);// fromTime, toTime, altOutput, connectionFilter, deviceFilter,description,altOutput);
+                                            }
+                                            else
+                                            {
+                                                Globals.SystemManager.LogApplicationEvent(this, "", "invalid task_details in task " + task.task_id + ": " + error + ". The task will not be executed");
+                                            }
+                                            break;
+                                        default:
+                                            Globals.SystemManager.LogApplicationEvent(this, "", "FDA Task id " + taskID + ", requested by demand " + affectedRow.FRGDUID + " has an unrecognized task type '" + task.task_type + "'. The task will not be executed");
+                                            continue;
                                     }
                                 }
-                                Thread.Sleep(50); // a little breather for the database, this stuff doesn't need to be written as fast as possible       
+                                else
+                                {
+                                    Globals.SystemManager.LogApplicationEvent(this, "", "Task " + taskID + " was not found. Task was requested by demand " + affectedRow.FRGDUID, true);
+                                }
                             }
-                        }
-                    }
-                    conn.Close();
-                }
-            }
-            catch
-            {
-                Globals.SystemManager.LogApplicationEvent(this, "", "Query Failed: " + sql);
-            }
-        }
-
-        public byte[] GetAlmEvtPtrs(Guid connID, string NodeID, string ptrType)
-        {
-            string sql = "";
-            int lastRead = 0;
-            int currPtr = 0;
-
-            try
-            {
-                using (NpgsqlConnection conn = new NpgsqlConnection(ConnectionString))
-                {
-                    conn.Open();
-
-                    using (NpgsqlCommand sqlCommand = conn.CreateCommand())
-                    {
-                        // update the alarm or event current ptr and timestamp
-                        sql = "select " + ptrType + "CurPtrPosition,"+ptrType+"LastPtrReadPosition from " + Globals.SystemManager.GetTableName("FDAHistoricReferences");
-                        sql += " where NodeDetails = '" + NodeID + "' and ConnectionUID = '" + connID + "';";
-                        sqlCommand.CommandText = sql;
-                        using (NpgsqlDataReader sqlDataReader = sqlCommand.ExecuteReader())
-                        {
-                            while (sqlDataReader.Read())
+                            else
                             {
-                                try
+                                newRequestGroup = RequestGroupFromConfigString("Demand " + affectedRow.FRGDUID, groupConfig, affectedRow.Priority, affectedRow.CommsLogEnabled); // if the demand object has comms logging enabled, override the comms log setting on the group
+
+                                if (newRequestGroup != null)
                                 {
-                                    lastRead = (byte)sqlDataReader.GetInt32(sqlDataReader.GetOrdinal(ptrType + "LastPtrReadPosition"));
-                                    currPtr = (byte)sqlDataReader.GetInt32(sqlDataReader.GetOrdinal(ptrType + "CurPtrPosition"));
-                                }
-                                catch (Exception ex)
-                                {
-                                    Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "DBManager: out of range current or last read pointer in FDAHistoricReferences table (connectionID " + connID + ", Node " + NodeID);
-                                    return null;
+                                    demandedGroupList.Add(newRequestGroup);
+                                    requestGroupID = Guid.Parse(groupConfig.Split(':')[0]);
+                                    newRequestGroup.Protocol = GetRequestGroup(requestGroupID).DPSType;
                                 }
                             }
                         }
-                        conn.Close();
-                    }                              
+
+                        if (demandedGroupList.Count > 0)
+                        {
+                            RaiseDemandRequestEvent(affectedRow, demandedGroupList);
+                            if (affectedRow.DestroyDRG)
+                                DeleteRequestGroup(demandedGroupList);
+
+                            if (affectedRow.DestroyFRGD)
+                                DeleteDemand(affectedRow.FRGDUID);
+                        }
+                    }
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                Globals.SystemManager.LogApplicationEvent(this, "", "Query Failed: " + sql);
-                return null;
+                Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Error while parsing demand request " + affectedRow.FRGDUID);
             }
-
-            lastRead = Helpers.AddCircular(lastRead, -1, 0, 239);
-
-            return new byte[] {Convert.ToByte(lastRead),Convert.ToByte(currPtr) };
         }
+#endregion
+
+#region SQLServer Table change events
+
+        //private void _connectionDefMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<FDASourceConnection> e)
+        //{
+        //    ChangeType changeType = e.ChangeType;
+
+        //    if (changeType == ChangeType.None)
+        //        return;
+
+        //    // check for nulls
+        //    if (changeType == ChangeType.Insert || changeType == ChangeType.Update)
+        //    {
+        //        List<string> exceptions = new List<string> { "SCDetail02" };
+        //        string[] nulls = FindNulls(e.Entity,exceptions);
+        //        if (nulls.Length > 0)
+        //        {
+        //            Globals.SystemManager.LogApplicationEvent(this, "", "SCUID " + e.Entity.SCUID + " " + changeType.ToString().ToLower() + " rejected, null values in field(s) " + string.Join(",", nulls));
+        //            return;
+        //        }
+        //    }
+
+        //    string action = "";
+        //    lock (_connectionsConfig)
+        //    {
+        //        switch (changeType)
+        //        {
+        //            case ChangeType.Insert:
+        //                _connectionsConfig.Add(e.Entity.SCUID, e.Entity);
+        //                action = "added";
+        //                break;                    
+        //            case ChangeType.Update:
+        //                if (_connectionsConfig.ContainsKey(e.Entity.SCUID))
+        //                {
+        //                    _connectionsConfig[e.Entity.SCUID] = e.Entity;
+        //                }
+        //                else
+        //                {
+        //                    if (e.EntityOldValues != null)
+        //                    {
+        //                        if (e.EntityOldValues.SCUID != e.Entity.SCUID)
+        //                        {
+        //                            Globals.SystemManager.LogApplicationEvent(this, "", "Changes to the SCUID are not permitted, update for connection " + e.EntityOldValues.SCUID + " rejected");
+        //                            return;
+        //                        }
+        //                    }
+        //                    else
+        //                    {
+        //                        // record not found (not due to a change in the ID) so do an insert instead
+        //                        _connectionsConfig.Add(e.Entity.SCUID, e.Entity);
+        //                        action = "not found, adding it as a new connection";
+        //                        changeType = ChangeType.Insert;
+        //                        break;
+        //                    }
+        //                }
+        //                action = "updated";
+        //                break;
+        //            case ChangeType.Delete:
+        //                _connectionsConfig.Remove(e.Entity.SCUID);
+        //                action = "deleted";
+        //                break;                     
+        //        }
+        //    }
+        //    Globals.SystemManager.LogApplicationEvent(this, "", "SCUID " + e.Entity.SCUID + " " + action);
+
+        //    RaiseConfigChangeEvent(changeType.ToString(),Globals.SystemManager.GetTableName("FDASourceConnections"), e.Entity.SCUID);          
+        //}
 
 
-     
-        public void UpdateAlmEvtCurrentPtrs(DataRequest PtrPositionRequest)
+        //private void _dataPointDefMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<FDADataPointDefinitionStructure> e)
+        //{
+        //    ChangeType changeType = e.ChangeType;
+
+        //    if (changeType == ChangeType.None)
+        //        return;
+
+        //    // check for nulls
+        //    if (changeType == ChangeType.Insert || changeType == ChangeType.Update)
+        //    {
+        //        List<string> exceptionList = new List<string>(new string[] { "backfill_enabled", "backfill_dataID", "backfill_data_structure_type", "backfill_data_lapse_limit", "backfill_data_interval" });
+        //        string[] nulls = FindNulls(e.Entity, exceptionList);
+        //        if (nulls.Length > 0)
+        //        {
+        //            Globals.SystemManager.LogApplicationEvent(this, "", "DPDUID " + e.Entity.DPDUID + " " + changeType.ToString().ToLower() + " rejected, null values in field(s) " + string.Join(",", nulls));
+        //            return;
+        //        }
+        //    }
+
+        //    string action = "";
+        //    lock (_dataPointConfig)
+        //    {
+        //        switch (changeType)
+        //        {
+
+        //            case ChangeType.Insert:
+        //                _dataPointConfig.Add(e.Entity.DPDUID, e.Entity);
+        //                action = "added";                       
+        //                break;
+        //            case ChangeType.Delete:
+        //                _dataPointConfig.Remove(e.Entity.DPDUID); 
+        //                action = "deleted";
+        //                break;
+        //            case ChangeType.Update:
+        //                if (_dataPointConfig.ContainsKey(e.Entity.DPDUID))
+        //                {
+        //                    _dataPointConfig[e.Entity.DPDUID] = e.Entity;
+        //                    action = "updated";
+        //                }
+        //                else
+        //                {
+        //                    if (e.EntityOldValues != null)
+        //                    {
+        //                        if (e.EntityOldValues.DPDUID != e.Entity.DPDUID)
+        //                        {
+        //                            Globals.SystemManager.LogApplicationEvent(this, "", "Changes to the DPDUID are not permitted, update for DataPointDefinitionStructure " + e.EntityOldValues.DPDUID + " rejected");
+        //                            return;
+        //                        }
+        //                    }
+        //                    else
+        //                    {
+        //                        // record not found (not due to a change in the ID) so do an insert instead
+        //                        _dataPointConfig.Add(e.Entity.DPDUID, e.Entity);
+        //                        action = "not found, adding it as a new DataPointDefinitionStructure";
+        //                        changeType = ChangeType.Insert;
+        //                        break;
+        //                    }
+
+        //                }
+
+
+        //                break;
+
+        //        }
+
+        //    }
+
+        //    Globals.SystemManager.LogApplicationEvent(this, "", "DPDUID " + e.Entity.DPDUID + " " + action);
+
+        //    RaiseConfigChangeEvent(changeType.ToString(), Globals.SystemManager.GetTableName("DataPointDefinitionStructures"), e.Entity.DPDUID);
+
+        //}
+
+        //private void _DemandMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<FDARequestGroupDemand> e)
+        //{
+        //    try
+        //    {
+        //        if (e.ChangeType == ChangeType.Insert || e.ChangeType == ChangeType.Update)
+        //        {
+        //            RequestGroup newRequestGroup;
+        //            if (e.Entity.FRGDEnabled)
+        //            {
+        //                Globals.SystemManager.LogApplicationEvent(this, "", "Demand Request Received: " + e.Entity.Description);
+
+        //                // check for nulls
+        //                string[] nulls = FindNulls(e.Entity);
+        //                if (nulls.Length > 0)
+        //                {
+        //                    Globals.SystemManager.LogApplicationEvent(this, "", "FRGDUID " + e.Entity.FRGDUID + " rejected, null values in field(s) " + string.Join(",", nulls));
+        //                    return;
+        //                }
+
+        //                List<RequestGroup> demandedGroupList = new List<RequestGroup>();
+
+        //                string[] requestGroupConfigs = e.Entity.RequestGroupList.Split('|');
+
+        //                Guid requestGroupID;
+        //                foreach (string groupConfig in requestGroupConfigs)
+        //                {
+        //                    if (groupConfig.StartsWith("^"))
+        //                    {
+        //                        // task reference
+        //                        Guid taskID;
+        //                        if (!Guid.TryParse(groupConfig.Remove(0, 1),out taskID))
+        //                        {
+        //                            // cbad Guid
+        //                            Globals.SystemManager.LogApplicationEvent(this, "", "Invalid Task ID in demand " + e.Entity.FRGDUID + ", the correct format is xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx", true);
+        //                            continue;
+        //                        }
+
+        //                        FDATask task = GetTask(taskID);
+        //                        if (task != null)
+        //                        {
+        //                            switch (task.task_type.ToUpper())
+        //                            {
+        //                                case "DATAACQ":
+        //                                    newRequestGroup = RequestGroupFromConfigString("Demand " + e.Entity.FRGDUID, task.task_details, e.Entity.Priority, e.Entity.CommsLogEnabled);
+        //                                    if (newRequestGroup != null)
+        //                                    {
+        //                                        demandedGroupList.Add(newRequestGroup);
+        //                                        requestGroupID = Guid.Parse(task.task_details.Split(':')[0]);
+        //                                        newRequestGroup.Protocol = GetRequestGroup(requestGroupID).DPSType;
+        //                                    }
+        //                                    break;
+        //                                case "CALCCOMMSSTATS":
+        //                                    string error;
+        //                                    List<object> calcParams = ParseStatsCalcParams(task.task_details,out error);
+        //                                    if (error == "" && calcParams != null)
+        //                                    {
+        //                                        Globals.SystemManager.LogApplicationEvent(this, "", "Calculating communications statistics (requested by demand " + e.Entity.FRGDUID);
+        //                                        RemoteQueryManager.DoCommsStats(calcParams);// fromTime, toTime, altOutput, connectionFilter, deviceFilter,description,altOutput);
+        //                                    }
+        //                                    else
+        //                                    {
+        //                                        Globals.SystemManager.LogApplicationEvent(this, "", "invalid task_details in task " + task.task_id + ": " + error + ". The task will not be executed");
+        //                                    }
+        //                                    break;
+        //                                default:
+        //                                    Globals.SystemManager.LogApplicationEvent(this, "", "FDA Task id " + taskID + ", requested by demand " + e.Entity.FRGDUID + " has an unrecognized task type '" + task.task_type + "'. The task will not be executed");
+        //                                    continue;
+        //                            }
+        //                        }
+        //                        else
+        //                        {
+        //                            Globals.SystemManager.LogApplicationEvent(this, "", "Task " + taskID + " was not found. Task was requested by demand " + e.Entity.FRGDUID, true);
+        //                        }
+        //                    }
+        //                    else
+        //                    {
+        //                        newRequestGroup = RequestGroupFromConfigString("Demand " + e.Entity.FRGDUID, groupConfig, e.Entity.Priority, e.Entity.CommsLogEnabled); // if the demand object has comms logging enabled, override the comms log setting on the group
+
+        //                        if (newRequestGroup != null)
+        //                        {
+        //                            demandedGroupList.Add(newRequestGroup);
+        //                            requestGroupID = Guid.Parse(groupConfig.Split(':')[0]);
+        //                            newRequestGroup.Protocol = GetRequestGroup(requestGroupID).DPSType;
+        //                        }
+        //                    }
+        //                }
+
+        //                if (demandedGroupList.Count > 0)
+        //                {
+        //                    RaiseDemandRequestEvent(e.Entity, demandedGroupList);
+        //                    if (e.Entity.DestroyDRG)
+        //                        DeleteRequestGroup(demandedGroupList);
+
+        //                    if (e.Entity.DestroyFRGD)
+        //                        DeleteDemand(e.Entity.FRGDUID);
+        //                }
+        //            }
+        //        }
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Error while parsing demand request " + e.Entity.FRGDUID);
+        //    }
+        //}
+
+        //private void _requestGroupMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<FDADataBlockRequestGroup> e)
+        //{
+        //    ChangeType changeType = e.ChangeType;
+
+        //    if (changeType == ChangeType.None)
+        //        return;
+
+        //    if (changeType == ChangeType.Insert || changeType == ChangeType.Update)
+        //    {
+        //        // check for nulls
+        //        string[] nulls = FindNulls(e.Entity);
+        //        if (nulls.Length > 0)
+        //        {
+        //            Globals.SystemManager.LogApplicationEvent(this, "", "DRGUID " + e.Entity.DRGUID + " " + changeType.ToString().ToLower() + " rejected, null values in field(s) " + string.Join(",", nulls));
+        //            return;
+        //        }
+        //    }
+
+        //    string action = "";
+        //    lock (_requestgroupConfig)
+        //    {
+        //        switch (changeType)
+        //        {
+        //            case ChangeType.Insert:
+        //                _requestgroupConfig.Add(e.Entity.DRGUID, e.Entity); 
+        //                action = "inserted";
+        //                break;
+
+        //            case ChangeType.Update:
+
+        //                if (_requestgroupConfig.ContainsKey(e.Entity.DRGUID))
+        //                {
+        //                    _requestgroupConfig[e.Entity.DRGUID] = e.Entity;
+        //                    action = "updated";
+        //                }
+        //                else
+        //                {
+        //                    if (e.EntityOldValues != null)
+        //                    {
+        //                        if (e.EntityOldValues.DRGUID != e.Entity.DRGUID)
+        //                        {
+        //                            Globals.SystemManager.LogApplicationEvent(this, "", "Changes to the DRGUID are not permitted, update for FDADataBlockRequestGroup " + e.EntityOldValues.DRGUID + " rejected");
+        //                            return;
+        //                        }
+        //                    }
+        //                    else
+        //                    {
+        //                        // record not found (not due to a change in the ID) so do an insert instead
+        //                        _requestgroupConfig.Add(e.Entity.DRGUID, e.Entity);
+        //                        action = "not found, adding it as a new FDADataBlockRequestGroup";
+        //                        changeType = ChangeType.Insert;
+        //                        break;
+
+        //                    }
+        //                }
+
+
+        //                break;
+        //            case ChangeType.Delete:
+        //                _requestgroupConfig.Remove(e.Entity.DRGUID);
+        //                action = "deleted";
+        //                break;                      
+        //        }
+        //    }
+        //     Globals.SystemManager.LogApplicationEvent(this, "", "DRGUID " + e.Entity.DRGUID + " " + action);
+
+        //    RaiseConfigChangeEvent(changeType.ToString(), Globals.SystemManager.GetTableName("FDADataBlockRequestGroup"), e.Entity.DRGUID);
+
+        //}
+
+        //private void _SchedMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<FDARequestGroupScheduler> e)
+        //{
+
+        //    ChangeType changeType = e.ChangeType;
+        //    if (changeType == ChangeType.None)
+        //        return;
+
+        //    string action = "";
+
+
+        //    // check for nulls
+        //    if (changeType == ChangeType.Insert || changeType == ChangeType.Update)
+        //    {
+        //        string[] nulls = FindNulls(e.Entity);
+        //        if (nulls.Length > 0)
+        //        {
+        //            Globals.SystemManager.LogApplicationEvent(this, "", "FRGSUID " + e.Entity.FRGSUID + " " + changeType.ToString().ToLower() + " rejected, null values in field(s) " + string.Join(",", nulls));
+        //            return;
+
+        //        }
+        //    }
+
+
+        //    lock (_schedConfig)
+        //    {
+        //        switch (changeType)
+        //        {
+        //            case ChangeType.Delete:
+        //                 _schedConfig.Remove(e.Entity.FRGSUID); 
+        //                action = " deleted";
+        //                break;
+        //            case ChangeType.Insert:
+        //                List<FDATask> taskList;
+        //                e.Entity.RequestGroups = RequestGroupListToRequestGroups(e.Entity.FRGSUID, e.Entity.Priority, e.Entity.RequestGroupList,out taskList);
+        //                e.Entity.Tasks = taskList;
+        //                 _schedConfig.Add(e.Entity.FRGSUID, e.Entity);
+        //                action = " added";
+        //                break;
+
+        //            case ChangeType.Update:
+
+        //                if (_schedConfig.ContainsKey(e.Entity.FRGSUID))
+        //                {                                                 
+        //                    action = " updated";
+        //                    lock (_schedConfig) { _schedConfig[e.Entity.FRGSUID] = e.Entity; }
+        //                    taskList = null;
+        //                    e.Entity.RequestGroups = RequestGroupListToRequestGroups(e.Entity.FRGSUID, e.Entity.Priority, e.Entity.RequestGroupList,out taskList);
+        //                    e.Entity.Tasks = taskList;
+        //                }
+        //                else
+        //                {
+        //                    if (e.EntityOldValues != null)
+        //                    {
+        //                        if (e.EntityOldValues.FRGSUID != e.Entity.FRGSUID)
+        //                        {
+        //                            Globals.SystemManager.LogApplicationEvent(this, "", "Changes to the FRGSUID are not permitted, update for FDARequestGroupScheduler " + e.EntityOldValues.FRGSUID + " rejected");
+        //                            return;
+        //                        }
+        //                    }
+        //                    else
+        //                    {
+        //                        // record not found (not due to a change in the ID) so do an insert instead
+        //                        _schedConfig.Add(e.Entity.FRGSUID, e.Entity);
+        //                        action = "not found, adding it as a new FDARequestGroupScheduler";
+        //                        changeType = ChangeType.Insert;
+        //                        break;
+        //                    }
+
+        //                }
+        //                break;
+        //        }
+        //    }
+
+        //    Globals.SystemManager.LogApplicationEvent(this, "", "FRGSUID " + e.Entity.FRGSUID + " " + action);
+
+        //    RaiseConfigChangeEvent(changeType.ToString(), Globals.SystemManager.GetTableName("FDARequestGroupScheduler"), e.Entity.FRGSUID);
+
+
+        //}
+
+        //private void _deviceDefMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<FDADevice> e)
+        //{
+        //    ChangeType changeType = e.ChangeType;
+
+        //    if (changeType == ChangeType.None)
+        //        return;
+
+        //    // check for nulls
+        //    if (changeType == ChangeType.Insert || changeType == ChangeType.Update)
+        //    {
+        //        string[] nulls = FindNulls(e.Entity);
+        //        if (nulls.Length > 0)
+        //        {
+        //            Globals.SystemManager.LogApplicationEvent(this, "", "device_id " + e.Entity.device_id + " " + changeType.ToString().ToLower() + " rejected, null values in field(s) " + string.Join(",", nulls));
+        //            return;
+        //        }
+        //    }
+
+        //    string action = "";
+
+        //    lock (_deviceConfig)
+        //    {
+        //        switch (changeType)
+        //        {
+        //            case ChangeType.Delete:
+        //                _deviceConfig.Remove(e.Entity.device_id);
+        //                action = "deleted";
+        //                break;
+        //            case ChangeType.Insert:
+        //                _deviceConfig.Add(e.Entity.device_id, e.Entity);
+        //                action = "added";
+        //                break;
+
+        //            case ChangeType.Update:
+
+        //                if (_deviceConfig.ContainsKey(e.Entity.device_id))
+        //                {
+        //                    action = "updated";
+        //                    _deviceConfig[e.Entity.device_id] = e.Entity;
+        //                }
+        //                else
+        //                {
+        //                    if (e.EntityOldValues != null)
+        //                    {
+        //                        if (e.EntityOldValues.device_id != e.Entity.device_id)
+        //                        {
+        //                            Globals.SystemManager.LogApplicationEvent(this, "", "Changes to the DeviceID are not permitted, update for FDADevice " + e.EntityOldValues.device_id + " rejected");
+        //                            return;
+        //                        }
+        //                    }
+        //                    else
+        //                    {
+        //                        // record not found (not due to a change in the ID) so do an insert instead
+        //                        _deviceConfig.Add(e.Entity.device_id, e.Entity);
+        //                        action = "not found, adding it as a new FDADevice";
+        //                        changeType = ChangeType.Insert;
+        //                        break;
+        //                    }
+        //                }
+        //                break;
+        //        }
+        //    }
+
+        //    Globals.SystemManager.LogApplicationEvent(this, "", "device_id " + e.Entity.device_id + " " + action);
+
+        //    RaiseConfigChangeEvent(changeType.ToString(), Globals.SystemManager.GetTableName("FDADevices"), e.Entity.device_id);
+        //}
+        //private void _taskDefMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<FDATask> e)
+        //{
+        //    ChangeType changeType = e.ChangeType;
+
+        //    if (changeType == ChangeType.None)
+        //        return;
+
+        //    // check for nulls
+        //    if (changeType == ChangeType.Insert || changeType == ChangeType.Update)
+        //    {
+        //        string[] nulls = FindNulls(e.Entity);
+        //        if (nulls.Length > 0)
+        //        {
+        //            Globals.SystemManager.LogApplicationEvent(this, "", "task_id " + e.Entity.task_id + " " + changeType.ToString().ToLower() + " rejected, null values in field(s) " + string.Join(",", nulls));
+        //            return;
+        //        }
+        //    }
+
+        //    string action = "";
+
+        //    lock (_taskConfig)
+        //    {
+        //        switch (changeType)
+        //        {
+        //            case ChangeType.Delete:
+        //                _taskConfig.Remove(e.Entity.task_id);
+        //                action = "deleted";
+        //                break;
+        //            case ChangeType.Insert:
+        //                _taskConfig.Add(e.Entity.task_id, e.Entity);
+        //                action = "added";
+        //                break;
+
+        //            case ChangeType.Update:
+
+        //                if (_taskConfig.ContainsKey(e.Entity.task_id))
+        //                {
+        //                    action = "updated";
+        //                    _taskConfig[e.Entity.task_id] = e.Entity;
+        //                }
+        //                else
+        //                {
+        //                    if (e.EntityOldValues != null)
+        //                    {
+        //                        if (e.EntityOldValues.task_id != e.Entity.task_id)
+        //                        {
+        //                            Globals.SystemManager.LogApplicationEvent(this, "", "Changes to the task_id are not permitted, update for FDATask " + e.EntityOldValues.task_id + " rejected");
+        //                            return;
+        //                        }
+        //                    }
+        //                    else
+        //                    {
+        //                        // record not found (not due to a change in the ID) so do an insert instead
+        //                        _taskConfig.Add(e.Entity.task_id, e.Entity);
+        //                        action = "not found, adding it as a new FDA Task";
+        //                        changeType = ChangeType.Insert;
+        //                        break;
+        //                    }
+        //                }
+        //                break;
+        //        }
+        //    }
+
+        //    Globals.SystemManager.LogApplicationEvent(this, "", "task_id  " + e.Entity.task_id + " " + action);
+
+        //    RaiseConfigChangeEvent(changeType.ToString(), Globals.SystemManager.GetTableName("FDATasks"), e.Entity.task_id);
+        //}
+   
+#endregion
+
+
+
+
+
+private void DeleteDemand(Guid DemandID)
+{
+    string sql = "delete from " + Globals.SystemManager.GetTableName("FDARequestGroupDemand") + " where FRGDUID  = '" + DemandID.ToString() + "';";
+    try
+    {
+        using (NpgsqlConnection conn = new NpgsqlConnection(ConnectionString))
         {
-            string sql = "";
-            ushort almsPtr = (ushort)PtrPositionRequest.TagList[0].Value; 
-            DateTime almsTimestamp = PtrPositionRequest.TagList[0].Timestamp;
-            ushort evtsPtr = (ushort)PtrPositionRequest.TagList[1].Value;
-            DateTime evtsTimestamp = PtrPositionRequest.TagList[1].Timestamp;
-            string nodeID = PtrPositionRequest.NodeID;
-            int affectedRows = 0;
-
-            string ResponseTimestamp = Helpers.FormatDateTime(PtrPositionRequest.ResponseTimestamp);
             try
             {
-                using (NpgsqlConnection conn = new NpgsqlConnection(ConnectionString))
+                conn.Open();
+                using (NpgsqlCommand sqlCommand = conn.CreateCommand())
                 {
-                    conn.Open();
-
-                    using (NpgsqlCommand sqlCommand = conn.CreateCommand())
-                    {
-                        // update the alarm or event current ptr and timestamp
-                        sql = "update " + Globals.SystemManager.GetTableName("FDAHistoricReferences") + " set AlarmsCurPtrPosition = " + almsPtr + ", AlarmsCurPtrTimestamp = '" + Helpers.FormatDateTime(almsTimestamp) + "'";
-                        sql += ",EventsCurPtrPosition = " + evtsPtr + ", EventsCurPtrTimestamp = '" + Helpers.FormatDateTime(evtsTimestamp) + "'";
-                        sql += " where NodeDetails = '" + nodeID + "' and ConnectionUID = '" + PtrPositionRequest.ConnectionID + "';";
-                        sqlCommand.CommandText = sql;
-                        affectedRows = sqlCommand.ExecuteNonQuery();
-
-                        if (affectedRows == 0) // update had no effect because row doesn't exist, do an insert instead
-                        {
-                            sql = "insert into " + Globals.SystemManager.GetTableName("FDAHistoricReferences") + " (DPSType,HistoricStructureType,ConnectionUID,NodeDetails,EventsCurPtrTimestamp,EventsCurPtrPosition,EventsCurMaxNumRecords,";
-                            sql += "EventsLastPtrReadTimestamp,EventsLastPtrReadPosition,AlarmsCurPtrTimestamp,AlarmsCurPtrPosition,AlarmsCurMaxNumRecords,AlarmsLastPtrReadTimestamp,AlarmsLastPtrReadPosition)";
-                            sql += " values (";
-                            sql += "'" + PtrPositionRequest.Protocol + "',1,'" + PtrPositionRequest.ConnectionID + "','" + PtrPositionRequest.NodeID + "','" + ResponseTimestamp + "',";
-                            sql += evtsPtr + ",240,'" + ResponseTimestamp + "',0,'" + ResponseTimestamp + "'," + almsPtr + ",240,'" + ResponseTimestamp + "',0);";
-                            sqlCommand.CommandText = sql;
-                            sqlCommand.ExecuteNonQuery();
-                        }
-                    }
-                    conn.Close();
+                    sqlCommand.CommandText = sql;
+                    sqlCommand.ExecuteNonQuery();
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                Globals.SystemManager.LogApplicationEvent(this, "", "Query Failed: " + sql);
+                Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Query failed: " + sql);
             }
         }
-
-
-        public class DemandEventArgs: EventArgs
-        {
-            public FDARequestGroupDemand DemandRequestObject { get; }
-            public List<RequestGroup> RequestGroups;
- 
-            public DemandEventArgs(FDARequestGroupDemand demand,List<RequestGroup> requestGroups)
-            {
-                DemandRequestObject = demand;
-                RequestGroups = requestGroups;
-            }
-        }
-
-        private void RaiseDemandRequestEvent(FDARequestGroupDemand demand,List<RequestGroup> requestGroups)
-        {
-            DemandRequest?.Invoke(this, new DemandEventArgs(demand,requestGroups));
-        }
-
-        
-        private void RaiseConfigChangeEvent(string type,string table, Guid item)
-        {
-            //Globals.SystemManager.LogApplicationEvent(this, "", table + " table changed (" + type + "), ID = " + item.ToString());
-            ConfigChange?.Invoke(this, new ConfigEventArgs(type,table, item));
-        }
-        
-
-        #region IDisposable Support
-        private bool disposedValue = false; // To detect redundant calls
-
-        protected virtual void Dispose(bool disposing)
-        {
-           
-            if (!disposedValue)
-            {
-                if (disposing)
-                {
-                    Globals.SystemManager.LogApplicationEvent(this, "", "Stopping Demand Table Monitor");
-                    //_demandMonitor?.Stop();
-                    //_demandMonitor?.Dispose();
-
-                    // log any data that's sitting in the caches before shutting down
-                    Globals.SystemManager.LogApplicationEvent(this, "", "Flushing all cached data");
-
-                    if (_cacheManager != null)
-                    {
-                        List<string> batches = _cacheManager.FlushAll();
-                        foreach (string batch in batches)
-                        {
-                            ExecuteSQL(batch);
-                        }
-                    }
-                    _cacheManager.Dispose();
-
-                    Stopwatch stopwatch = new Stopwatch();
-                    // wait for datawriter thread to finish (up to 10 seconds)
-                    if (_dataWriter != null)
-                    {
-                        if (_dataWriter.IsBusy)
-                            Globals.SystemManager.LogApplicationEvent(this, "", "Waiting for data writer thread to finish and exit");
-
-                        stopwatch.Start();
-                        while (_dataWriter.IsBusy && stopwatch.Elapsed.Seconds < 10)
-                            Thread.Sleep(50);
-                        stopwatch.Stop();
-                        _dataWriter.Dispose();
-                    }
-
-                    // wait for alarms and events writing thread to finish (up to 10 seconds)
-                    if (_alarmsEventsWriter != null)
-                    {
-                        if (_alarmsEventsWriter.IsBusy)
-                            Globals.SystemManager.LogApplicationEvent(this, "", "Waiting for Alarms and Events writer thread to finish and exit");
-
-                        stopwatch.Reset();
-                        stopwatch.Start();
-                        while (_alarmsEventsWriter.IsBusy && stopwatch.Elapsed.Seconds < 10)
-                            Thread.Sleep(50);
-                        stopwatch.Stop();
-                        _alarmsEventsWriter.Dispose();
-                    }
-
-                    stopwatch = null;
-
-                                      
-                    //_schedMonitor?.Stop();
-                    //_dataPointDefMonitor?.Stop();
-                    //_requestGroupDefMonitor?.Stop();
-                    //_connectionDefMonitor?.Stop();
-                        
-                    //_schedMonitor?.Dispose();
-                    //_dataPointDefMonitor?.Dispose();
-                    //_requestGroupDefMonitor?.Dispose();
-                    //_connectionDefMonitor?.Dispose();
-              
-
-                    Globals.SystemManager.LogApplicationEvent(this, "", "Clearing configuration data");
-                    lock (_schedConfig) { _schedConfig.Clear(); }
-                    lock (_requestgroupConfig) { _requestgroupConfig.Clear(); }
-                    lock (_dataPointConfig) { _dataPointConfig.Clear(); }
-                    lock (_connectionsConfig) { _connectionsConfig.Clear(); }                   
-                }
-                disposedValue = true;
-            }
-        }
-
-        // TODO: override a finalizer only if Dispose(bool disposing) above has code to free unmanaged resources.
-        // ~DBManager() {
-        //   // Do not change this code. Put cleanup code in Dispose(bool disposing) above.
-        //   Dispose(false);
-        // }
-
-        // This code added to correctly implement the disposable pattern.
-        public void Dispose()
-        {
-            // Do not change this code. Put cleanup code in Dispose(bool disposing) above.
-            Dispose(true);
-            // TODO: uncomment the following line if the finalizer is overridden above.
-            // GC.SuppressFinalize(this);
-        }
-        #endregion
-
-        #endregion
     }
+    catch (Exception ex)
+    {
+        // failed to connect to DB, exit the DB write routine
+        Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Failed to connect to the database");
+        return;
+    }
+}
+
+private void DeleteRequestGroup(List<RequestGroup> groupsToDelete)
+{
+    StringBuilder sb = new StringBuilder();
+    sb.Append("delete from ");
+    sb.Append(Globals.SystemManager.GetTableName("FDADataBlockRequestGroup"));
+    sb.Append(" where DRGUID in (");
+
+    if (groupsToDelete.Count == 0)
+        return;
+
+    //string sqlTemplate = "delete from " + Globals.SystemManager.GetTableName("FDADataBlockRequestGroup") + " where DRGUID  = '<ID>';";
+    //string sqlBatch = "";
+    try
+    {
+        using (NpgsqlConnection conn = new NpgsqlConnection(ConnectionString))
+        {
+            try
+            {
+                conn.Open();
+                using (NpgsqlCommand sqlCommand = conn.CreateCommand())
+                {
+                    foreach (RequestGroup group in groupsToDelete)
+                    {
+                        sb.Append("'");
+                        sb.Append(group.ID);
+                        sb.Append("',");
+                    }
+                    sb.Remove(sb.Length - 1, 1);
+                    sb.Append(");");
+                    sqlCommand.CommandText = sb.ToString();
+                    sqlCommand.ExecuteNonQuery();
+                }
+            }
+            catch (Exception ex)
+            {
+                Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Query failed: " + sb.ToString());
+            }
+        }
+    }
+    catch (Exception ex)
+    {
+        // failed to connect to DB, exit the DB write routine
+        Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Failed to connect to the database");
+        return;
+    }
+}
+
+public void WriteAlarmsEvents(List<AlarmEventRecord> recordsList)
+{
+    if (_alarmEventQueue == null)
+        _alarmEventQueue = new Queue<List<AlarmEventRecord>>();
+
+    if (_alarmsEventsWriter == null)
+    {
+        _alarmsEventsWriter = new BackgroundWorker();
+        _alarmsEventsWriter.DoWork += _alarmsEventsWriter_DoWork;
+    }
+
+    lock (_alarmEventQueue)
+    {
+        _alarmEventQueue.Enqueue(recordsList);
+    }
+
+    if (!_alarmsEventsWriter.IsBusy)
+        _alarmsEventsWriter.RunWorkerAsync();
+}
+
+private void _alarmsEventsWriter_DoWork(object sender, DoWorkEventArgs e)
+{
+    string sql = "";
+    List<AlarmEventRecord> recordsList;
+
+
+    try
+    {
+        using (NpgsqlConnection conn = new NpgsqlConnection(ConnectionString))
+        {
+            conn.Open();
+
+            using (NpgsqlCommand sqlCommand = conn.CreateCommand())
+            {
+                while (_alarmEventQueue.Count > 0)
+                {
+                    lock (_alarmEventQueue)
+                    {
+                        recordsList = _alarmEventQueue.Dequeue();
+                    }
+
+                    if (recordsList.Count == 0)
+                        continue;
+
+                    foreach (AlarmEventRecord record in recordsList)
+                    {
+                        sql = record.GetWriteSQL();
+                        sqlCommand.CommandText = record.GetWriteSQL();
+
+                        if (sqlCommand.ExecuteNonQuery() > 0) // if the write was successful, update the last read record in the "HistoricReferences" Table
+                        {
+                            sql = record.GetUpdateLastRecordSQL();
+                            if (sql != "")
+                            {
+                                sqlCommand.CommandText = sql;
+                                sqlCommand.ExecuteNonQuery();
+                            }
+                        }
+                        Thread.Sleep(50); // a little breather for the database, this stuff doesn't need to be written as fast as possible       
+                    }
+                }
+            }
+            conn.Close();
+        }
+    }
+    catch
+    {
+        Globals.SystemManager.LogApplicationEvent(this, "", "Query Failed: " + sql);
+    }
+}
+
+public byte[] GetAlmEvtPtrs(Guid connID, string NodeID, string ptrType)
+{
+    string sql = "";
+    int lastRead = 0;
+    int currPtr = 0;
+
+    try
+    {
+        using (NpgsqlConnection conn = new NpgsqlConnection(ConnectionString))
+        {
+            conn.Open();
+
+            using (NpgsqlCommand sqlCommand = conn.CreateCommand())
+            {
+                // update the alarm or event current ptr and timestamp
+                sql = "select " + ptrType + "CurPtrPosition,"+ptrType+"LastPtrReadPosition from " + Globals.SystemManager.GetTableName("FDAHistoricReferences");
+                sql += " where NodeDetails = '" + NodeID + "' and ConnectionUID = '" + connID + "';";
+                sqlCommand.CommandText = sql;
+                using (NpgsqlDataReader sqlDataReader = sqlCommand.ExecuteReader())
+                {
+                    while (sqlDataReader.Read())
+                    {
+                        try
+                        {
+                            lastRead = (byte)sqlDataReader.GetInt32(sqlDataReader.GetOrdinal(ptrType + "LastPtrReadPosition"));
+                            currPtr = (byte)sqlDataReader.GetInt32(sqlDataReader.GetOrdinal(ptrType + "CurPtrPosition"));
+                        }
+                        catch (Exception ex)
+                        {
+                            Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "DBManager: out of range current or last read pointer in FDAHistoricReferences table (connectionID " + connID + ", Node " + NodeID);
+                            return null;
+                        }
+                    }
+                }
+                conn.Close();
+            }                              
+        }
+    }
+    catch
+    {
+        Globals.SystemManager.LogApplicationEvent(this, "", "Query Failed: " + sql);
+        return null;
+    }
+
+    lastRead = Helpers.AddCircular(lastRead, -1, 0, 239);
+
+    return new byte[] {Convert.ToByte(lastRead),Convert.ToByte(currPtr) };
+}
+
+
+
+public void UpdateAlmEvtCurrentPtrs(DataRequest PtrPositionRequest)
+{
+    string sql = "";
+    ushort almsPtr = (ushort)PtrPositionRequest.TagList[0].Value; 
+    DateTime almsTimestamp = PtrPositionRequest.TagList[0].Timestamp;
+    ushort evtsPtr = (ushort)PtrPositionRequest.TagList[1].Value;
+    DateTime evtsTimestamp = PtrPositionRequest.TagList[1].Timestamp;
+    string nodeID = PtrPositionRequest.NodeID;
+    int affectedRows = 0;
+
+    string ResponseTimestamp = Helpers.FormatDateTime(PtrPositionRequest.ResponseTimestamp);
+    try
+    {
+        using (NpgsqlConnection conn = new NpgsqlConnection(ConnectionString))
+        {
+            conn.Open();
+
+            using (NpgsqlCommand sqlCommand = conn.CreateCommand())
+            {
+                // update the alarm or event current ptr and timestamp
+                sql = "update " + Globals.SystemManager.GetTableName("FDAHistoricReferences") + " set AlarmsCurPtrPosition = " + almsPtr + ", AlarmsCurPtrTimestamp = '" + Helpers.FormatDateTime(almsTimestamp) + "'";
+                sql += ",EventsCurPtrPosition = " + evtsPtr + ", EventsCurPtrTimestamp = '" + Helpers.FormatDateTime(evtsTimestamp) + "'";
+                sql += " where NodeDetails = '" + nodeID + "' and ConnectionUID = '" + PtrPositionRequest.ConnectionID + "';";
+                sqlCommand.CommandText = sql;
+                affectedRows = sqlCommand.ExecuteNonQuery();
+
+                if (affectedRows == 0) // update had no effect because row doesn't exist, do an insert instead
+                {
+                    sql = "insert into " + Globals.SystemManager.GetTableName("FDAHistoricReferences") + " (DPSType,HistoricStructureType,ConnectionUID,NodeDetails,EventsCurPtrTimestamp,EventsCurPtrPosition,EventsCurMaxNumRecords,";
+                    sql += "EventsLastPtrReadTimestamp,EventsLastPtrReadPosition,AlarmsCurPtrTimestamp,AlarmsCurPtrPosition,AlarmsCurMaxNumRecords,AlarmsLastPtrReadTimestamp,AlarmsLastPtrReadPosition)";
+                    sql += " values (";
+                    sql += "'" + PtrPositionRequest.Protocol + "',1,'" + PtrPositionRequest.ConnectionID + "','" + PtrPositionRequest.NodeID + "','" + ResponseTimestamp + "',";
+                    sql += evtsPtr + ",240,'" + ResponseTimestamp + "',0,'" + ResponseTimestamp + "'," + almsPtr + ",240,'" + ResponseTimestamp + "',0);";
+                    sqlCommand.CommandText = sql;
+                    sqlCommand.ExecuteNonQuery();
+                }
+            }
+            conn.Close();
+        }
+    }
+    catch
+    {
+        Globals.SystemManager.LogApplicationEvent(this, "", "Query Failed: " + sql);
+    }
+}
+
+
+public class DemandEventArgs: EventArgs
+{
+    public FDARequestGroupDemand DemandRequestObject { get; }
+    public List<RequestGroup> RequestGroups;
+
+    public DemandEventArgs(FDARequestGroupDemand demand,List<RequestGroup> requestGroups)
+    {
+        DemandRequestObject = demand;
+        RequestGroups = requestGroups;
+    }
+}
+
+private void RaiseDemandRequestEvent(FDARequestGroupDemand demand,List<RequestGroup> requestGroups)
+{
+    DemandRequest?.Invoke(this, new DemandEventArgs(demand,requestGroups));
+}
+
+
+private void RaiseConfigChangeEvent(string type,string table, Guid item)
+{
+    //Globals.SystemManager.LogApplicationEvent(this, "", table + " table changed (" + type + "), ID = " + item.ToString());
+    ConfigChange?.Invoke(this, new ConfigEventArgs(type,table, item));
+}
+
+
+#region IDisposable Support
+private bool disposedValue = false; // To detect redundant calls
+
+protected virtual void Dispose(bool disposing)
+{
+
+    if (!disposedValue)
+    {
+        if (disposing)
+        {
+            Globals.SystemManager.LogApplicationEvent(this, "", "Stopping Demand Table Monitor");
+            _demandMonitor?.StopListening();
+            _demandMonitor?.Dispose();
+
+            // log any data that's sitting in the caches before shutting down
+            Globals.SystemManager.LogApplicationEvent(this, "", "Flushing all cached data");
+
+            if (_cacheManager != null)
+            {
+                List<string> batches = _cacheManager.FlushAll();
+                foreach (string batch in batches)
+                {
+                    PG_ExecuteNonQuery(batch);
+                }
+            }
+            _cacheManager.Dispose();
+
+            Stopwatch stopwatch = new Stopwatch();
+            // wait for datawriter thread to finish (up to 10 seconds)
+            if (_dataWriter != null)
+            {
+                if (_dataWriter.IsBusy)
+                    Globals.SystemManager.LogApplicationEvent(this, "", "Waiting for data writer thread to finish and exit");
+
+                stopwatch.Start();
+                while (_dataWriter.IsBusy && stopwatch.Elapsed.Seconds < 10)
+                    Thread.Sleep(50);
+                stopwatch.Stop();
+                _dataWriter.Dispose();
+            }
+
+            // wait for alarms and events writing thread to finish (up to 10 seconds)
+            if (_alarmsEventsWriter != null)
+            {
+                if (_alarmsEventsWriter.IsBusy)
+                    Globals.SystemManager.LogApplicationEvent(this, "", "Waiting for Alarms and Events writer thread to finish and exit");
+
+                stopwatch.Reset();
+                stopwatch.Start();
+                while (_alarmsEventsWriter.IsBusy && stopwatch.Elapsed.Seconds < 10)
+                    Thread.Sleep(50);
+                stopwatch.Stop();
+                _alarmsEventsWriter.Dispose();
+            }
+
+            stopwatch = null;
+
+
+            _schedMonitor?.StopListening();
+            _dataPointDefMonitor?.StopListening();
+            _requestGroupDefMonitor?.StopListening();
+            _connectionDefMonitor?.StopListening();
+
+            _schedMonitor?.Dispose();
+            _dataPointDefMonitor?.Dispose();
+            _requestGroupDefMonitor?.Dispose();
+            _connectionDefMonitor?.Dispose();
+
+
+            Globals.SystemManager.LogApplicationEvent(this, "", "Clearing configuration data");
+            lock (_schedConfig) { _schedConfig.Clear(); }
+            lock (_requestgroupConfig) { _requestgroupConfig.Clear(); }
+            lock (_dataPointConfig) { _dataPointConfig.Clear(); }
+            lock (_connectionsConfig) { _connectionsConfig.Clear(); }                   
+        }
+        disposedValue = true;
+    }
+}
+
+// TODO: override a finalizer only if Dispose(bool disposing) above has code to free unmanaged resources.
+// ~DBManager() {
+//   // Do not change this code. Put cleanup code in Dispose(bool disposing) above.
+//   Dispose(false);
+// }
+
+// This code added to correctly implement the disposable pattern.
+public void Dispose()
+{
+    // Do not change this code. Put cleanup code in Dispose(bool disposing) above.
+    Dispose(true);
+    // TODO: uncomment the following line if the finalizer is overridden above.
+    // GC.SuppressFinalize(this);
+}
+#endregion
+
+#endregion
+}
 
 
 }

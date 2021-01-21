@@ -25,13 +25,15 @@ namespace Common
         private List<string> ReadOnlyOptions;
 
         private Dictionary<string, FDAConfig> _appConfig;
-        SqlTableDependency<FDAConfig> _appConfigMonitor;
+        PostgreSQLListener<FDAConfig> _appConfigMonitor;
 
         private Dictionary<string, RocDataTypes> _rocDataTypes;
         //SqlTableDependency<RocDataTypes> _rocDataTypesMonitor;
+        PostgreSQLListener<RocDataTypes> _rocDataTypesMonitor;
 
         private Dictionary<int, RocEventFormats> _RocEventFormats;
         //SqlTableDependency<RocEventFormats> _RocEventsFormatsMonitor;
+        PostgreSQLListener<RocEventFormats> _RocEventsFormatsMonitor;
 
         private Queue<CommsLogItemBase> _commsLogInputBuffer;
         private Queue<EventLogItem> _eventLogInputBuffer;
@@ -49,8 +51,8 @@ namespace Common
         public delegate void ConfigChangeHandler(object sender, ConfigEventArgs e);
         public event ConfigChangeHandler ConfigChange;
 
-        public delegate void AppConfigMonitorError(object sender, ErrorEventArgs e);
-        public event AppConfigMonitorError AppconfigMonitorError;
+        //public delegate void AppConfigMonitorError(object sender, ErrorEventArgs e);
+        //public event AppConfigMonitorError AppconfigMonitorError;
 
         public FDASystemManager(string SQLInstance, string systemDBName, string login, string pass, string version, Guid executionID)
         {
@@ -62,8 +64,8 @@ namespace Common
             // sql server conn string
             //SystemDBConnectionString = "Server=" + SQLInstance + "; Database = " + systemDBName + "; user = " + login + "; password = " + pass + ";";
             
-            // postgres conn string
-            SystemDBConnectionString = "Server=" + SQLInstance + ";Port=5432;User Id=" + login + ";Password=" + pass + ";Database=" + systemDBName + ";";
+            // postgresql conn string
+            SystemDBConnectionString = "Server=" + SQLInstance + ";Port=5432;User Id=" + login + ";Password=" + pass + ";Database=" + systemDBName + ";Keepalive=1";
 
             systemDBSQLInstance = SQLInstance;
             systemDBLogin = login;
@@ -121,7 +123,13 @@ namespace Common
             //TriggerCleanup();
 
             // set up monitoring of the appconfig table
-            // ********** SqlTableDependency doesn't support postgresql ******************
+
+            // ************ PostgreSQL version *******************
+            _appConfigMonitor = new PostgreSQLListener<FDAConfig>(SystemDBConnectionString, "FDAConfig");
+            _appConfigMonitor.Notification += _appConfigMonitor_Notification;
+            _appConfigMonitor.StartListening();
+
+            // ************* SQL Server version  ******************
             /*
             try
             {
@@ -161,7 +169,13 @@ namespace Common
 
 
 
-            // set up monitoring of RocDataTypes tables
+            // set up monitoring of RocDataTypes tables (PostgreSQL version)
+            _rocDataTypesMonitor = new PostgreSQLListener<RocDataTypes>(SystemDBConnectionString, "rocdatatypes");
+            _rocDataTypesMonitor.Notification += _rocDataTypesMonitor_Notification;
+            _rocDataTypesMonitor.StartListening();
+
+
+            // set up monitoring of RocDataTypes tables (SQL Server version)
             /*
             try
             {
@@ -190,9 +204,15 @@ namespace Common
                 _rocDataTypesMonitor.OnError += _rocDataTypesMonitor_OnError;
                 _rocDataTypesMonitor.Start();
             }
+            */
 
- 
-            // set up monitoring of RocEventFormats table
+            // set up monitoring of the RocEventFormats table (PostgreSQL version)
+            _RocEventsFormatsMonitor = new PostgreSQLListener<RocEventFormats>(SystemDBConnectionString, "RocEventFormats");
+            _RocEventsFormatsMonitor.Notification += _RocEventsFormatsMonitor_Notification;
+            _RocEventsFormatsMonitor.StartListening();
+
+            /*
+            // set up monitoring of RocEventFormats table (SQL Server version)
             try
             {
                 _RocEventsFormatsMonitor = new SqlTableDependency<RocEventFormats>(SystemDBConnectionString, "RocEventFormats");
@@ -223,8 +243,11 @@ namespace Common
             */
         }
 
-      
-            void TriggerCleanup()
+       
+
+
+        /* SQL Server
+        void TriggerCleanup()
         {
             // get a list of triggers to be cleaned
             using (NpgsqlConnection conn = new NpgsqlConnection(SystemDBConnectionString))
@@ -278,7 +301,7 @@ namespace Common
             }
         }
 
-        /*
+        
         private void _rocDataTypesMonitor_OnError(object sender, TableDependency.SqlClient.Base.EventArgs.ErrorEventArgs e)
         {
             _rocDataTypesMonitor.OnChanged -= _rocDataTypesMonitor_OnChanged;
@@ -288,6 +311,46 @@ namespace Common
             Globals.SystemManager.LogApplicationError(Globals.GetOffsetUTC(), e.Error, "SQL Table change monitor object (RocDataTypes) error: " + e.Error.Message);
         }
         */
+
+        private void _rocDataTypesMonitor_Notification(object sender, PostgreSQLListener<RocDataTypes>.PostgreSQLNotification notifyEvent)
+        {
+           
+            string message = "";
+
+            switch (notifyEvent.Notification.operation)
+            {
+                case "INSERT":
+                    if (_rocDataTypes == null)
+                        _rocDataTypes = new Dictionary<string, RocDataTypes>();
+                    if (!_rocDataTypes.ContainsKey(notifyEvent.Notification.row.Key))
+                        _rocDataTypes.Add(notifyEvent.Notification.row.Key, notifyEvent.Notification.row);
+                    message = "RocDataTypes new row - PointType:Parameter = " + notifyEvent.Notification.row.Key;
+
+                    break;
+                case "DELETE":
+                    if (_rocDataTypes != null)
+                    {
+                        if (_rocDataTypes.ContainsKey(notifyEvent.Notification.row.Key))
+                            _rocDataTypes.Remove(notifyEvent.Notification.row.Key);
+                    }
+                    message = "RocDataTypes row deleted - PointType:Parameter = " + notifyEvent.Notification.row.Key;
+
+                    break;
+                case "UPDATE":
+                    if (_rocDataTypes == null)
+                        _rocDataTypes = new Dictionary<string, RocDataTypes>();
+                    if (_rocDataTypes.ContainsKey(notifyEvent.Notification.row.Key))
+                    {
+                        _rocDataTypes.Remove(notifyEvent.Notification.row.Key);
+                        _rocDataTypes.Add(notifyEvent.Notification.row.Key, notifyEvent.Notification.row);
+                    }
+                    else
+                        _rocDataTypes.Add(notifyEvent.Notification.row.Key, notifyEvent.Notification.row);
+                    message = "RocDataTypes row updated - PointType:Parameter = " + notifyEvent.Notification.row.Key;
+                    break;
+            }
+            Globals.SystemManager.LogApplicationEvent(this, "", message);
+        }
 
         /*
         private void _rocDataTypesMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<RocDataTypes> e)
@@ -347,7 +410,53 @@ namespace Common
             _RocEventsFormatsMonitor = null;
             Globals.SystemManager.LogApplicationError(Globals.GetOffsetUTC(), e.Error, "SQL Table change monitor object (RocEventFormats) error: " + e.Error.Message);
         }
+        */
 
+         private void _RocEventsFormatsMonitor_Notification(object sender, PostgreSQLListener<RocEventFormats>.PostgreSQLNotification notifyEvent)
+        {
+      
+            string message = "";
+
+
+
+            switch (notifyEvent.Notification.operation)
+            {
+                case "INSERT":
+                    if (_RocEventFormats == null)
+                        _RocEventFormats = new Dictionary<int, RocEventFormats>();
+                    if (!_RocEventFormats.ContainsKey(notifyEvent.Notification.row.PointType))
+                        _RocEventFormats.Add(notifyEvent.Notification.row.PointType, notifyEvent.Notification.row);
+                    message = "RocEventFormats new row: PointType = " + notifyEvent.Notification.row.PointType;
+
+                    break;
+                case "DELETE":
+                    if (_rocDataTypes != null)
+                    {
+                        if (_RocEventFormats.ContainsKey(notifyEvent.Notification.row.PointType))
+                            _RocEventFormats.Remove(notifyEvent.Notification.row.PointType);
+                    }
+                    message = "RocEventFormats row deleted: PointType = " + notifyEvent.Notification.row.PointType;
+
+                    break;
+                case "UPDATE":
+                    if (_RocEventFormats == null)
+                        _RocEventFormats = new Dictionary<int, RocEventFormats>();
+                    if (_RocEventFormats.ContainsKey(notifyEvent.Notification.row.PointType))
+                    {
+                        _RocEventFormats.Remove(notifyEvent.Notification.row.PointType);
+                        _RocEventFormats.Add(notifyEvent.Notification.row.PointType, notifyEvent.Notification.row);
+                    }
+                    else
+                        _RocEventFormats.Add(notifyEvent.Notification.row.PointType, notifyEvent.Notification.row);
+
+                    message = "RocEventFormats row updated: PointType = " + notifyEvent.Notification.row.PointType;
+                    break;
+            }
+            Globals.SystemManager.LogApplicationEvent(this, "", message);
+        }
+
+        /*
+        
         private void _RocEventsFormatsMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<RocEventFormats> e)
         {
             if (e.ChangeType == ChangeType.None)
@@ -402,8 +511,10 @@ namespace Common
 
         */
 
+        /* SQL Server
         private void AppConfigMonitor_OnError(object sender, TableDependency.SqlClient.Base.EventArgs.ErrorEventArgs e)
         {
+
             _appConfigMonitor.OnChanged -= _appConfigMonitor_OnChanged;
             _appConfigMonitor.OnStatusChanged -= AppConfigMonitor_OnStatusChanged;
             _appConfigMonitor.OnError -= AppConfigMonitor_OnError;
@@ -421,6 +532,7 @@ namespace Common
             if (e.Status != TableDependencyStatus.StopDueToError)
                 LogApplicationEvent(Globals.FDANow(), "SQLTableDependency", "AppConfigMonitor", "Status change: " + e.Status.ToString());
         }
+        */
 
         private void LoadRocLookupTables()
         {
@@ -623,7 +735,7 @@ namespace Common
                 Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Query for options from FDAConfig table failed. Query = " + query);
                 return false;
             }
-            _appConfigMonitor?.Start();
+            _appConfigMonitor?.StartListening();
             return true;
         }
 
@@ -683,7 +795,7 @@ namespace Common
                     FDAPass = options["FDADBPass"].OptionValue;
             }
 
-            AppDBConnectionString = "Server=" + FDASqlInstance + ";port=5432; Database = " + FDAdb + ";User Id = " + FDALogin + "; password = " + FDAPass + ";";
+            AppDBConnectionString = "Server=" + FDASqlInstance + ";port=5432; Database = " + FDAdb + ";User Id = " + FDALogin + "; password = " + FDAPass + ";Keepalive=1";
 
             return AppDBConnectionString;
         }
@@ -702,70 +814,72 @@ namespace Common
             return _appConfig;
         }
 
-        private void _appConfigMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<FDAConfig> e)
+
+
+        private void _appConfigMonitor_Notification(object sender, PostgreSQLListener<FDAConfig>.PostgreSQLNotification notifyEvent)
         {
             string restartMessage = " (change will be applied after a restart)";
             string message = "";
 
             /* Mar 9, 2020 Ignore BackfillDataLapseLimit global setting */
-            if (e.Entity.OptionName == "BackfillDataLapseLimit")
+            if (notifyEvent.Notification.row.OptionName == "BackfillDataLapseLimit")
                 return;
             bool isReadOnly = false;
-            if (e.ChangeType != ChangeType.None)
+            if (notifyEvent.Notification.operation != "NONE")
             {
-                isReadOnly = ReadOnlyOptions.Contains(e.Entity.OptionName);
-                if (e.ChangeType == ChangeType.Insert)
+                isReadOnly = ReadOnlyOptions.Contains(notifyEvent.Notification.row.OptionName);
+                if (notifyEvent.Notification.operation == "INSERT")
                 {
                     if (!isReadOnly)
-                        _appConfig.Add(e.Entity.OptionName, e.Entity);
+                        _appConfig.Add(notifyEvent.Notification.row.OptionName, notifyEvent.Notification.row);
 
-                    message = "FDAConfig new option entered : " + e.Entity.OptionName + " = " + e.Entity.OptionValue;
+                    message = "FDAConfig new option entered : " + notifyEvent.Notification.row.OptionName + " = " + notifyEvent.Notification.row.OptionValue;
 
                     // publish the default comms stats table to MQTT
-                    if (e.Entity.OptionName.ToUpper() == "COMMSSTATS")
+                    if (notifyEvent.Notification.row.OptionName.ToUpper() == "COMMSSTATS")
                     {
-                        PublishCommsStatsTable(e.Entity.OptionValue);
+                        PublishCommsStatsTable(notifyEvent.Notification.row.OptionValue);
                     }
                 }
 
-                if (e.ChangeType == ChangeType.Update)
+                if (notifyEvent.Notification.operation == "UPDATE")
                 {
-                    if (_appConfig.ContainsKey(e.Entity.OptionName))
+                    if (_appConfig.ContainsKey(notifyEvent.Notification.row.OptionName))
                     {
                         if (!isReadOnly)
-                            _appConfig[e.Entity.OptionName] = e.Entity;
+                            _appConfig[notifyEvent.Notification.row.OptionName] = notifyEvent.Notification.row;
 
-                        message = "FDAConfig option change : " + e.Entity.OptionName + " = " + e.Entity.OptionValue;
+                        message = "FDAConfig option change : " + notifyEvent.Notification.row.OptionName + " = " + notifyEvent.Notification.row.OptionValue;
 
-                        if (e.Entity.OptionName.ToUpper() == "COMMSSTATS")
+                        if (notifyEvent.Notification.row.OptionName.ToUpper() == "COMMSSTATS")
                         {
-                            PublishCommsStatsTable(e.Entity.OptionValue);
+                            PublishCommsStatsTable(notifyEvent.Notification.row.OptionValue);
                         }
                     }
                     else
                     {
                         if (!isReadOnly)
-                            _appConfig.Add(e.Entity.OptionName, e.Entity);
+                            _appConfig.Add(notifyEvent.Notification.row.OptionName, notifyEvent.Notification.row);
 
-                        message = "FDAConfig new option : " + e.Entity.OptionName + " = " + e.Entity.OptionValue;
-                        if (e.Entity.OptionName.ToUpper() == "COMMSSTATS")
+                        message = "FDAConfig new option : " + notifyEvent.Notification.row.OptionName + " = " + notifyEvent.Notification.row.OptionValue;
+                        if (notifyEvent.Notification.row.OptionName.ToUpper() == "COMMSSTATS")
                         {
-                            PublishCommsStatsTable(e.Entity.OptionValue);
+                            PublishCommsStatsTable(notifyEvent.Notification.row.OptionValue);
                         }
                     }
                 }
 
-                if (e.ChangeType == ChangeType.Delete)
-                    if (_appConfig.ContainsKey(e.Entity.OptionName))
+                if (notifyEvent.Notification.operation == "DELETE")
+                    if (_appConfig.ContainsKey(notifyEvent.Notification.row.OptionName))
                     {
                         if (!isReadOnly)
-                            _appConfig.Remove(e.Entity.OptionName);
+                            _appConfig.Remove(notifyEvent.Notification.row.OptionName);
 
-                        message = "FDAConfig option deleted, reverting to default : " + e.Entity.OptionName;
+                        message = "FDAConfig option deleted, reverting to default : " + notifyEvent.Notification.row.OptionName;
 
-                        if (e.Entity.OptionName.ToUpper() == "COMMSSTATS")
+                        if (notifyEvent.Notification.row.OptionName.ToUpper() == "COMMSSTATS")
                         {
-                            PublishCommsStatsTable(e.Entity.OptionName);
+                            PublishCommsStatsTable(notifyEvent.Notification.row.OptionName);
                         }
 
                     }
@@ -775,10 +889,89 @@ namespace Common
 
                 Globals.SystemManager.LogApplicationEvent(this, "", message);
 
-                ConfigChange?.Invoke(this, new ConfigEventArgs(e.ChangeType.ToString(), "FDAConfig", Guid.Empty));
+                ConfigChange?.Invoke(this, new ConfigEventArgs(notifyEvent.Notification.operation, "FDAConfig", Guid.Empty));
             }
         }
 
+        // SQL Server Version
+
+        //private void _appConfigMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<FDAConfig> e)
+        //{
+        //    string restartMessage = " (change will be applied after a restart)";
+        //    string message = "";
+
+        //    /* Mar 9, 2020 Ignore BackfillDataLapseLimit global setting */
+        //    if (e.Entity.OptionName == "BackfillDataLapseLimit")
+        //        return;
+        //    bool isReadOnly = false;
+        //    if (e.ChangeType != ChangeType.None)
+        //    {
+        //        isReadOnly = ReadOnlyOptions.Contains(e.Entity.OptionName);
+        //        if (e.ChangeType == ChangeType.Insert)
+        //        {
+        //            if (!isReadOnly)
+        //                _appConfig.Add(e.Entity.OptionName, e.Entity);
+
+        //            message = "FDAConfig new option entered : " + e.Entity.OptionName + " = " + e.Entity.OptionValue;
+
+        //            // publish the default comms stats table to MQTT
+        //            if (e.Entity.OptionName.ToUpper() == "COMMSSTATS")
+        //            {
+        //                PublishCommsStatsTable(e.Entity.OptionValue);
+        //            }
+        //        }
+
+        //        if (e.ChangeType == ChangeType.Update)
+        //        {
+        //            if (_appConfig.ContainsKey(e.Entity.OptionName))
+        //            {
+        //                if (!isReadOnly)
+        //                    _appConfig[e.Entity.OptionName] = e.Entity;
+
+        //                message = "FDAConfig option change : " + e.Entity.OptionName + " = " + e.Entity.OptionValue;
+
+        //                if (e.Entity.OptionName.ToUpper() == "COMMSSTATS")
+        //                {
+        //                    PublishCommsStatsTable(e.Entity.OptionValue);
+        //                }
+        //            }
+        //            else
+        //            {
+        //                if (!isReadOnly)
+        //                    _appConfig.Add(e.Entity.OptionName, e.Entity);
+
+        //                message = "FDAConfig new option : " + e.Entity.OptionName + " = " + e.Entity.OptionValue;
+        //                if (e.Entity.OptionName.ToUpper() == "COMMSSTATS")
+        //                {
+        //                    PublishCommsStatsTable(e.Entity.OptionValue);
+        //                }
+        //            }
+        //        }
+
+        //        if (e.ChangeType == ChangeType.Delete)
+        //            if (_appConfig.ContainsKey(e.Entity.OptionName))
+        //            {
+        //                if (!isReadOnly)
+        //                    _appConfig.Remove(e.Entity.OptionName);
+
+        //                message = "FDAConfig option deleted, reverting to default : " + e.Entity.OptionName;
+
+        //                if (e.Entity.OptionName.ToUpper() == "COMMSSTATS")
+        //                {
+        //                    PublishCommsStatsTable(e.Entity.OptionName);
+        //                }
+
+        //            }
+
+        //        if (isReadOnly)
+        //            message += restartMessage;
+
+        //        Globals.SystemManager.LogApplicationEvent(this, "", message);
+
+        //        ConfigChange?.Invoke(this, new ConfigEventArgs(e.ChangeType.ToString(), "FDAConfig", Guid.Empty));
+        //    }
+        //}
+         
         private void PublishCommsStatsTable(string table)
         {
             // publish changes to the default CommsStats output table to MQTT
@@ -1193,7 +1386,7 @@ namespace Common
                     Stopwatch stopwatch = new Stopwatch();
 
                     LogApplicationEvent(this, "", "Stopping FDAConfig table monitor");
-                    _appConfigMonitor?.Stop();
+                    _appConfigMonitor?.StopListening();
                     _appConfigMonitor?.Dispose();
 
                     if (_bgCommsLogger != null)

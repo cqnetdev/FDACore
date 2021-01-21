@@ -42,7 +42,7 @@ namespace FDA
 
             try
             {
-                Globals.SystemManager.AppconfigMonitorError += Logger_AppconfigMonitorError;
+                //Globals.SystemManager.AppconfigMonitorError += Logger_AppconfigMonitorError;
                 Globals.SystemManager.ConfigChange += ConfigChangeHandler;
             }
             catch 
@@ -77,15 +77,15 @@ namespace FDA
                 // apply any app configuration options
                 ApplyConfigOptions();
 
-                // subscribe to configuration change events (not needed, SQLTableDependency doesn't support postgres)
-                //_dbManager.ConfigChange += ConfigChangeHandler;
-                //_dbManager.DemandRequest += DemandRequestHandler;
+                // subscribe to configuration change events from the DBManager
+                _dbManager.ConfigChange += ConfigChangeHandler;
+                _dbManager.DemandRequest += DemandRequestHandler;
 
                 // create connection objects for each DSSourceConnection            
-                List<FDASourceConnections> ConnectionList = _dbManager.GetAllConnectionconfigs();
+                List<FDASourceConnection> ConnectionList = _dbManager.GetAllConnectionconfigs();
 
                 string[] connDetails;
-                foreach (FDASourceConnections connectionconfig in ConnectionList)
+                foreach (FDASourceConnection connectionconfig in ConnectionList)
                 {
                     // separate the hostname from the port
                     connDetails = connectionconfig.SCDetail01.Split(':');
@@ -217,6 +217,8 @@ namespace FDA
             {
                 Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "DataAcqManager: General error in Start()");
             }
+
+         
 
             PublishUpdatedConnectionsList();
 
@@ -407,7 +409,7 @@ namespace FDA
                     switch (e.ChangeType)
 
                     {
-                        case "Update":
+                        case "UPDATE":
                             // find the existing schedule
                             FDAScheduler oldScheduler=null;
                             if (_schedulersDictionary.ContainsKey(e.ID))
@@ -474,13 +476,13 @@ namespace FDA
 
                             break;
 
-                        case "Delete":
+                        case "DELETE":
                             _schedulersDictionary[e.ID].Enabled = false;
                             _schedulersDictionary[e.ID].TimerElapsed -= ScheduleTickHandler;
                             lock (_schedulersDictionary) { _schedulersDictionary.Remove(e.ID); }
                             break;
  
-                        case "Insert":
+                        case "INSERT":
                             lock (_schedulersDictionary)
                             {
                                 switch (SchedulerConfig.FRGSType.ToUpper())
@@ -504,7 +506,7 @@ namespace FDA
                 if (e.TableName == Globals.SystemManager.GetTableName("FDASourceConnections"))
                 {                    
                     string changeType = e.ChangeType;
-                    if (changeType == "Update")
+                    if (changeType == "UPDATE")
                     {
 
                         // get the connection object from the dictionary
@@ -515,7 +517,7 @@ namespace FDA
                             ConnectionManager conn = _connectionsDictionary[e.ID];
 
                             // get the connection configuration object that was updated from the database manager
-                            FDASourceConnections updatedConfig = _dbManager.GetConnectionConfig(e.ID);
+                            FDASourceConnection updatedConfig = _dbManager.GetConnectionConfig(e.ID);
 
                             if (conn.ConnectionType.ToString().ToUpper() != updatedConfig.SCType.ToUpper())
                             {
@@ -595,7 +597,7 @@ namespace FDA
 
                     }
 
-                    if (changeType == "Delete")
+                    if (changeType == "DELETE")
                     {
                         if (_connectionsDictionary.ContainsKey(e.ID))
                         {
@@ -618,9 +620,9 @@ namespace FDA
                         RevalidateRequestGroups(1);
                     }
 
-                    if (changeType == "Insert")
+                    if (changeType == "INSERT")
                     {
-                        FDASourceConnections connConfig = _dbManager.GetConnectionConfig(e.ID);
+                        FDASourceConnection connConfig = _dbManager.GetConnectionConfig(e.ID);
 
                         // separate the hostname from the port
                         string[] connDetails = connConfig.SCDetail01.Split(':');
@@ -683,7 +685,7 @@ namespace FDA
                 // handle request group config changes 
                 if (e.TableName == Globals.SystemManager.GetTableName("FDADataBlockRequestGroup"))
                 {
-                    if (e.ChangeType == "Update")
+                    if (e.ChangeType == "UPDATE")
                     {
                         // get the updated group config from the database
                         FDADataBlockRequestGroup updatedGroupConfig = _dbManager.GetRequestGroup(e.ID);
@@ -711,7 +713,7 @@ namespace FDA
                         }
                     }
 
-                    if (e.ChangeType == "Delete")
+                    if (e.ChangeType == "DELETE")
                     {
                         foreach (FDAScheduler scheduler in _schedulersDictionary.Values)
                         {
@@ -768,7 +770,7 @@ namespace FDA
                 // handle task changes
                 if (e.TableName == Globals.SystemManager.GetTableName("FDATasks"))
                 {
-                    if (e.ChangeType == "Update")
+                    if (e.ChangeType == "UPDATE")
                     {
                         // get the updated task definition from the database manager
                         FDATask updatedTask = _dbManager.GetTask(e.ID);
@@ -785,7 +787,7 @@ namespace FDA
                         }
                     }
 
-                    if (e.ChangeType == "Delete")
+                    if (e.ChangeType == "DELETE")
                     {
                         foreach (FDAScheduler scheduler in _schedulersDictionary.Values)
                         {
@@ -804,10 +806,10 @@ namespace FDA
                 if (e.TableName == Globals.SystemManager.GetTableName("DataPointDefinitionStructures"))
                 {
                     // mark request groups for revalidation
-                    if (e.ChangeType == "Insert")
+                    if (e.ChangeType == "INSERT")
                         RevalidateRequestGroups(2);
 
-                    if (e.ChangeType == "Delete")
+                    if (e.ChangeType == "DELETE")
                         RevalidateRequestGroups(1);
                     
                 }

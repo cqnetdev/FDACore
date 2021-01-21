@@ -145,7 +145,7 @@ namespace Common
         }
     }
 
-    public class FDASourceConnections
+    public class FDASourceConnection
     {
         public Guid SCUID { get; set; }
         public bool ConnectionEnabled { get; set; }
