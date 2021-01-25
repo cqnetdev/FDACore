@@ -14,7 +14,7 @@ namespace Common
         private NpgsqlConnection _conn;
         private string _table;
 
-        public delegate void ConnErrorHandler(object sender, PostgreSQLNotifierError e);
+        public delegate void ConnErrorHandler(object sender, Exception e);
         public event ConnErrorHandler Error;
 
         public delegate void NotificationHandler(object sender, PostgreSQLNotification notifyEvent);
@@ -40,11 +40,18 @@ namespace Common
             }
             catch (Exception ex)
             {
-                Error?.Invoke(this, new PostgreSQLNotifierError(ex));
+                Error?.Invoke(this,ex);
                 return;
             }
 
             _conn.Notification += _conn_Notification;
+            _conn.StateChange += _conn_StateChange;
+        }
+
+        private void _conn_StateChange(object sender, System.Data.StateChangeEventArgs e)
+        {
+            if ((e.CurrentState == System.Data.ConnectionState.Broken || e.CurrentState == System.Data.ConnectionState.Closed) && e.OriginalState == System.Data.ConnectionState.Open)
+                Error?.Invoke(this, new Exception("Database connection lost"));
         }
 
         public void StartListening()
@@ -54,11 +61,17 @@ namespace Common
             if (_conn.State != System.Data.ConnectionState.Open) return;
 
             // start listening for notifications
-            using (NpgsqlCommand command = new NpgsqlCommand("listen " + _notify_id + ";", _conn))
+            try
             {
-                command.ExecuteNonQuery();
+                using (NpgsqlCommand command = new NpgsqlCommand("listen " + _notify_id + ";", _conn))
+                {
+                    command.ExecuteNonQuery();
+                }
             }
-            _conn.WaitAsync();
+            catch (Exception ex)
+            {
+                Error?.Invoke(this,ex);
+            }
         }
 
         public void StopListening()
@@ -67,9 +80,15 @@ namespace Common
             if (_conn.State != System.Data.ConnectionState.Open) return;
 
             // start listening for notifications
-            using (NpgsqlCommand command = new NpgsqlCommand("unlisten " + _notify_id + ";", _conn))
+            try
             {
-                command.ExecuteNonQuery();
+                using (NpgsqlCommand command = new NpgsqlCommand("unlisten " + _notify_id + ";", _conn))
+                {
+                    command.ExecuteNonQuery();
+                }
+            }catch (Exception ex)
+            {
+                Error?.Invoke(this,ex);
             }
 
         }

@@ -53,14 +53,14 @@ namespace FDA
         }
 
 
-        private void Logger_AppconfigMonitorError(object sender, ErrorEventArgs e)
+        private void Logger_AppconfigMonitorError(object sender, Exception e)
         {
-            _dbManager?.HandleTableMonitorError("AppConfigMonitor", e);
+            _dbManager?.HandleTableMonitorError(e);
         }
 
         public bool TestDBConnection()
         {
-            return _dbManager.TestConnection();
+            return _dbManager.TestDatabaseConnection();
         }
 
         public void Start()

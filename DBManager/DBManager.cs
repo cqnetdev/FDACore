@@ -28,6 +28,8 @@ namespace FDA
 
         private CacheManager _cacheManager;
 
+        private bool _DBStatus = false;
+        private DateTime _PreviousDBStartTime = DateTime.MinValue;
 
         private Dictionary<Guid, FDARequestGroupScheduler> _schedConfig;
         private Dictionary<Guid, FDADataBlockRequestGroup> _requestgroupConfig;
@@ -37,10 +39,10 @@ namespace FDA
         private Dictionary<Guid, FDATask> _taskConfig;
 
 
-        private Timer _databaseConnectionCheckTimer;
-        private bool _databaseDownTimerActive = false;
-        private double _databaseConnectionDownTime = 0;
-        private readonly double _databaseDownNotificationLimit = 0.02083; // in days (default to 30 minutes)
+        private Timer _keepAliveTimer;
+        private TimeSpan _DBKeepAliveRate = new TimeSpan(0, 0, 3);
+        private Stopwatch _DBDownTimer = new Stopwatch();
+        private readonly TimeSpan _databaseDownNotificationLimit = new TimeSpan(0, 30, 0); // in days (default to 30 minutes)
         private bool _devicesTableExists = false;
         private bool _tasksTableExists;
         public RemoteQueryManager RemoteQueryManager;
@@ -92,7 +94,7 @@ namespace FDA
             _taskConfig = new Dictionary<Guid, FDATask>();
 
 
-            _databaseConnectionCheckTimer = new Timer(DBCheckTimerTick, this, Timeout.Infinite, Timeout.Infinite);
+            _keepAliveTimer = new Timer(DBCheckTimerTick, this, Timeout.Infinite, Timeout.Infinite);
 
             int batchLimit = 500;
             int batchTimeout = 500;
@@ -137,34 +139,58 @@ namespace FDA
 
         private void DBCheckTimerTick(Object o)
         {
-
-            if (!TestConnection(false))
+            using (NpgsqlConnection conn = new NpgsqlConnection(ConnectionString))
             {
-                // if (_databaseConnectionDownTime == 0)
-                Console.WriteLine(Globals.FDANow().ToString() + ": The database connection is down :" + _databaseConnectionDownTime);
-
-                _databaseConnectionDownTime += (5 / 86400.0);
-
-                if (_databaseConnectionDownTime >= _databaseDownNotificationLimit)
+                try
                 {
-                    // perform the notification (email? audible alarm?)
-                    Console.WriteLine(Globals.FDANow().ToString() + ": The database connection downtime has exceeded the limit (future: email? audible alarm?");
+                    conn.Open();
                 }
-            }
-            else
-            {
+                catch
+                {
+                    if (!_DBDownTimer.IsRunning)
+                        _DBDownTimer.Start();
 
-                _databaseConnectionCheckTimer.Change(Timeout.Infinite, Timeout.Infinite);
-                _databaseDownTimerActive = false;
-                Globals.SystemManager.LogApplicationEvent(this, "", "Database connection restored after a downtime of " + _databaseConnectionDownTime * 1440 + " minutes");
-                //Console.WriteLine(Globals.FDANow().ToString() + ": Database connection restored");
-                _databaseConnectionDownTime = 0;
-                Initialize();
-                LoadConfig();
-                StartChangeMonitoring();
+                    // failed to connect                  
+                    Console.WriteLine(Globals.FDANow().ToString() + ": The database connection is down (" + _DBDownTimer.Elapsed.ToString() + ")");                
 
-                if (_writeQueue.Count > 0 && !_dataWriter.IsBusy)
-                    _dataWriter.RunWorkerAsync();
+                    if (_DBDownTimer.Elapsed >= _databaseDownNotificationLimit)
+                    {
+                        // perform the notification (email? audible alarm?)
+                        Console.WriteLine(Globals.FDANow().ToString() + ": The database connection downtime has exceeded the limit (future: email? audible alarm?");
+                    }
+                    _DBStatus = false;
+                    return;
+                }
+
+                // current status = true, previous status = false means a recovered connection
+                if (_DBStatus == false)
+                {
+                    _DBDownTimer.Stop();
+                    _DBDownTimer.Reset();
+
+                    _DBStatus = true;
+                    Globals.SystemManager.LogApplicationEvent(this, "DBManager", "Database connection restored, re-initializing the DBManager");
+                    Initialize();
+                    LoadConfig();
+                    StartChangeMonitoring();
+                    return;
+                }
+
+                DateTime DB_starttime = PG_GetDBStartTime();
+
+                if (DB_starttime > _PreviousDBStartTime)
+                {
+                    Globals.SystemManager.LogApplicationEvent(this, "DBManager", "Database connection start time mismatch, re-initializing DBManager");
+
+                    Initialize();
+                    LoadConfig();
+                    StartChangeMonitoring();
+
+                    if (_writeQueue.Count > 0 && !_dataWriter.IsBusy)
+                        _dataWriter.RunWorkerAsync();
+                }
+
+
             }
         }
 
@@ -224,7 +250,39 @@ namespace FDA
             }
             return result;
         }
-        
+
+        private DateTime PG_GetDBStartTime()
+        {
+            using (NpgsqlConnection conn = new NpgsqlConnection(ConnectionString))
+            {
+                try
+                {
+                    conn.Open();
+                }
+                catch (Exception ex)
+                {
+                    Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Failed to connect to database");
+                    return DateTime.MinValue;
+                }
+
+                try
+                {
+                    using (NpgsqlCommand sqlCommand = conn.CreateCommand())
+                    {
+                        sqlCommand.CommandText = "SELECT pg_postmaster_start_time()";
+                        return (DateTime)sqlCommand.ExecuteScalar();
+                    }
+
+                }
+                catch (Exception ex)
+                {
+                    Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Failed to retrieve database start time");
+                    return DateTime.MinValue;
+                }
+            }
+                
+        }
+
         private int PG_ExecuteScalar(string sql)
         {
             int scalarResult = -1;
@@ -659,7 +717,10 @@ namespace FDA
             // start the remote query manager (handles queries from FDAManagers)
             Globals.SystemManager.LogApplicationEvent(this, "", "Starting Remote Query Manager");
             RemoteQueryManager = new RemoteQueryManager(ConnectionString);
-           
+
+
+            // get the last DB start time
+            _PreviousDBStartTime = PG_GetDBStartTime();
 
             Globals.SystemManager.LogApplicationEvent(this, "", "FDA initialization complete");
 
@@ -686,7 +747,19 @@ namespace FDA
             if (_taskDefMonitor != null)
                 _taskDefMonitor.Notification += _taskDefMonitor_Notification;
 
+            _demandMonitor.Error += _PostgresSQLMonitor_Error;
+            _schedMonitor.Error += _PostgresSQLMonitor_Error;
+            _requestGroupDefMonitor.Error += _PostgresSQLMonitor_Error;
+            _connectionDefMonitor.Error += _PostgresSQLMonitor_Error;
+            _dataPointDefMonitor.Error += _PostgresSQLMonitor_Error;
+            if (_deviceDefMonitor != null)
+                _deviceDefMonitor.Error += _PostgresSQLMonitor_Error;
+            if (_taskDefMonitor != null)
+                _taskDefMonitor.Error += _PostgresSQLMonitor_Error;
+
             StartChangeMonitoring();
+
+            _keepAliveTimer.Change(_DBKeepAliveRate, _DBKeepAliveRate);
 
             // SQlTableDependency objects (one per table), monitor for changes/additions/deletions and raise event when changes detects
 
@@ -843,7 +916,12 @@ namespace FDA
 
         }
 
- 
+        private void _PostgresSQLMonitor_Error(object sender,Exception e)
+        {
+            HandleTableMonitorError(e);
+        }
+
+
 
 
         /* not needed, no triggers because SQlTableDependency doesn't support postgres
@@ -1000,19 +1078,20 @@ namespace FDA
 
 
 
-        public void HandleTableMonitorError(string monitorName, TableDependency.SqlClient.Base.EventArgs.ErrorEventArgs e)
+        public void HandleTableMonitorError(Exception e)
         {
-            Globals.SystemManager.LogApplicationError(Globals.FDANow(), e.Error, "SQL Table change monitor object (" + monitorName + ") error: " + e.Error.Message);
+            Globals.SystemManager.LogApplicationError(Globals.FDANow(), e, "Database error reported by table change monitoring object.  Error: " + e.Message);
 
-            // enable the database downtime checking routine, this will repeatedly attempt to connect to the databse, raise some of alert if  the downtime is too long, and re-initialize the database
+            // enable the database downtime checking routine, this will repeatedly attempt to connect to the database, raise some of alert if  the downtime is too long, and re-initialize the database
             //manager when the connection is restored
-            if (!_databaseDownTimerActive)
-            {
-                _databaseDownTimerActive = true;
-                _databaseConnectionCheckTimer.Change(TimeSpan.FromSeconds(0), TimeSpan.FromSeconds(5));
-            }
+            //if (!_databaseDownTimerActive)
+            //{
+            //    _databaseDownTimerActive = true;
+            //    _databaseConnectionCheckTimer.Change(TimeSpan.FromSeconds(0), TimeSpan.FromSeconds(5));
+            //}
         }
 
+        /*
         private void DemandMonitor_OnStatusChanged(object sender, TableDependency.SqlClient.Base.EventArgs.StatusChangedEventArgs e)
         {
             LogMonitorStatusChangeEvent("DemandMonitor", e);
@@ -1060,14 +1139,13 @@ namespace FDA
             if (e.Status != TableDependencyStatus.StopDueToError)
                 Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "SQLTableDependency", monitorName, "Status change: " + e.Status.ToString());
         }
+        */
 
 
-
-        // test the connection to the database, return true if successful, false if not
-        public bool TestConnection(bool log = true)
+    
+        public bool TestDatabaseConnection()
         {
-            if (log)
-                Globals.SystemManager.LogApplicationEvent(this, "", "Testing Database connection");
+           Globals.SystemManager.LogApplicationEvent(this, "", "Testing Database connection");
 
             using (NpgsqlConnection conn = new NpgsqlConnection(ConnectionString))
             {
@@ -1078,17 +1156,26 @@ namespace FDA
                 catch (Exception ex)
                 {
                     // failed to connect
-                    if (log)
-                        Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Error occurred while attempting to connect to the database");
+                    Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Error occurred while attempting to connect to the database");
+                    _DBStatus = false;
                     return false;
                 }
 
+               _DBStatus = true;
+                using (NpgsqlCommand command = conn.CreateCommand())
+                {
+                    command.CommandText = "SELECT pg_postmaster_start_time()";
+                    _PreviousDBStartTime = (DateTime)command.ExecuteScalar();
+                }
                 conn.Close();
             }
-            if (log)
-                Globals.SystemManager.LogApplicationEvent(this, "", "Successfully connected to the database",false,true);
 
-            Globals.SystemManager.LogApplicationEvent(this, "", "Checking database pre-requisites",false,true);
+            Globals.SystemManager.LogApplicationEvent(this, "", "Successfully connected to the database", false, true);
+
+         
+            
+
+            Globals.SystemManager.LogApplicationEvent(this, "", "Checking database pre-requisites", false, true);
 
             return PreReqCheck();
         }
@@ -1147,7 +1234,6 @@ namespace FDA
                             FDASystemServiceBrokerEnabled = enabled;
                     }
                 }
-
             }
         }
 
@@ -1264,6 +1350,8 @@ namespace FDA
             lock (_requestgroupConfig) { _requestgroupConfig.Clear(); }
             lock (_dataPointConfig) { _dataPointConfig.Clear(); }
             lock (_connectionsConfig) { _connectionsConfig.Clear(); }
+            lock (_taskConfig) { _taskConfig.Clear(); }
+            lock (_deviceConfig) { _deviceConfig.Clear(); }
 
             using (NpgsqlConnection conn = new NpgsqlConnection(ConnectionString))
             {
@@ -1537,7 +1625,7 @@ namespace FDA
                                     }
                                     catch
                                     {
-                                        Globals.SystemManager.LogApplicationEvent(this, "", "FDA Start, Config Error - Device ID '" + ID + "' rejected", true);
+                                        Globals.SystemManager.LogApplicationEvent(this, "", "FDA Start, Config Error - Task ID '" + ID + "' rejected", true);
                                     }
                                 }
                             }
