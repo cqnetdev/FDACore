@@ -29,8 +29,8 @@ namespace FDAApp
         static private Guid ExecutionID;
         static private System.Threading.Timer upTimeReporterTmr;
         static private System.Threading.Timer MqttRetryTimer;
-        //static private readonly bool FDAIsElevated = false;
-        //static private bool FDAElevationMessagePosted = false;
+        static private bool FDAIsElevated = false;
+        static private bool FDAElevationMessagePosted = false;
         static private bool ShutdownComplete = false;
         static IConfiguration configuration;
         //private string FDAidentifier = "";
@@ -134,8 +134,11 @@ namespace FDAApp
                 configuration = new ConfigurationBuilder().AddJsonFile("appsettings.json", false, true).Build();
                 var appConfig = configuration.GetSection(nameof(AppSettings));
 
-                //FDAIsElevated = new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator);
+                FDAIsElevated = false;
+                FDAIsElevated = MQTTUtils.ThisProcessIsAdmin();
 
+                //if (Environment.OSVersion.Platform == PlatformID.Win32NT)
+                //    FDAIsElevated = new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator);
 
                 ExecutionID = Guid.NewGuid();
                 string FDAID = appConfig["FDAID"];
@@ -193,7 +196,7 @@ namespace FDAApp
 
                 systemManager.LogStartup(ExecutionID, Globals.FDANow(), versionInfo.FileVersion);
 
-                //RepairMosquittoService();
+                
 
                 Globals.ExecutionTime = Globals.FDANow();
 
@@ -355,10 +358,9 @@ namespace FDAApp
             else
             {
                 Globals.SystemManager.LogApplicationEvent(null, "", "Failed to connect to MQTT broker. Will attempt to reconnect every 30 seconds until a connection is established", false, false);
-                /* not .NET core compatible 
                 // check if the Mosquitto service is not started, try to start it if it isn't running
                 RepairMosquittoService();
-                */
+                
                 // start a 5 second timer for re-attempting the connection
                 if (MqttRetryTimer == null)
                     MqttRetryTimer = new System.Threading.Timer(MQTTConnect, o, 30000, 30000);
@@ -648,8 +650,8 @@ namespace FDAApp
                 MqttRetryTimer.Change(5000, 5000);
         }
 
-        /* not .NET Core Compatible
-        private void RepairMosquittoService()
+
+        private static void RepairMosquittoService()
         {
             try
             { 
@@ -657,14 +659,14 @@ namespace FDAApp
                 if (FDAIsElevated)
                 { 
                     // run the mosquitto utility
-                    Globals.SystemManager.LogApplicationEvent(this, "", "Unable to connect to the MQTT broker, attempting to repair the service");
+                    Globals.SystemManager.LogApplicationEvent(null, "", "Unable to connect to the MQTT broker, attempting to repair the service");
                     string result = MQTTUtils.RepairMQTT();
                     if (result == "")
                     {
-                        Globals.SystemManager.LogApplicationEvent(this, "", "MQTT succesfully repaired");
+                        Globals.SystemManager.LogApplicationEvent(null, "", "MQTT succesfully repaired");
                     }
                     else
-                        Globals.SystemManager.LogApplicationEvent(this, "", "Unable to repair MQTT broker: " + result);
+                        Globals.SystemManager.LogApplicationEvent(null, "", "Unable to repair MQTT broker: " + result);
                     //ProcessStartInfo startInfo = new ProcessStartInfo();
                     //startInfo.FileName = "MQTTBrokerUtility.exe";
                     //Process.Start(startInfo);                
@@ -673,8 +675,7 @@ namespace FDAApp
                 {
                     if (!FDAElevationMessagePosted)
                     {
-                        MessageBox.Show("Unable to connect to MQTT Broker, Please run the FDA as Administrator to repair the problem","Warning",MessageBoxButtons.OK,MessageBoxIcon.Warning);
-                        Globals.SystemManager.LogApplicationEvent(this, "", "Warning: Unable to connect to the MQTT Broker, and the FDA cannot repair the issue because it does not have administrator privileges, please run the FDA as Administrator");
+                        Globals.SystemManager.LogApplicationEvent(null, "", "Warning: Unable to connect to the MQTT Broker, and the FDA cannot repair the issue because it does not have administrator privileges, please run the FDA as Administrator/SuperUser");
                         FDAElevationMessagePosted = true;
                     }
                 }                
@@ -684,7 +685,7 @@ namespace FDAApp
                 Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Error while attempting to repair the Mosquitto Broker service");
             }
         }
-        */
+        
 
         static private void ReportUptime(object o)
         {

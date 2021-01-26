@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using System.Security.Principal;
@@ -15,38 +16,135 @@ namespace Common
         private static string exeRelativePath = "\\MQTT\\mosquitto.exe";
         private static string MQTTFolderRelativePath = "\\MQTT";
 
-        /* not .NET Core compatible 
+
+        private static string RunCommand(string command, string args, string workingDir = "")
+        {
+            var processStartInfo = new ProcessStartInfo()
+            {
+                FileName = command,
+                Arguments = args,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            };
+
+            if (workingDir != "")
+                processStartInfo.WorkingDirectory = workingDir;
+
+            var process = new Process();
+            process.StartInfo = processStartInfo;
+
+
+            process.Start();
+            string output = process.StandardOutput.ReadToEnd();
+            string error = process.StandardError.ReadToEnd();
+            process.WaitForExit();
+
+            if (string.IsNullOrEmpty(error)) { return output; }
+            else { return error; }
+        }
+
+
         public static bool ThisProcessIsAdmin()
         {
-            return new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator);
+
+            if (Environment.OSVersion.Platform == PlatformID.Win32NT)
+            {
+                return new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator);
+            }
+            
+            if (Environment.OSVersion.Platform == PlatformID.Unix)
+            {
+                return Environment.UserName == "root";
+            }
+
+            return false;
         }
-        
+
 
         public static bool ServiceInstalled()
         {
-            return ServiceController.GetServices().Any(serviceController => serviceController.ServiceName.Equals(serviceName));
+            if (Environment.OSVersion.Platform == PlatformID.Win32NT)
+            {
+                return ServiceController.GetServices().Any(serviceController => serviceController.ServiceName.Equals(serviceName));
+            }
+
+            if (Environment.OSVersion.Platform == PlatformID.Unix)
+            {
+                string result = RunCommand("systemctl", "status " + serviceName);
+
+                return !(result.Contains("could not be found") || result.Contains(".service is masked")); // 'could not be found' = never installed, '.service is masked' = previously installed, but has been uninstalled
+
+            }
+
+            return false;
         }
 
         public static string GetMQTTStartMode()
         {
-            // check if the service is set to run automatically on startup
-            ServiceController sc = new ServiceController();
-            sc.ServiceName = serviceName;
             string starttype = "unknown start type (service not found)";
-            try
+            // check if the service is set to run automatically on startup
+            if (Environment.OSVersion.Platform == PlatformID.Win32NT)
             {
-                starttype = sc.StartType.ToString();
+                ServiceController sc = new ServiceController();
+                sc.ServiceName = serviceName;              
+                try
+                {
+                    starttype = sc.StartType.ToString();
+                }
+                catch { }
             }
-            catch { }
+
+            if (Environment.OSVersion.Platform == PlatformID.Unix)
+            {
+                string result = RunCommand("systemctl", "status " + serviceName);
+
+                if (result.Contains(".service; enabled"))
+                {
+                    return "Automatic";
+                }
+                else
+                    return "Disabled";
+            }
+
 
             return starttype;
         }
 
         public static string InstallMosquitto()
         {
-            string error = RunMosquittoExecutable("install");
-            if (error != String.Empty)
-                error = "Error while installing Mosquitto: " + error;
+            string error = "";
+            if (Environment.OSVersion.Platform == PlatformID.Win32NT)
+            {
+                error = RunMosquittoExecutable("install");
+                if (error != String.Empty)
+                    error = "Error while installing Mosquitto: " + error;
+
+                return error;
+            }
+
+            if (Environment.OSVersion.Platform == PlatformID.Unix)
+            {
+                // install mosquitto
+                string result = "";
+                result = RunCommand("wget", "http://repo.mosquitto.org/debian/mosquitto-repo.gpg.key") + Environment.NewLine;
+                result = RunCommand("apt-key", "add mosquitto-repo.gpg.key") + Environment.NewLine;
+                result = RunCommand("wget","http://repo.mosquitto.org/debian/mosquitto-buster.list", "/etc/apt/sources.list.d/");              
+                result = RunCommand("apt-get", "update");
+                result =  RunCommand("apt-get", "-y install mosquitto");
+
+                // copy configuration files
+                result =  RunCommand("cp", "users.txt /etc/mosquitto/users.txt");
+                result = RunCommand("cp", "acl.txt /etc/mosquitto/acl.txt");
+                result = RunCommand("cp", "mosquitto.conf /etc/mosquitto/mosquitto.conf");
+
+                // just in case the service exists from a previous installation but is masked
+                result = RunCommand("systemctl", "unmask " + serviceName); 
+
+                // restart the service (load the configuration)
+                result = RunCommand("systemctl", "restart " + serviceName);
+            }
 
             return error;
         }
@@ -54,9 +152,19 @@ namespace Common
 
         public static string UnInstallMosquitto()
         {
-            string error = RunMosquittoExecutable("uninstall");
-            if (error != String.Empty)
-                error = "Error while un-installing Mosquitto: " + error;
+            string error = "";
+            if (Environment.OSVersion.Platform == PlatformID.Win32NT)
+            {
+                error = RunMosquittoExecutable("uninstall");
+                if (error != String.Empty)
+                    error = "Error while un-installing Mosquitto: " + error;
+
+            }
+
+            if (Environment.OSVersion.Platform == PlatformID.Unix)
+            {
+               error = RunCommand("apt-get", "-y remove mosquitto");
+            }
 
             return error;
         }
@@ -102,54 +210,84 @@ namespace Common
 
         public static string GetMQTTStatus()
         {
-            ServiceController sc = new ServiceController();
-            sc.ServiceName = serviceName;
             string status = "unknown";
-            try
+            if (Environment.OSVersion.Platform == PlatformID.Win32NT)
             {
-                status = sc.Status.ToString();
+                ServiceController sc = new ServiceController();
+                sc.ServiceName = serviceName;
+
+                try
+                {
+                    status = sc.Status.ToString();
+                }
+                catch { }
+
+             
             }
-            catch { }
+
+
+            if (Environment.OSVersion.Platform == PlatformID.Unix)
+            {
+                string result = RunCommand("systemctl", "status " + serviceName);
+                if (result.Contains("active (running)"))
+                    status = "Running";
+                else
+                    status = "Stopped";
+            }
+
 
             return status;
+
         }
 
 
 
         public static string StartMosquittoService()
         {
-            ServiceController sc = new ServiceController();
-            sc.ServiceName = serviceName;
-            try
+            if (Environment.OSVersion.Platform == PlatformID.Win32NT)
             {
-                sc.Start();
-            }
-            catch (Exception ex)
-            { 
-                return ex.Message; 
+                ServiceController sc = new ServiceController();
+                sc.ServiceName = serviceName;
+                try
+                {
+                    sc.Start();
+                }
+                catch (Exception ex)
+                {
+                    return ex.Message;
+                }
+
+                sc.WaitForStatus(ServiceControllerStatus.Running, new TimeSpan(0, 0, 5)); // 5 second timeout for service to start
+                if (sc.Status != ServiceControllerStatus.Running)
+                    return "service was started, but it failed to initialize";
+                return string.Empty;
+            }                   
+
+            if (Environment.OSVersion.Platform == PlatformID.Unix)
+            {
+                string result = RunCommand("systemctl", "start " + serviceName);
+                return result;
             }
 
-            sc.WaitForStatus(ServiceControllerStatus.Running, new TimeSpan(0, 0, 5)); // 5 second timeout for service to start
-            if (sc.Status != ServiceControllerStatus.Running)
-                return "service was started, but it failed to initialize";
-
-            return string.Empty;
+            return "unsupported platform"; // should never see this;
         }
 
 
 
         public static string RepairMQTT()
         {
+            Console.WriteLine("Starting MQTT Repair");
+
             // utility run as admin?
             if (!MQTTUtils.ThisProcessIsAdmin())
             {
-                return "Unable to repair MQTT, please run in Administrator mode";
+                return "Unable to repair MQTT, please run the FDA as Administrator/Superuser";
             }
 
             // service exists?
             bool registrationAttempted = false;
             bool serviceExists = false;
-            
+
             RecheckServiceExists:
             serviceExists = MQTTUtils.ServiceInstalled();
             string error = "";
@@ -159,6 +297,7 @@ namespace Common
                 {
                     // try registering it
                     registrationAttempted = true;
+                    Console.WriteLine("Installing mosquitto");
                     error = MQTTUtils.InstallMosquitto();
                     goto RecheckServiceExists;
                 }
@@ -166,50 +305,64 @@ namespace Common
             if (!serviceExists)
                 return "Service not installed, and an attempt to installed it failed: " + error;
 
-
-            // check that the required environment variable exists
-            string path;
-            bool repaired = false;
-
-        RecheckVar:
-            if (!MQTTUtils.EnvVarExists(out path))
+            // environment variable is windows only
+            if (Environment.OSVersion.Platform == PlatformID.Win32NT)
             {
-                if (!repaired)
-                {
-                    MQTTUtils.SetMQTTPath();
-                    repaired = true;
-                    goto RecheckVar;
-                }
-                else
-                {
-                    return "Failed to create the MOSQUITTO_DIR environment variable";
-                }
-            }
+                // check that the required environment variable exists
+                string path;
+                bool repaired = false;
 
-            // checking that MOSQUITTO_DIR is set to the correct path          
-            repaired = false;
-            RecheckPath:
-            if (!MQTTUtils.MQTTPathCorrect())
-            {
-                if (!repaired)
+                RecheckVar:
+                if (!MQTTUtils.EnvVarExists(out path))
                 {
-                    MQTTUtils.SetMQTTPath();
-                    repaired = true;
-                    goto RecheckPath;
+                    if (!repaired)
+                    {
+                        MQTTUtils.SetMQTTPath();
+                        repaired = true;
+                        goto RecheckVar;
+                    }
+                    else
+                    {
+                        return "Failed to create the MOSQUITTO_DIR environment variable";
+                    }
                 }
-                else
+
+                // checking that MOSQUITTO_DIR is set to the correct path          
+                repaired = false;
+                RecheckPath:
+                if (!MQTTUtils.MQTTPathCorrect())
                 {
-                    return "Failed to set the MOSQUITTO_DIR environment variable";
+                    if (!repaired)
+                    {
+                        MQTTUtils.SetMQTTPath();
+                        repaired = true;
+                        goto RecheckPath;
+                    }
+                    else
+                    {
+                        return "Failed to set the MOSQUITTO_DIR environment variable";
+                    }
                 }
             }
 
             // service is set to run automatically?
-            string result;
+            string result = "";
             if (MQTTUtils.GetMQTTStartMode() != "Automatic")
             {
-                // no way to just change the start mode, uninstall it and re-install it and the intaller will set it to automatic
-                MQTTUtils.UnInstallMosquitto();
-                result = MQTTUtils.InstallMosquitto();
+                if (Environment.OSVersion.Platform == PlatformID.Win32NT)
+                {
+                    // no way to just change the start mode, uninstall it and re-install it and the intaller will set it to automatic
+                    MQTTUtils.UnInstallMosquitto();
+                    result = MQTTUtils.InstallMosquitto();
+                }
+
+                if (Environment.OSVersion.Platform == PlatformID.Unix)
+                {
+                    // enable the service
+                    Console.WriteLine("Enabling the service");
+                    RunCommand("systemctl", "unmask " + serviceName); // just in case
+                    RunCommand("systemctl", "enable " + serviceName);
+                }
 
                 if (result != "")
                     return "Error while changing MQTT service start mode to automatic: " + result;
@@ -224,6 +377,7 @@ namespace Common
             }
 
             return "";
+           
         }
 
 
@@ -250,8 +404,6 @@ namespace Common
 
             return error;
         }
-
-        */
 
     }
 }
