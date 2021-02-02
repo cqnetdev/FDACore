@@ -105,7 +105,7 @@ namespace FDA
             if (Globals.SystemManager.GetAppConfig().ContainsKey("BatchInsertMaxTime"))
                 int.TryParse(Globals.SystemManager.GetAppConfig()["BatchInsertMaxTime"].OptionValue, out batchTimeout);
 
-            // cap at 500 records
+            // cap write batches at 500 records
             if (batchLimit > 500)
                 batchLimit = 500;
 
@@ -113,10 +113,10 @@ namespace FDA
             _cacheManager.CacheFlush += _cacheMananger_CacheFlush;
 
             // check if device table exists
-            _devicesTableExists =(PG_ExecuteScalar("SELECT cast(count(1) as integer) from information_schema.tables where table_name = '" + Globals.SystemManager.GetTableName("fdadevices") + "';") > 0);
+            _devicesTableExists =((int)PG_ExecuteScalar("SELECT cast(count(1) as integer) from information_schema.tables where table_name = '" + Globals.SystemManager.GetTableName("fdadevices") + "';") > 0);
 
             // check if tasks table exists
-            _tasksTableExists = (PG_ExecuteScalar("SELECT cast(count(1) as integer) from information_schema.tables where table_name = '" + Globals.SystemManager.GetTableName("fdatasks") + "';") > 0);
+            _tasksTableExists = ((int)PG_ExecuteScalar("SELECT cast(count(1) as integer) from information_schema.tables where table_name = '" + Globals.SystemManager.GetTableName("fdatasks") + "';") > 0);
         }
 
         public void UpdateCacheSize(int cacheLimit)
@@ -175,6 +175,7 @@ namespace FDA
                     StartChangeMonitoring();
                     return;
                 }
+
 
                 DateTime DB_starttime = PG_GetDBStartTime();
 
@@ -253,43 +254,22 @@ namespace FDA
 
         private DateTime PG_GetDBStartTime()
         {
-            using (NpgsqlConnection conn = new NpgsqlConnection(ConnectionString))
-            {
-                try
-                {
-                    conn.Open();
-                }
-                catch (Exception ex)
-                {
-                    Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Failed to connect to database");
-                    return DateTime.MinValue;
-                }
+            object scalarResult = PG_ExecuteScalar("SELECT pg_postmaster_start_time()");
+            DateTime startTime = DateTime.MinValue;
 
-                try
-                {
-                    using (NpgsqlCommand sqlCommand = conn.CreateCommand())
-                    {
-                        sqlCommand.CommandText = "SELECT pg_postmaster_start_time()";
-                        return (DateTime)sqlCommand.ExecuteScalar();
-                    }
+            if (scalarResult != null)
+                startTime = (DateTime)scalarResult;
 
-                }
-                catch (Exception ex)
-                {
-                    Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Failed to retrieve database start time");
-                    return DateTime.MinValue;
-                }
-            }
-                
+            return startTime;
+               
         }
 
-        private int PG_ExecuteScalar(string sql)
+        private object PG_ExecuteScalar(string sql)
         {
-            int scalarResult = -1;
-            int result = -1;
-            bool success = false;
-            NpgsqlException sqlException = null;
-            int tries = 0;
+            int maxRetries = 3;
+            int retries = 0;
+
+            Retry:
             using (NpgsqlConnection conn = new NpgsqlConnection(ConnectionString))
             {
                 try
@@ -298,79 +278,40 @@ namespace FDA
                 }
                 catch (Exception ex)
                 {
-                    Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Failed to connect to database");
-                    return 0;
+                    Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "PG_ExecuateScalar() Failed to connect to database");
+                    return null;
                 }
 
-                while (!success && tries < 3)
+
+                using (NpgsqlCommand sqlCommand = conn.CreateCommand())
                 {
+                    sqlCommand.CommandText = sql;
+
                     try
                     {
-                        using (NpgsqlCommand sqlCommand = conn.CreateCommand())
+                        return sqlCommand.ExecuteScalar();
+                    }
+                    catch (Exception ex)
+                    {
+                        retries++;
+                        if (retries < maxRetries)
                         {
-                            tries++;
-                            sqlCommand.CommandText = sql;
-                         
-                            scalarResult = (int)sqlCommand.ExecuteScalar();
+                            Thread.Sleep(250);
+                            goto Retry;
                         }
-                        success = true;
+                        else
+                        {
+                            Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "PG_ExecuteScalar() Failed to execute query after " + (maxRetries + 1) + " attempts.");
+                            return null;
+                        }
                     }
-                    catch (NpgsqlException ex)
-                    {
-                        sqlException = ex;
-                        success = false;
-                        Thread.Sleep(200);
-                    }
+
                 }
-                conn.Close();
+               
             }
-
-            if (!success)
-                Globals.SystemManager.LogApplicationError(Globals.FDANow(), sqlException, "Failed to execute query = " + sql);
-            else
-            {         
-                Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "DBManager", "Scalar query successful: returned value of " + scalarResult + ", " + tries + " tries : " + sql.Substring(0, 30) + "...", false, true);
-                result = scalarResult;
-            }
-
-            return result;
         }
 
-        // this doesn't work because the connection gets automatically closed when the function exits (because of the 'using' keyword), making the datareader unusable
-        private NpgsqlDataReader PG_ExecuteDataReader(string sql)
-        {
-            NpgsqlDataReader reader;
-            using (NpgsqlConnection conn = new NpgsqlConnection(ConnectionString))
-            {
-                try
-                {
-                    conn.Open();
-                }
-                catch (Exception ex)
-                {
-                    Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Failed to connect to database while retrieving values to write to device");
-                    return null;
-                }
-
-
-
-                try
-                {
-                    using (NpgsqlCommand sqlCommand = conn.CreateCommand())
-                    {
-                        sqlCommand.CommandText = sql;
-                        reader = sqlCommand.ExecuteReader();
-                    }
-                }
-                catch (NpgsqlException ex)
-                {
-                    Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Failed to execute query = " + sql);
-                    return null;
-                }
-            }
-
-            return reader;
-        }
+ 
 
         public void WriteDataToDB(DataRequest completedRequest)
         {
@@ -578,19 +519,6 @@ namespace FDA
                                         batch.Append(tag.Quality);
                                         batch.Append(");");
 
-                                        /* slow way of putting together the query
-                                        batch += "if (select count(1) from " + dest + " where DPDUID = '" + tag.TagID.ToString() + "')>0 "
-                                        + "update " + dest + " set Value = " + value
-                                        + ",Timestamp = '" + Helpers.FormatDateTime(tag.Timestamp) + "'"
-                                        + ",Quality = " + tag.Quality.ToString()
-                                        + " where DPDUID = '" + tag.TagID.ToString()
-                                        + "' and Timestamp = (select MAX(Timestamp) from " + dest + " where DPDUID = '" + tag.TagID.ToString() + "')"
-                                        + " else "
-                                        + "insert into " + dest + "(DPDUID, Timestamp, Value, Quality) "
-                                        + "values ('" + tag.TagID.ToString()
-                                        + "','" + Helpers.FormatDateTime(tag.Timestamp) + "'"
-                                        + "," + value + "," + tag.Quality.ToString() + ");";
-                                        */
                                         querycount++;
                                     }
                                     firstDest = false;
@@ -628,34 +556,7 @@ namespace FDA
                                     batch.Append(tag.Quality);
                                     batch.Append(" WHERE NOT EXISTS (SELECT 1 FROM FDALastDataValues WHERE dpduid = '");
                                     batch.Append(tag.TagID);
-                                    batch.Append("');");
-
-                                 
-                                    /* non-compatible query
-                                    batch.Append("update FDALastDataValues set value=");
-                                    batch.Append(tag.Value);
-                                    batch.Append(",timestamp='");
-                                    batch.Append(Helpers.FormatDateTime(tag.Timestamp));
-                                    batch.Append("',");
-                                    batch.Append("quality=");
-                                    batch.Append(tag.Quality);
-                                    batch.Append(" where DPDUID='");
-                                    batch.Append(tag.TagID);
-                                    batch.Append("' IF @@ROWCOUNT = 0 insert into FDALastDataValues(DPDUID, value, timestamp,quality) values('");
-                                    batch.Append(tag.TagID);
-                                    batch.Append("',");
-                                    batch.Append(tag.Value);
-                                    batch.Append(",'");
-                                    batch.Append(Helpers.FormatDateTime(tag.Timestamp));
-                                    batch.Append("',");
-                                    batch.Append(tag.Quality);
-                                    batch.Append(");");
-                                    */
-
-                                    /* slow way of building a query
-                                    batch += "update FDALastDataValues set LastReadDataValue=" + tag.Value + ",LastReadDataTimestamp='" + Helpers.FormatDateTime(tag.Timestamp) + "' where DPDUID='" + tag.TagID + "' "
-                                                    + " IF @@ROWCOUNT = 0 insert into FDALastDataValues(DPDUID, LastReadDataValue, LastReadDataTimestamp) values('" + tag.TagID + "'," + tag.Value + ",'" + Helpers.FormatDateTime(tag.Timestamp) + "');";
-                                    */
+                                    batch.Append("');");                                 
                                 }
                             }
 
