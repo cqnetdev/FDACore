@@ -50,6 +50,9 @@ namespace Common
 
         private void _conn_StateChange(object sender, System.Data.StateChangeEventArgs e)
         {
+            if (Globals.FDAStatus != Globals.AppState.Normal)
+                return;
+
             if ((e.CurrentState == System.Data.ConnectionState.Broken || e.CurrentState == System.Data.ConnectionState.Closed) && e.OriginalState == System.Data.ConnectionState.Open)
                 Error?.Invoke(this, new Exception("Database connection lost"));
         }
