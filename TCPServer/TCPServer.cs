@@ -78,11 +78,12 @@ namespace FDA
             _timer.Change(_tickRate, Timeout.Infinite);
         }
 
-        public bool Send(Guid clientID, object message)
+        public bool Send(Guid clientID, string message)
         {
             if (!_clients.ContainsKey(clientID))
                 return false; // client doesn't exist, can't send anything to it
 
+            /*
             byte dataType;
             byte[] dataBlock = new byte[0];
 
@@ -120,7 +121,7 @@ namespace FDA
 
             Array.Copy(header, toSend, header.Length);
             Array.Copy(dataBlock, 0, toSend, header.Length, dataBlock.Length);
-
+            */
 
 
             if (_clients.ContainsKey(clientID))
@@ -128,7 +129,7 @@ namespace FDA
                 Client client = _clients[clientID];
                 lock (client.SendQueue)
                 {
-                    client.SendQueue.Enqueue(toSend);
+                    client.SendQueue.Enqueue(Encoding.UTF8.GetBytes(message));
                 }
             }
             else
@@ -141,6 +142,10 @@ namespace FDA
         {
             _timer.Change(Timeout.Infinite, Timeout.Infinite);
 
+            if (Globals.FDAStatus != Globals.AppState.Normal)
+            {
+                goto ResetTimer;
+            }
             // check for pending connections
             if (_server.Pending())
             {
@@ -172,6 +177,7 @@ namespace FDA
                 }
             }
 
+            ResetTimer:
             _timer.Change(_tickRate, Timeout.Infinite);
         }
 
