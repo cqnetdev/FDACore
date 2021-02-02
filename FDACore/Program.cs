@@ -206,8 +206,8 @@ namespace FDAApp
                 if (_TCPServer != null)
                 {
                     _TCPServer.DataAvailable += TCPServer_DataAvailable;
-                    //_TCPServer.ClientDisconnected += _TCPServer_ClientDisconnected;
-                    //_TCPServer.ClientConnected += _TCPServer_ClientConnected;
+                    _TCPServer.ClientDisconnected += _TCPServer_ClientDisconnected;
+                    _TCPServer.ClientConnected += _TCPServer_ClientConnected; 
                     _TCPServer.Start();
                 }
                 else
@@ -257,6 +257,16 @@ namespace FDAApp
             {
                 Thread.Sleep(1000);
             }
+        }
+
+        private static void _TCPServer_ClientDisconnected(object sender, TCPServer.ClientEventArgs e)
+        {
+            LogEvent("Client disconnected");
+        }
+
+        private static void _TCPServer_ClientConnected(object sender, TCPServer.ClientEventArgs e)
+        {
+            LogEvent("Client connected");
         }
 
         static private void MQTTConnect(object o)
@@ -426,22 +436,44 @@ namespace FDAApp
 
         private static void TCPServer_DataAvailable(object sender, TCPServer.TCPCommandEventArgs e)
         {
-            string receivedStr = System.Text.Encoding.ASCII.GetString(e.Data);     // something wrong with the received string "TDOWN" followed by a long string of nulls.. to be continued
-            receivedStr = receivedStr.Substring(0, receivedStr.Length - 1);
-            switch (receivedStr.ToUpper())
+            string receivedStr = Encoding.UTF8.GetString(e.Data);
+            
+            
+            string command = receivedStr;
+
+            // if the command is null terminated, remove the null so that the command is recognized in the switch statement below
+            if (e.Data[e.Data.Length - 1] == 0)
+            {
+                command = Encoding.UTF8.GetString(e.Data, 0, e.Data.Length - 1);
+            }
+
+            LogEvent("Command received: " + command);
+            switch (command.ToUpper())
             {
                 case "PING":
-                    return;       
-                  case "SHUTDOWN":
-        //            if (!PermissionCheck(e.ClientID,e.Host, parsedCommand[0]))
-        //            {
-        //                return;
-        //            }
-                        Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "FDA Application", "", "Shutdown command received");
-                        Globals.FDAStatus = Globals.AppState.ShuttingDown;
+                    _TCPServer.Send(e.ClientID, "OK");
+                    break;
+                case "SHUTDOWN":
+                    Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "FDA Application", "", "Shutdown command received");
+                    //            if (!PermissionCheck(e.ClientID,e.Host, parsedCommand[0]))
+                    //            {
+                    //                return;
+                    //            }
+                    _TCPServer.Send(e.ClientID, "OK");
 
-                        DoShutdown();
-                        break;
+                    // give the TCP server a second to send the response before starting the shutdown
+                    Thread.Sleep(1000);
+
+                    Globals.FDAStatus = Globals.AppState.ShuttingDown;
+                    DoShutdown();
+                    break;
+                case "TOTALQUEUECOUNT":
+                    LogEvent("Getting queue counts");
+                    int count = _dataAquisitionManager.GetTotalQueueCounts();
+                    LogEvent("Replying with the count (" + count.ToString() + ")");
+                    _TCPServer.Send(e.ClientID, count.ToString());
+                    break;
+
         //        case "ELEVATE":
         //            Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "FDA Application", "", "Received request for elevated permissions from TCP client " + e.Host, false, true);
         //            string auth = parsedCommand[1];
@@ -569,6 +601,7 @@ namespace FDAApp
 
 
                 default:
+                    Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "FDA Application", "", "Unrecognized command received over TCP '" + receivedStr + "'");
                     _TCPServer.Send(e.ClientID, "Unrecognized command '" + receivedStr);
                     break;
 

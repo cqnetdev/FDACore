@@ -137,6 +137,8 @@ namespace FDA
         public DateTime LastCommsTime { get => _lastCommsDateTime; set { if (value != _lastCommsDateTime) { _lastCommsDateTime = value; HandlePropertyChanged(); } } }
         public string ConnDetails { get => _connDetails; set { if (value != _connDetails) { _connDetails = value; HandlePropertyChanged(); } } }
 
+        public int TotalQueueCount { get => _queueManager.TotalQueueCount; }
+
         // public types/events/delegates/classes
         public enum ConnStatus { Disconnected, ConnectionRetry_Delay, Connected_Ready, Connecting, Connected_Delayed }
         public enum ConnType { Serial, Ethernet, EthernetUDP };
@@ -568,7 +570,6 @@ namespace FDA
         #endregion
 
         #region public functions
-
 
         public bool QueueTransactionGroup(RequestGroup requestGroup)
         {

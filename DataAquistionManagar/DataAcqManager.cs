@@ -52,7 +52,14 @@ namespace FDA
             }
         }
 
-
+        public int GetTotalQueueCounts()
+        {
+            int count = 0;
+            foreach (ConnectionManager mgr in _connectionsDictionary.Values)
+                count += mgr.TotalQueueCount;
+            
+            return count;
+        }
         private void Logger_AppconfigMonitorError(object sender, Exception e)
         {
             _dbManager?.HandleTableMonitorError(e);
