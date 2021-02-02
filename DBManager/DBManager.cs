@@ -195,7 +195,54 @@ namespace FDA
             }
         }
 
+        // returning a datareader doesn't work, it's closed as soon as we exit the 'using' and becomes unusable
+        // try making some kind of copy of the data and returning that instead
+        // then, use this function for all datareader operations
+        private NpgsqlDataReader PG_ExecuteDataReader(string sql)
+        {
+            int maxRetries = 3;
+            int retries = 0;
+            NpgsqlDataReader reader;
+            Retry:
+            using (NpgsqlConnection conn = new NpgsqlConnection(ConnectionString))
+            {
+                try
+                {
+                    conn.Open();
+                }
+                catch (Exception ex)
+                {
+                    Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "PG_ExecuteDataReader() Failed to connect to database");
+                    return null;
+                }
 
+                using (NpgsqlCommand command = conn.CreateCommand())
+                {
+                    command.CommandText = sql;
+
+                    try
+                    {
+                        reader = command.ExecuteReader(System.Data.CommandBehavior.CloseConnection);
+                    }
+                    catch (Exception ex)
+                    {
+                         retries++;
+                        if (retries < maxRetries)
+                        {
+                            Thread.Sleep(250);
+                            goto Retry;
+                        }
+                        else
+                        {
+                            Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "PG_ExecuteScalar() Failed to execute query after " + (maxRetries + 1) + " attempts.");
+                            return null;
+                        }
+                    }
+                    return reader;
+                }
+
+            }
+        }
           
 
         private int PG_ExecuteNonQuery(string sql)
@@ -213,7 +260,7 @@ namespace FDA
                 }
                 catch (Exception ex)
                 {
-                    Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Failed to connect to database");
+                    Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "PG_ExecuteNonQuery() Failed to connect to database");
                     return 0;
                 }
 
@@ -263,6 +310,7 @@ namespace FDA
             return startTime;
                
         }
+
 
         private object PG_ExecuteScalar(string sql)
         {
@@ -584,17 +632,22 @@ namespace FDA
                                 }
 
                                 if (success)
+                                {
                                     lock (_writeQueue)
                                     {
                                         _writeQueue.Dequeue();
-                                        Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "DBManager", "Group " + transactionToLog.GroupID + ", index " + transactionToLog.GroupIdxNumber + " processed");
                                     }
+                                    Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "DBManager", "Group " + transactionToLog.GroupID + ", index " + transactionToLog.GroupIdxNumber + " processed");
+                                }  
                             }
                             else
                             {
                                 //Globals.SystemManager.LogApplicationEvent(Globals.GetOffsetUTC(), "DBManager", "Group " + transactionToLog.GroupID + ", index " + transactionToLog.GroupIdxNumber + " was processed, but the response contained no valid values");
                                 Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "DBManager", "Group " + transactionToLog.GroupID + ", index " + transactionToLog.GroupIdxNumber + " processed");
-                                _writeQueue.Dequeue();
+                                lock (_writeQueue)
+                                {
+                                    _writeQueue.Dequeue();
+                                }
                             }
                         }
                         Thread.Sleep(20); // slow down the queries a bit to reduce the load on SQL server while clearing a backlog 
@@ -1063,12 +1116,15 @@ namespace FDA
                 }
 
                _DBStatus = true;
-                using (NpgsqlCommand command = conn.CreateCommand())
-                {
-                    command.CommandText = "SELECT pg_postmaster_start_time()";
-                    _PreviousDBStartTime = (DateTime)command.ExecuteScalar();
-                }
-                conn.Close();
+                DateTime returnedDateTime = DateTime.MinValue;
+
+                object scalarresult = PG_ExecuteScalar("SELECT pg_postmaster_start_time()");
+                if (scalarresult != null)
+                    returnedDateTime = (DateTime)scalarresult;
+                
+                 _PreviousDBStartTime = (DateTime)scalarresult;
+
+                
             }
 
             Globals.SystemManager.LogApplicationEvent(this, "", "Successfully connected to the database", false, true);
@@ -1089,35 +1145,33 @@ namespace FDA
             //bool FDAServiceBrokerEnabled = false;
            // bool FDASystemServiceBrokerEnabled = false;
             string FDAdbname;
-            using (NpgsqlConnection conn = new NpgsqlConnection(ConnectionString))
+            object result;
+            string query;
+
+           
+             // check if commslog and applog tables exist
+            query = "select count(1) from INFORMATION_SCHEMA.TABLES where TABLE_NAME  = '" + Globals.SystemManager.GetTableName("applog") + "';";
+            result = PG_ExecuteScalar(query);
+            if (result != null)
             {
-                string query = "";
-                try
-                {
-                    conn.Open();
+                appLogexists = ((long)result > 0);
+            }
+           
 
-                    using (NpgsqlCommand sqlCommand = conn.CreateCommand())
-                    {
-                        // check if commslog and applog tables exist
-                        query = "select count(1) from INFORMATION_SCHEMA.TABLES where TABLE_NAME  = '" + Globals.SystemManager.GetTableName("applog") + "';";
-                        sqlCommand.CommandText = query;
-                        appLogexists = ((long)sqlCommand.ExecuteScalar() > 0);
+            query = "select count(1) from INFORMATION_SCHEMA.TABLES where TABLE_NAME  = '" + Globals.SystemManager.GetTableName("commslog") + "';";
+            result = PG_ExecuteScalar(query);
+            if (result!=null)
+            {
+                commsLogExists = ((long)result > 0);
+            }
 
-                        query = "select count(1) from INFORMATION_SCHEMA.TABLES where TABLE_NAME  = '" + Globals.SystemManager.GetTableName("commslog") + "';";
-                        sqlCommand.CommandText = query;
-                        commsLogExists = ((long)sqlCommand.ExecuteScalar() > 0);
-                        conn.Close();
+            
+            FDAdbname = "FDA";
+            if (Globals.SystemManager.GetAppConfig().ContainsKey("FDADBName"))
+                FDAdbname = Globals.SystemManager.GetAppConfig()["FDADBName"].OptionValue;
+       
 
-                        FDAdbname = "FDA";
-                        if (Globals.SystemManager.GetAppConfig().ContainsKey("FDADBName"))
-                            FDAdbname = Globals.SystemManager.GetAppConfig()["FDADBName"].OptionValue;
-                    }
-                } catch
-                {
-                    Globals.SystemManager.LogApplicationEvent(this, "", "Query failed: " + query);
-                    return false;
-
-                }
+                
                 /* not supported in postgres
                 query = "SELECT name,is_broker_enabled FROM sys.databases WHERE name in ('" + FDAdbname + "','FDASystem')";
                 sqlCommand.CommandText = query;
@@ -1166,7 +1220,7 @@ namespace FDA
 
                     commsLogExists = BuildCommsLogTable(Globals.SystemManager.GetTableName("CommsLog"));
                 }
-            }
+            
 
 
             return appLogexists && commsLogExists;// && FDASystemServiceBrokerEnabled && FDAServiceBrokerEnabled;
