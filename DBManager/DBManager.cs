@@ -226,7 +226,7 @@ namespace FDA
                     }
                     catch (Exception ex)
                     {
-                         retries++;
+                        retries++;
                         if (retries < maxRetries)
                         {
                             Thread.Sleep(250);
@@ -247,11 +247,10 @@ namespace FDA
 
         private int PG_ExecuteNonQuery(string sql)
         {
-            int rowsaffected = 0;
-            int result = -1;
-            bool success = false;
-            Exception sqlException = null;
-            int tries = 0;
+            int rowsaffected = -99;
+            int retries = 0;
+            int maxRetries = 3;
+            Retry:
             using (NpgsqlConnection conn = new NpgsqlConnection(ConnectionString))
             {
                 try
@@ -261,42 +260,39 @@ namespace FDA
                 catch (Exception ex)
                 {
                     Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "PG_ExecuteNonQuery() Failed to connect to database");
-                    return 0;
+                    return -99;
                 }
 
-
-
-
-                while (!success && tries < 3)
+                try
                 {
-                    try
+                    using (NpgsqlCommand sqlCommand = conn.CreateCommand())
                     {
-                        using (NpgsqlCommand sqlCommand = conn.CreateCommand())
-                        {
-                            tries++;
-                            sqlCommand.CommandText = sql;
-                            rowsaffected = sqlCommand.ExecuteNonQuery();                       
-                        }
-                        success = true;
+                        retries++;
+                        sqlCommand.CommandText = sql;
+                        rowsaffected = sqlCommand.ExecuteNonQuery();                       
                     }
-                    catch (Exception ex)
-                    {
-                        sqlException = ex;
-                        success = false;
-                        Thread.Sleep(200);
-                    }
+                   
                 }
+                catch (Exception ex)
+                {
+                    retries++;
+                    if (retries < maxRetries)
+                    {
+                        Thread.Sleep(250);
+                        goto Retry;
+                    }
+                    else
+                    {
+                        Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "PG_ExecuteScalar() Failed to execute query after " + (maxRetries + 1) + " attempts. Query = " + sql);
+                        return -99;
+                    }
+
+                }
+          
                 conn.Close();
             }
 
-            if (!success)
-                Globals.SystemManager.LogApplicationError(Globals.FDANow(), sqlException, "Failed to execute query = " + sql);
-            else
-            {
-                    Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "DBManager", "Query successful: " + rowsaffected + " rows affected, " + tries + " tries : " + sql.Substring(0, 30) + "...", false, true);
-                    result = rowsaffected;
-            }
-            return result;
+            return rowsaffected;         
         }
 
         private DateTime PG_GetDBStartTime()
@@ -462,196 +458,171 @@ namespace FDA
             try
             {
 
-                int attempt = 0;
-                using (NpgsqlConnection conn = new NpgsqlConnection(ConnectionString))
-                {
-                    try
-                    {
-                        conn.Open();
-                    }
-                    catch (Exception ex)
-                    {
-                        // failed to connect to DB, exit the DB write routine
-                        Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Failed to connect to the database");
-                        return;
-                    }
+                //int attempt = 0;
+                //using (NpgsqlConnection conn = new NpgsqlConnection(ConnectionString))
+                //{
+                  //  try
+                  //  {
+                  //     conn.Open();
+                  //  }
+                  //  catch (Exception ex)
+                  //  {
+                  //      // failed to connect to DB, exit the DB write routine
+                  //      Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Failed to connect to the database");
+                  //      return;
+                  //  }
 
                     // db connection successful
                     DataRequest transactionToLog = null;
 
-                    while (_writeQueue.Count > 0 && conn.State == System.Data.ConnectionState.Open)
+                while (_writeQueue.Count > 0 /*&& conn.State == System.Data.ConnectionState.Open*/)
+                {
+                    // Get the next transaction out of the queue
+                    lock (_writeQueue)
                     {
-                        lock (_writeQueue)
+                        if (transactionToLog != _writeQueue.Peek())
                         {
-                            if (transactionToLog != _writeQueue.Peek())
-                            {
-                                transactionToLog = _writeQueue.Peek();
-                                attempt = 0;
-                            }
+                            transactionToLog = _writeQueue.Peek();
+                            //attempt = 0;
                         }
-
-                        StringBuilder batch = new StringBuilder();
-                        object value;
-                        int querycount = 0;
-
-
-                        string[] destList = transactionToLog.Destination.Split(',');
-
-                        using (NpgsqlCommand sqlCommand = conn.CreateCommand())
-                        {
-
-                            foreach (Tag tag in transactionToLog.TagList)
-                            {
-                                // don't try to write placeholder tags
-                                if (tag.TagID == Guid.Empty)
-                                    continue;
-
-                                // don't write disabled tags, or tags that have been deleted
-                                FDADataPointDefinitionStructure tagDef = GetTagDef(tag.TagID);
-                                if (tagDef == null)
-                                    continue;
-                                if (!tagDef.DPDSEnabled)
-                                    continue;
-
-                                if (tag.Value != null)
-                                    value = tag.Value.ToString();
-                                else
-                                    value = "null";
-
-                                bool firstDest = true;
-
-
-                                foreach (string dest in destList)
-                                {
-                                    if (transactionToLog.DBWriteMode == DataRequest.WriteMode.Insert || !firstDest) // always do an insert on additional destination tables (even if the writemode is set to update)
-                                    {
-
-                                        // Globals.SystemManager.LogApplicationEvent(this, "","Caching " + transactionToLog.TagList.Count(p => p.TagID != Guid.Empty) + " data points to be written to the table '" + dest + "'");
-
-
-                                        // cache inserts instead of writing them out right now
-                                        _cacheManager.CacheDataPoint(dest, tag);
-                                    }
-
-                                    // do an update on the first destination table, if write mode is update (if the tag isn't found in the table, do an insert instead)
-                                    if (transactionToLog.DBWriteMode == DataRequest.WriteMode.Update && firstDest)
-                                    {
-                                        batch.Append("if (select count(1) from ");
-                                        batch.Append(dest);
-                                        batch.Append(" where DPDUID = '");
-                                        batch.Append(tag.TagID.ToString());
-                                        batch.Append("')>0 ");
-                                        batch.Append("update ");
-                                        batch.Append(dest);
-                                        batch.Append(" set Value = ");
-                                        batch.Append(value);
-                                        batch.Append(", Timestamp = '");
-                                        batch.Append(Helpers.FormatDateTime(tag.Timestamp));
-                                        batch.Append("',Quality = ");
-                                        batch.Append(tag.Quality);
-                                        batch.Append(" where DPDUID = '");
-                                        batch.Append(tag.TagID);
-                                        batch.Append("' and Timestamp = (select MAX(Timestamp) from ");
-                                        batch.Append(dest);
-                                        batch.Append(" where DPDUID = '");
-                                        batch.Append(tag.TagID);
-                                        batch.Append("') else insert into ");
-                                        batch.Append(dest);
-                                        batch.Append(" (DPDUID, Timestamp, Value, Quality) values('");
-                                        batch.Append(tag.TagID);
-                                        batch.Append("','");
-                                        batch.Append(Helpers.FormatDateTime(tag.Timestamp));
-                                        batch.Append("',");
-                                        batch.Append(value);
-                                        batch.Append(",");
-                                        batch.Append(tag.Quality);
-                                        batch.Append(");");
-
-                                        querycount++;
-                                    }
-                                    firstDest = false;
-                                }
-
-                                // if this isn't a backfill request, update the last read value and timestamp in the DataPointDefinitions table
-                                // Feb 12, 2020: disabled writing last value to DataPointDefinitions table 
-                                /*
-                                if (transactionToLog.MessageType != DataRequest.RequestType.Backfill)
-                                {
-                                    batch += "update " + Globals.SystemManager.GetTableName("DataPointDefinitionStructures") + " set LastReadDataValue = " + tag.Value + ", LastReadDataTimestamp = '" + Helpers.FormatDateTime(tag.Timestamp) + "' "
-                                          + " where DPDUID = '" + tag.TagID.ToString() + "';";
-                                }
-                                */
-
-                                // if tag quality is good, write the value and timestamp to the FDALastDataValues table (update if it already exists in the table, insert otherwise)
-                                if (tag.Quality == 192)
-                                {
-                                    batch.Append("UPDATE FDALastDataValues SET value = ");
-                                    batch.Append(tag.Value);
-                                    batch.Append(",timestamp='");
-                                    batch.Append(Helpers.FormatDateTime(tag.Timestamp));
-                                    batch.Append("',");
-                                    batch.Append("quality=");
-                                    batch.Append(tag.Quality);
-                                    batch.Append(" where DPDUID='");
-                                    batch.Append(tag.TagID);
-                                    batch.Append("';  INSERT INTO FDALastDataValues(dpduid, value, timestamp, quality) SELECT '");
-                                    batch.Append(tag.TagID);
-                                    batch.Append("',");
-                                    batch.Append(tag.Value);
-                                    batch.Append(",'");
-                                    batch.Append(Helpers.FormatDateTime(tag.Timestamp));
-                                    batch.Append("',");
-                                    batch.Append(tag.Quality);
-                                    batch.Append(" WHERE NOT EXISTS (SELECT 1 FROM FDALastDataValues WHERE dpduid = '");
-                                    batch.Append(tag.TagID);
-                                    batch.Append("');");                                 
-                                }
-                            }
-
-                            if (batch.Length != 0)
-                            {
-                                sqlCommand.CommandText = batch.ToString();
-
-                                bool success = true;
-                                try
-                                {
-                                    attempt++;
-                                    sqlCommand.ExecuteNonQuery();
-                                }
-                                catch (Exception ex)
-                                {
-                                    Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Query failed: " + batch);
-                                    if (attempt > 3)
-                                    {
-                                        lock (_writeQueue)
-                                        {
-                                            _writeQueue.Dequeue();
-                                        }
-                                    }
-                                    success = false;
-                                }
-
-                                if (success)
-                                {
-                                    lock (_writeQueue)
-                                    {
-                                        _writeQueue.Dequeue();
-                                    }
-                                    Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "DBManager", "Group " + transactionToLog.GroupID + ", index " + transactionToLog.GroupIdxNumber + " processed");
-                                }  
-                            }
-                            else
-                            {
-                                //Globals.SystemManager.LogApplicationEvent(Globals.GetOffsetUTC(), "DBManager", "Group " + transactionToLog.GroupID + ", index " + transactionToLog.GroupIdxNumber + " was processed, but the response contained no valid values");
-                                Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "DBManager", "Group " + transactionToLog.GroupID + ", index " + transactionToLog.GroupIdxNumber + " processed");
-                                lock (_writeQueue)
-                                {
-                                    _writeQueue.Dequeue();
-                                }
-                            }
-                        }
-                        Thread.Sleep(20); // slow down the queries a bit to reduce the load on SQL server while clearing a backlog 
                     }
+
+
+                    StringBuilder batch = new StringBuilder();
+                    object value;
+                    int querycount = 0;
+
+
+                    string[] destList = transactionToLog.Destination.Split(',');
+
+
+
+                    foreach (Tag tag in transactionToLog.TagList)
+                    {
+                        // don't try to write placeholder tags
+                        if (tag.TagID == Guid.Empty)
+                            continue;
+
+                        // don't write disabled tags, or tags that have been deleted
+                        FDADataPointDefinitionStructure tagDef = GetTagDef(tag.TagID);
+                        if (tagDef == null)
+                            continue;
+                        if (!tagDef.DPDSEnabled)
+                            continue;
+
+                        if (tag.Value != null)
+                            value = tag.Value.ToString();
+                        else
+                            value = "null";
+
+                        bool firstDest = true;
+
+
+                        foreach (string dest in destList)
+                        {
+                            if (transactionToLog.DBWriteMode == DataRequest.WriteMode.Insert || !firstDest) // always do an insert on additional destination tables (even if the writemode is set to update)
+                            {
+
+                                // Globals.SystemManager.LogApplicationEvent(this, "","Caching " + transactionToLog.TagList.Count(p => p.TagID != Guid.Empty) + " data points to be written to the table '" + dest + "'");
+
+
+                                // cache inserts instead of writing them out right now
+                                _cacheManager.CacheDataPoint(dest, tag);
+                            }
+
+                            // do an update on the first destination table, if write mode is update (if the tag isn't found in the table, do an insert instead)
+                            if (transactionToLog.DBWriteMode == DataRequest.WriteMode.Update && firstDest)
+                            {
+                                batch.Append("if (select count(1) from ");
+                                batch.Append(dest);
+                                batch.Append(" where DPDUID = '");
+                                batch.Append(tag.TagID.ToString());
+                                batch.Append("')>0 ");
+                                batch.Append("update ");
+                                batch.Append(dest);
+                                batch.Append(" set Value = ");
+                                batch.Append(value);
+                                batch.Append(", Timestamp = '");
+                                batch.Append(Helpers.FormatDateTime(tag.Timestamp));
+                                batch.Append("',Quality = ");
+                                batch.Append(tag.Quality);
+                                batch.Append(" where DPDUID = '");
+                                batch.Append(tag.TagID);
+                                batch.Append("' and Timestamp = (select MAX(Timestamp) from ");
+                                batch.Append(dest);
+                                batch.Append(" where DPDUID = '");
+                                batch.Append(tag.TagID);
+                                batch.Append("') else insert into ");
+                                batch.Append(dest);
+                                batch.Append(" (DPDUID, Timestamp, Value, Quality) values('");
+                                batch.Append(tag.TagID);
+                                batch.Append("','");
+                                batch.Append(Helpers.FormatDateTime(tag.Timestamp));
+                                batch.Append("',");
+                                batch.Append(value);
+                                batch.Append(",");
+                                batch.Append(tag.Quality);
+                                batch.Append(");");
+
+                                querycount++;
+                            }
+                            firstDest = false;
+                        }
+
+                        // if this isn't a backfill request, update the last read value and timestamp in the DataPointDefinitions table
+                        // Feb 12, 2020: disabled writing last value to DataPointDefinitions table 
+                        /*
+                        if (transactionToLog.MessageType != DataRequest.RequestType.Backfill)
+                        {
+                            batch += "update " + Globals.SystemManager.GetTableName("DataPointDefinitionStructures") + " set LastReadDataValue = " + tag.Value + ", LastReadDataTimestamp = '" + Helpers.FormatDateTime(tag.Timestamp) + "' "
+                                  + " where DPDUID = '" + tag.TagID.ToString() + "';";
+                        }
+                        */
+
+                        // if tag quality is good, write the value and timestamp to the FDALastDataValues table (update if it already exists in the table, insert otherwise)
+                        if (tag.Quality == 192)
+                        {
+                            batch.Append("UPDATE FDALastDataValues SET value = ");
+                            batch.Append(tag.Value);
+                            batch.Append(",timestamp='");
+                            batch.Append(Helpers.FormatDateTime(tag.Timestamp));
+                            batch.Append("',");
+                            batch.Append("quality=");
+                            batch.Append(tag.Quality);
+                            batch.Append(" where DPDUID='");
+                            batch.Append(tag.TagID);
+                            batch.Append("';  INSERT INTO FDALastDataValues(dpduid, value, timestamp, quality) SELECT '");
+                            batch.Append(tag.TagID);
+                            batch.Append("',");
+                            batch.Append(tag.Value);
+                            batch.Append(",'");
+                            batch.Append(Helpers.FormatDateTime(tag.Timestamp));
+                            batch.Append("',");
+                            batch.Append(tag.Quality);
+                            batch.Append(" WHERE NOT EXISTS (SELECT 1 FROM FDALastDataValues WHERE dpduid = '");
+                            batch.Append(tag.TagID);
+                            batch.Append("');");
+                        }
+                    }
+
+                    // write it out to the database
+                    if (batch.Length != 0)
+                    {
+                        // retries and error messages are handled in PG_ExecuteNonQuery()
+                        int result = PG_ExecuteNonQuery(batch.ToString());
+                        if (result > 0)
+                        {
+                            Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "DBManager", "Group " + transactionToLog.GroupID + ", index " + transactionToLog.GroupIdxNumber + " successfully recorded in the database");
+                        }
+                        else
+                        {
+                            Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "DBManager", "Group " + transactionToLog.GroupID + ", index " + transactionToLog.GroupIdxNumber + " failed to write to the database");
+                        }
+
+                        lock (_writeQueue) { _writeQueue.Dequeue(); }
+                    }
+                    Thread.Sleep(20); // slow down the queries a bit to reduce the load on SQL server while clearing a backlog 
+
                 }
             }
             catch (Exception ex)
@@ -1229,62 +1200,15 @@ namespace FDA
         private bool BuildAppLogTable(string tableName)
         {
             string sql="CREATE TABLE applog(fdaexecutionid uuid NOT NULL,\"timestamp\" timestamp(6) NOT NULL,eventtype varchar(10) NOT NULL,objecttype varchar(100) NOT NULL,objectname varchar(500) NULL,description text NULL,errorcode varchar(10) NULL,stacktrace text NULL);";
-
-            try
-            {
-                using (NpgsqlConnection conn = new NpgsqlConnection(ConnectionString))
-                {
-                    conn.Open();
-
-                    using (NpgsqlCommand sqlCommand = conn.CreateCommand())
-                    {
-                        sqlCommand.CommandText = sql;
-
-                        sqlCommand.ExecuteNonQuery();
-                    }
-
-                    conn.Close();
-                }
-            }
-            catch
-            {
-                Globals.SystemManager.LogApplicationEvent(this, "", "Query Failed: " + sql);
-                return false;
-            }
-
-
-            return true;
-
+            int result = PG_ExecuteNonQuery(sql);
+            return (result == -1);
         }
 
         private bool BuildCommsLogTable(string tableName)
         {
             string sql = "CREATE TABLE commslog(fdaexecutionid uuid NOT NULL,connectionid uuid NOT NULL,deviceid uuid NULL,deviceaddress varchar(100) NOT NULL,timestamputc1 timestamp(6) NOT NULL,timestamputc2 timestamp(6) NULL,attempt int NULL, transstatus bit NULL,transcode int NULL,elapsedperiod bigint NULL,dbrguid uuid NULL,dbrgidx varchar(30) NULL,dbrgsize int NULL,details01 varchar(1000) NULL,txsize int NULL,details02 varchar(1000) NULL,rxsize int NULL,protocol varchar(20) NULL,protocolnote varchar(4000) NULL,applicationmessage varchar(8000) NULL)";
-
-            try
-            {
-                using (NpgsqlConnection conn = new NpgsqlConnection(ConnectionString))
-                {
-                    conn.Open();
-
-                    using (NpgsqlCommand sqlCommand = conn.CreateCommand())
-                    {
-                        sqlCommand.CommandText = sql;
-
-                        sqlCommand.ExecuteNonQuery();
-                    }
-
-                    conn.Close();
-                }
-            }
-            catch
-            {
-                Globals.SystemManager.LogApplicationEvent(this, "", "Query Failed: " + sql);
-                return false;
-            }
-
-
-            return true;
+            int result = PG_ExecuteNonQuery(sql);
+            return (result == -1);
         }
 
         private bool HasColumn(SqlDataReader dr,string column)
@@ -2648,9 +2572,9 @@ namespace FDA
                 Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Error while parsing demand request " + affectedRow.FRGDUID);
             }
         }
-#endregion
+        #endregion
 
-#region SQLServer Table change events
+        #region SQLServer Table change events
 
         //private void _connectionDefMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<FDASourceConnection> e)
         //{
@@ -3180,381 +3104,306 @@ namespace FDA
 
         //    RaiseConfigChangeEvent(changeType.ToString(), Globals.SystemManager.GetTableName("FDATasks"), e.Entity.task_id);
         //}
+
+        #endregion
+
+
+        private void DeleteDemand(Guid DemandID)
+        {
+            string sql = "delete from " + Globals.SystemManager.GetTableName("FDARequestGroupDemand") + " where FRGDUID  = '" + DemandID.ToString() + "';";
+            PG_ExecuteNonQuery(sql);
+            return;
+        }
+
+  
+
+        private void DeleteRequestGroup(List<RequestGroup> groupsToDelete)
+        {
+            StringBuilder sb = new StringBuilder();
+            sb.Append("delete from ");
+            sb.Append(Globals.SystemManager.GetTableName("FDADataBlockRequestGroup"));
+            sb.Append(" where DRGUID in (");
+
+            if (groupsToDelete.Count == 0)
+                return;
+
+  
+            foreach (RequestGroup group in groupsToDelete)
+            {
+                sb.Append("'");
+                sb.Append(group.ID);
+                sb.Append("',");
+            }
+            sb.Remove(sb.Length - 1, 1);
+            sb.Append(");");
+            PG_ExecuteNonQuery(sb.ToString());    
+        }
+
+        public void WriteAlarmsEvents(List<AlarmEventRecord> recordsList)
+        {
+            if (_alarmEventQueue == null)
+                _alarmEventQueue = new Queue<List<AlarmEventRecord>>();
+
+            if (_alarmsEventsWriter == null)
+            {
+                _alarmsEventsWriter = new BackgroundWorker();
+                _alarmsEventsWriter.DoWork += _alarmsEventsWriter_DoWork;
+            }
+
+            lock (_alarmEventQueue)
+            {
+                _alarmEventQueue.Enqueue(recordsList);
+            }
+
+            if (!_alarmsEventsWriter.IsBusy)
+                _alarmsEventsWriter.RunWorkerAsync();
+        }
+
+        private void _alarmsEventsWriter_DoWork(object sender, DoWorkEventArgs e)
+        {
+            string sql = "";
+            List<AlarmEventRecord> recordsList;
+
+
    
-#endregion
-
-
-
-
-
-private void DeleteDemand(Guid DemandID)
-{
-    string sql = "delete from " + Globals.SystemManager.GetTableName("FDARequestGroupDemand") + " where FRGDUID  = '" + DemandID.ToString() + "';";
-    try
-    {
-        using (NpgsqlConnection conn = new NpgsqlConnection(ConnectionString))
-        {
-            try
+        
+            while (_alarmEventQueue.Count > 0)
             {
-                conn.Open();
-                using (NpgsqlCommand sqlCommand = conn.CreateCommand())
+                lock (_alarmEventQueue)
                 {
-                    sqlCommand.CommandText = sql;
-                    sqlCommand.ExecuteNonQuery();
+                    recordsList = _alarmEventQueue.Dequeue();
                 }
-            }
-            catch (Exception ex)
-            {
-                Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Query failed: " + sql);
-            }
-        }
-    }
-    catch (Exception ex)
-    {
-        // failed to connect to DB, exit the DB write routine
-        Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Failed to connect to the database");
-        return;
-    }
-}
 
-private void DeleteRequestGroup(List<RequestGroup> groupsToDelete)
-{
-    StringBuilder sb = new StringBuilder();
-    sb.Append("delete from ");
-    sb.Append(Globals.SystemManager.GetTableName("FDADataBlockRequestGroup"));
-    sb.Append(" where DRGUID in (");
+                if (recordsList.Count == 0)
+                    continue;
 
-    if (groupsToDelete.Count == 0)
-        return;
-
-    //string sqlTemplate = "delete from " + Globals.SystemManager.GetTableName("FDADataBlockRequestGroup") + " where DRGUID  = '<ID>';";
-    //string sqlBatch = "";
-    try
-    {
-        using (NpgsqlConnection conn = new NpgsqlConnection(ConnectionString))
-        {
-            try
-            {
-                conn.Open();
-                using (NpgsqlCommand sqlCommand = conn.CreateCommand())
+                foreach (AlarmEventRecord record in recordsList)
                 {
-                    foreach (RequestGroup group in groupsToDelete)
+                    sql = record.GetWriteSQL();
+                    int result = PG_ExecuteNonQuery(sql);
+                   
+
+                    if (result > 0) // if the write was successful, update the last read record in the "HistoricReferences" Table
                     {
-                        sb.Append("'");
-                        sb.Append(group.ID);
-                        sb.Append("',");
-                    }
-                    sb.Remove(sb.Length - 1, 1);
-                    sb.Append(");");
-                    sqlCommand.CommandText = sb.ToString();
-                    sqlCommand.ExecuteNonQuery();
-                }
-            }
-            catch (Exception ex)
-            {
-                Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Query failed: " + sb.ToString());
-            }
-        }
-    }
-    catch (Exception ex)
-    {
-        // failed to connect to DB, exit the DB write routine
-        Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Failed to connect to the database");
-        return;
-    }
-}
-
-public void WriteAlarmsEvents(List<AlarmEventRecord> recordsList)
-{
-    if (_alarmEventQueue == null)
-        _alarmEventQueue = new Queue<List<AlarmEventRecord>>();
-
-    if (_alarmsEventsWriter == null)
-    {
-        _alarmsEventsWriter = new BackgroundWorker();
-        _alarmsEventsWriter.DoWork += _alarmsEventsWriter_DoWork;
-    }
-
-    lock (_alarmEventQueue)
-    {
-        _alarmEventQueue.Enqueue(recordsList);
-    }
-
-    if (!_alarmsEventsWriter.IsBusy)
-        _alarmsEventsWriter.RunWorkerAsync();
-}
-
-private void _alarmsEventsWriter_DoWork(object sender, DoWorkEventArgs e)
-{
-    string sql = "";
-    List<AlarmEventRecord> recordsList;
-
-
-    try
-    {
-        using (NpgsqlConnection conn = new NpgsqlConnection(ConnectionString))
-        {
-            conn.Open();
-
-            using (NpgsqlCommand sqlCommand = conn.CreateCommand())
-            {
-                while (_alarmEventQueue.Count > 0)
-                {
-                    lock (_alarmEventQueue)
-                    {
-                        recordsList = _alarmEventQueue.Dequeue();
-                    }
-
-                    if (recordsList.Count == 0)
-                        continue;
-
-                    foreach (AlarmEventRecord record in recordsList)
-                    {
-                        sql = record.GetWriteSQL();
-                        sqlCommand.CommandText = record.GetWriteSQL();
-
-                        if (sqlCommand.ExecuteNonQuery() > 0) // if the write was successful, update the last read record in the "HistoricReferences" Table
+                        sql = record.GetUpdateLastRecordSQL();
+                        if (sql != "")
                         {
-                            sql = record.GetUpdateLastRecordSQL();
-                            if (sql != "")
+                            PG_ExecuteNonQuery(sql);
+                        }
+                    }
+                    Thread.Sleep(50); // a little breather for the database, this stuff doesn't need to be written as fast as possible       
+                }
+            
+            }
+ 
+        }
+
+        public byte[] GetAlmEvtPtrs(Guid connID, string NodeID, string ptrType)
+        {
+            string sql = "";
+            int lastRead = 0;
+            int currPtr = 0;
+
+            try
+            {
+                using (NpgsqlConnection conn = new NpgsqlConnection(ConnectionString))
+                {
+                    conn.Open();
+
+                    using (NpgsqlCommand sqlCommand = conn.CreateCommand())
+                    {
+                        // update the alarm or event current ptr and timestamp
+                        sql = "select " + ptrType + "CurPtrPosition,"+ptrType+"LastPtrReadPosition from " + Globals.SystemManager.GetTableName("FDAHistoricReferences");
+                        sql += " where NodeDetails = '" + NodeID + "' and ConnectionUID = '" + connID + "';";
+                        sqlCommand.CommandText = sql;
+                        using (NpgsqlDataReader sqlDataReader = sqlCommand.ExecuteReader())
+                        {
+                            while (sqlDataReader.Read())
                             {
-                                sqlCommand.CommandText = sql;
-                                sqlCommand.ExecuteNonQuery();
+                                try
+                                {
+                                    lastRead = (byte)sqlDataReader.GetInt32(sqlDataReader.GetOrdinal(ptrType + "LastPtrReadPosition"));
+                                    currPtr = (byte)sqlDataReader.GetInt32(sqlDataReader.GetOrdinal(ptrType + "CurPtrPosition"));
+                                }
+                                catch (Exception ex)
+                                {
+                                    Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "DBManager: out of range current or last read pointer in FDAHistoricReferences table (connectionID " + connID + ", Node " + NodeID);
+                                    return null;
+                                }
                             }
                         }
-                        Thread.Sleep(50); // a little breather for the database, this stuff doesn't need to be written as fast as possible       
-                    }
+                        conn.Close();
+                    }                              
                 }
             }
-            conn.Close();
-        }
-    }
-    catch
-    {
-        Globals.SystemManager.LogApplicationEvent(this, "", "Query Failed: " + sql);
-    }
-}
-
-public byte[] GetAlmEvtPtrs(Guid connID, string NodeID, string ptrType)
-{
-    string sql = "";
-    int lastRead = 0;
-    int currPtr = 0;
-
-    try
-    {
-        using (NpgsqlConnection conn = new NpgsqlConnection(ConnectionString))
-        {
-            conn.Open();
-
-            using (NpgsqlCommand sqlCommand = conn.CreateCommand())
+            catch
             {
-                // update the alarm or event current ptr and timestamp
-                sql = "select " + ptrType + "CurPtrPosition,"+ptrType+"LastPtrReadPosition from " + Globals.SystemManager.GetTableName("FDAHistoricReferences");
-                sql += " where NodeDetails = '" + NodeID + "' and ConnectionUID = '" + connID + "';";
-                sqlCommand.CommandText = sql;
-                using (NpgsqlDataReader sqlDataReader = sqlCommand.ExecuteReader())
+                Globals.SystemManager.LogApplicationEvent(this, "", "Query Failed: " + sql);
+                return null;
+            }
+
+            lastRead = Helpers.AddCircular(lastRead, -1, 0, 239);
+
+            return new byte[] {Convert.ToByte(lastRead),Convert.ToByte(currPtr) };
+        }
+
+
+
+        public void UpdateAlmEvtCurrentPtrs(DataRequest PtrPositionRequest)
+        {
+            string sql = "";
+            ushort almsPtr = (ushort)PtrPositionRequest.TagList[0].Value; 
+            DateTime almsTimestamp = PtrPositionRequest.TagList[0].Timestamp;
+            ushort evtsPtr = (ushort)PtrPositionRequest.TagList[1].Value;
+            DateTime evtsTimestamp = PtrPositionRequest.TagList[1].Timestamp;
+            string nodeID = PtrPositionRequest.NodeID;
+            int affectedRows = 0;
+
+            string ResponseTimestamp = Helpers.FormatDateTime(PtrPositionRequest.ResponseTimestamp);
+
+
+            // update the alarm or event current ptr and timestamp
+            sql = "update " + Globals.SystemManager.GetTableName("FDAHistoricReferences") + " set AlarmsCurPtrPosition = " + almsPtr + ", AlarmsCurPtrTimestamp = '" + Helpers.FormatDateTime(almsTimestamp) + "'";
+            sql += ",EventsCurPtrPosition = " + evtsPtr + ", EventsCurPtrTimestamp = '" + Helpers.FormatDateTime(evtsTimestamp) + "'";
+            sql += " where NodeDetails = '" + nodeID + "' and ConnectionUID = '" + PtrPositionRequest.ConnectionID + "';";
+            affectedRows = PG_ExecuteNonQuery(sql);
+
+            if (affectedRows == 0) // update had no effect because row doesn't exist, do an insert instead
+            {
+                sql = "insert into " + Globals.SystemManager.GetTableName("FDAHistoricReferences") + " (DPSType,HistoricStructureType,ConnectionUID,NodeDetails,EventsCurPtrTimestamp,EventsCurPtrPosition,EventsCurMaxNumRecords,";
+                sql += "EventsLastPtrReadTimestamp,EventsLastPtrReadPosition,AlarmsCurPtrTimestamp,AlarmsCurPtrPosition,AlarmsCurMaxNumRecords,AlarmsLastPtrReadTimestamp,AlarmsLastPtrReadPosition)";
+                sql += " values (";
+                sql += "'" + PtrPositionRequest.Protocol + "',1,'" + PtrPositionRequest.ConnectionID + "','" + PtrPositionRequest.NodeID + "','" + ResponseTimestamp + "',";
+                sql += evtsPtr + ",240,'" + ResponseTimestamp + "',0,'" + ResponseTimestamp + "'," + almsPtr + ",240,'" + ResponseTimestamp + "',0);";
+                PG_ExecuteNonQuery(sql);
+            }
+
+        
+        }
+
+
+        public class DemandEventArgs: EventArgs
+        {
+            public FDARequestGroupDemand DemandRequestObject { get; }
+            public List<RequestGroup> RequestGroups;
+
+            public DemandEventArgs(FDARequestGroupDemand demand,List<RequestGroup> requestGroups)
+            {
+                DemandRequestObject = demand;
+                RequestGroups = requestGroups;
+            }
+        }
+
+        private void RaiseDemandRequestEvent(FDARequestGroupDemand demand,List<RequestGroup> requestGroups)
+        {
+            DemandRequest?.Invoke(this, new DemandEventArgs(demand,requestGroups));
+        }
+
+
+        private void RaiseConfigChangeEvent(string type,string table, Guid item)
+        {
+            //Globals.SystemManager.LogApplicationEvent(this, "", table + " table changed (" + type + "), ID = " + item.ToString());
+            ConfigChange?.Invoke(this, new ConfigEventArgs(type,table, item));
+        }
+
+
+        #region IDisposable Support
+        private bool disposedValue = false; // To detect redundant calls
+
+        protected virtual void Dispose(bool disposing)
+        {
+
+            if (!disposedValue)
+            {
+                if (disposing)
                 {
-                    while (sqlDataReader.Read())
+                    Globals.SystemManager.LogApplicationEvent(this, "", "Stopping Demand Table Monitor");
+                    _demandMonitor?.StopListening();
+                    _demandMonitor?.Dispose();
+
+                    // log any data that's sitting in the caches before shutting down
+                    Globals.SystemManager.LogApplicationEvent(this, "", "Flushing all cached data");
+
+                    if (_cacheManager != null)
                     {
-                        try
+                        List<string> batches = _cacheManager.FlushAll();
+                        foreach (string batch in batches)
                         {
-                            lastRead = (byte)sqlDataReader.GetInt32(sqlDataReader.GetOrdinal(ptrType + "LastPtrReadPosition"));
-                            currPtr = (byte)sqlDataReader.GetInt32(sqlDataReader.GetOrdinal(ptrType + "CurPtrPosition"));
-                        }
-                        catch (Exception ex)
-                        {
-                            Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "DBManager: out of range current or last read pointer in FDAHistoricReferences table (connectionID " + connID + ", Node " + NodeID);
-                            return null;
+                            PG_ExecuteNonQuery(batch);
                         }
                     }
+                    _cacheManager.Dispose();
+
+                    Stopwatch stopwatch = new Stopwatch();
+                    // wait for datawriter thread to finish (up to 10 seconds)
+                    if (_dataWriter != null)
+                    {
+                        if (_dataWriter.IsBusy)
+                            Globals.SystemManager.LogApplicationEvent(this, "", "Waiting for data writer thread to finish and exit");
+
+                        stopwatch.Start();
+                        while (_dataWriter.IsBusy && stopwatch.Elapsed.Seconds < 10)
+                            Thread.Sleep(50);
+                        stopwatch.Stop();
+                        _dataWriter.Dispose();
+                    }
+
+                    // wait for alarms and events writing thread to finish (up to 10 seconds)
+                    if (_alarmsEventsWriter != null)
+                    {
+                        if (_alarmsEventsWriter.IsBusy)
+                            Globals.SystemManager.LogApplicationEvent(this, "", "Waiting for Alarms and Events writer thread to finish and exit");
+
+                        stopwatch.Reset();
+                        stopwatch.Start();
+                        while (_alarmsEventsWriter.IsBusy && stopwatch.Elapsed.Seconds < 10)
+                            Thread.Sleep(50);
+                        stopwatch.Stop();
+                        _alarmsEventsWriter.Dispose();
+                    }
+
+                    stopwatch = null;
+
+
+                    _schedMonitor?.StopListening();
+                    _dataPointDefMonitor?.StopListening();
+                    _requestGroupDefMonitor?.StopListening();
+                    _connectionDefMonitor?.StopListening();
+
+                    _schedMonitor?.Dispose();
+                    _dataPointDefMonitor?.Dispose();
+                    _requestGroupDefMonitor?.Dispose();
+                    _connectionDefMonitor?.Dispose();
+
+
+                    Globals.SystemManager.LogApplicationEvent(this, "", "Clearing configuration data");
+                    lock (_schedConfig) { _schedConfig.Clear(); }
+                    lock (_requestgroupConfig) { _requestgroupConfig.Clear(); }
+                    lock (_dataPointConfig) { _dataPointConfig.Clear(); }
+                    lock (_connectionsConfig) { _connectionsConfig.Clear(); }                   
                 }
-                conn.Close();
-            }                              
+                disposedValue = true;
+            }
         }
-    }
-    catch
-    {
-        Globals.SystemManager.LogApplicationEvent(this, "", "Query Failed: " + sql);
-        return null;
-    }
 
-    lastRead = Helpers.AddCircular(lastRead, -1, 0, 239);
+        // TODO: override a finalizer only if Dispose(bool disposing) above has code to free unmanaged resources.
+        // ~DBManager() {
+        //   // Do not change this code. Put cleanup code in Dispose(bool disposing) above.
+        //   Dispose(false);
+        // }
 
-    return new byte[] {Convert.ToByte(lastRead),Convert.ToByte(currPtr) };
-}
-
-
-
-public void UpdateAlmEvtCurrentPtrs(DataRequest PtrPositionRequest)
-{
-    string sql = "";
-    ushort almsPtr = (ushort)PtrPositionRequest.TagList[0].Value; 
-    DateTime almsTimestamp = PtrPositionRequest.TagList[0].Timestamp;
-    ushort evtsPtr = (ushort)PtrPositionRequest.TagList[1].Value;
-    DateTime evtsTimestamp = PtrPositionRequest.TagList[1].Timestamp;
-    string nodeID = PtrPositionRequest.NodeID;
-    int affectedRows = 0;
-
-    string ResponseTimestamp = Helpers.FormatDateTime(PtrPositionRequest.ResponseTimestamp);
-    try
-    {
-        using (NpgsqlConnection conn = new NpgsqlConnection(ConnectionString))
+        // This code added to correctly implement the disposable pattern.
+        public void Dispose()
         {
-            conn.Open();
-
-            using (NpgsqlCommand sqlCommand = conn.CreateCommand())
-            {
-                // update the alarm or event current ptr and timestamp
-                sql = "update " + Globals.SystemManager.GetTableName("FDAHistoricReferences") + " set AlarmsCurPtrPosition = " + almsPtr + ", AlarmsCurPtrTimestamp = '" + Helpers.FormatDateTime(almsTimestamp) + "'";
-                sql += ",EventsCurPtrPosition = " + evtsPtr + ", EventsCurPtrTimestamp = '" + Helpers.FormatDateTime(evtsTimestamp) + "'";
-                sql += " where NodeDetails = '" + nodeID + "' and ConnectionUID = '" + PtrPositionRequest.ConnectionID + "';";
-                sqlCommand.CommandText = sql;
-                affectedRows = sqlCommand.ExecuteNonQuery();
-
-                if (affectedRows == 0) // update had no effect because row doesn't exist, do an insert instead
-                {
-                    sql = "insert into " + Globals.SystemManager.GetTableName("FDAHistoricReferences") + " (DPSType,HistoricStructureType,ConnectionUID,NodeDetails,EventsCurPtrTimestamp,EventsCurPtrPosition,EventsCurMaxNumRecords,";
-                    sql += "EventsLastPtrReadTimestamp,EventsLastPtrReadPosition,AlarmsCurPtrTimestamp,AlarmsCurPtrPosition,AlarmsCurMaxNumRecords,AlarmsLastPtrReadTimestamp,AlarmsLastPtrReadPosition)";
-                    sql += " values (";
-                    sql += "'" + PtrPositionRequest.Protocol + "',1,'" + PtrPositionRequest.ConnectionID + "','" + PtrPositionRequest.NodeID + "','" + ResponseTimestamp + "',";
-                    sql += evtsPtr + ",240,'" + ResponseTimestamp + "',0,'" + ResponseTimestamp + "'," + almsPtr + ",240,'" + ResponseTimestamp + "',0);";
-                    sqlCommand.CommandText = sql;
-                    sqlCommand.ExecuteNonQuery();
-                }
-            }
-            conn.Close();
+            // Do not change this code. Put cleanup code in Dispose(bool disposing) above.
+            Dispose(true);
+            // TODO: uncomment the following line if the finalizer is overridden above.
+            // GC.SuppressFinalize(this);
         }
+        #endregion
+
+    #endregion
     }
-    catch
-    {
-        Globals.SystemManager.LogApplicationEvent(this, "", "Query Failed: " + sql);
-    }
-}
-
-
-public class DemandEventArgs: EventArgs
-{
-    public FDARequestGroupDemand DemandRequestObject { get; }
-    public List<RequestGroup> RequestGroups;
-
-    public DemandEventArgs(FDARequestGroupDemand demand,List<RequestGroup> requestGroups)
-    {
-        DemandRequestObject = demand;
-        RequestGroups = requestGroups;
-    }
-}
-
-private void RaiseDemandRequestEvent(FDARequestGroupDemand demand,List<RequestGroup> requestGroups)
-{
-    DemandRequest?.Invoke(this, new DemandEventArgs(demand,requestGroups));
-}
-
-
-private void RaiseConfigChangeEvent(string type,string table, Guid item)
-{
-    //Globals.SystemManager.LogApplicationEvent(this, "", table + " table changed (" + type + "), ID = " + item.ToString());
-    ConfigChange?.Invoke(this, new ConfigEventArgs(type,table, item));
-}
-
-
-#region IDisposable Support
-private bool disposedValue = false; // To detect redundant calls
-
-protected virtual void Dispose(bool disposing)
-{
-
-    if (!disposedValue)
-    {
-        if (disposing)
-        {
-            Globals.SystemManager.LogApplicationEvent(this, "", "Stopping Demand Table Monitor");
-            _demandMonitor?.StopListening();
-            _demandMonitor?.Dispose();
-
-            // log any data that's sitting in the caches before shutting down
-            Globals.SystemManager.LogApplicationEvent(this, "", "Flushing all cached data");
-
-            if (_cacheManager != null)
-            {
-                List<string> batches = _cacheManager.FlushAll();
-                foreach (string batch in batches)
-                {
-                    PG_ExecuteNonQuery(batch);
-                }
-            }
-            _cacheManager.Dispose();
-
-            Stopwatch stopwatch = new Stopwatch();
-            // wait for datawriter thread to finish (up to 10 seconds)
-            if (_dataWriter != null)
-            {
-                if (_dataWriter.IsBusy)
-                    Globals.SystemManager.LogApplicationEvent(this, "", "Waiting for data writer thread to finish and exit");
-
-                stopwatch.Start();
-                while (_dataWriter.IsBusy && stopwatch.Elapsed.Seconds < 10)
-                    Thread.Sleep(50);
-                stopwatch.Stop();
-                _dataWriter.Dispose();
-            }
-
-            // wait for alarms and events writing thread to finish (up to 10 seconds)
-            if (_alarmsEventsWriter != null)
-            {
-                if (_alarmsEventsWriter.IsBusy)
-                    Globals.SystemManager.LogApplicationEvent(this, "", "Waiting for Alarms and Events writer thread to finish and exit");
-
-                stopwatch.Reset();
-                stopwatch.Start();
-                while (_alarmsEventsWriter.IsBusy && stopwatch.Elapsed.Seconds < 10)
-                    Thread.Sleep(50);
-                stopwatch.Stop();
-                _alarmsEventsWriter.Dispose();
-            }
-
-            stopwatch = null;
-
-
-            _schedMonitor?.StopListening();
-            _dataPointDefMonitor?.StopListening();
-            _requestGroupDefMonitor?.StopListening();
-            _connectionDefMonitor?.StopListening();
-
-            _schedMonitor?.Dispose();
-            _dataPointDefMonitor?.Dispose();
-            _requestGroupDefMonitor?.Dispose();
-            _connectionDefMonitor?.Dispose();
-
-
-            Globals.SystemManager.LogApplicationEvent(this, "", "Clearing configuration data");
-            lock (_schedConfig) { _schedConfig.Clear(); }
-            lock (_requestgroupConfig) { _requestgroupConfig.Clear(); }
-            lock (_dataPointConfig) { _dataPointConfig.Clear(); }
-            lock (_connectionsConfig) { _connectionsConfig.Clear(); }                   
-        }
-        disposedValue = true;
-    }
-}
-
-// TODO: override a finalizer only if Dispose(bool disposing) above has code to free unmanaged resources.
-// ~DBManager() {
-//   // Do not change this code. Put cleanup code in Dispose(bool disposing) above.
-//   Dispose(false);
-// }
-
-// This code added to correctly implement the disposable pattern.
-public void Dispose()
-{
-    // Do not change this code. Put cleanup code in Dispose(bool disposing) above.
-    Dispose(true);
-    // TODO: uncomment the following line if the finalizer is overridden above.
-    // GC.SuppressFinalize(this);
-}
-#endregion
-
-#endregion
-}
 
 
 }
