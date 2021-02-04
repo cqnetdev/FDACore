@@ -680,55 +680,44 @@ namespace Common
             string query = string.Empty;
             try
             {
-                using (NpgsqlConnection conn = new NpgsqlConnection(SystemDBConnectionString))
+                query = "SELECT EXISTS(SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'fdaconfig');";
+                    
+                object result = PG_ExecuteScalar(query);
+                bool tableExists = false;
+                if (result != null)
                 {
-                    try
-                    {
-                        conn.Open();
-                    }
-                    catch (Exception ex)
-                    {
-                        // failed to connect to DB, log the error and exit the function
-                        LogApplicationError(Globals.FDANow(), ex, "Event Logger: Unable to connect to the database");
-                        return false;
-                    }
-
-                    using (NpgsqlCommand sqlCommand = conn.CreateCommand())
-                    {
-                        query = "SELECT EXISTS(SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'fdaconfig');";
-                        sqlCommand.CommandText = query;
-                        bool tableExists = (bool)sqlCommand.ExecuteScalar();
-                       
-
-                        if (tableExists)
-                        {
-                            query = "select OptionName,OptionValue,ConfigType from FDAConfig";
-                            sqlCommand.CommandText = query;
-                            using (var sqlDataReader = sqlCommand.ExecuteReader())
-                            {
-                                while (sqlDataReader.Read())
-                                {
-                                    try
-                                    {
-                                        optionName = sqlDataReader.GetString(0);
-                                        _appConfig.Add(optionName,
-                                          new FDAConfig()
-                                          {
-                                              OptionName = sqlDataReader.GetString(sqlDataReader.GetOrdinal("OptionName")),
-                                              OptionValue = sqlDataReader.GetString(sqlDataReader.GetOrdinal("OptionValue")),
-                                              ConfigType = sqlDataReader.GetInt32(sqlDataReader.GetOrdinal("ConfigType"))
-                                          });
-                                    }
-                                    catch (Exception ex)
-                                    {
-                                        Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Failed to parse option '" + optionName);
-                                        return false;
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    tableExists = (bool)result;
                 }
+                
+                if (tableExists)
+                {
+                    NpgsqlConnection conn = new NpgsqlConnection(SystemDBConnectionString);
+
+                        query = "select OptionName,OptionValue,ConfigType from FDAConfig";
+                    NpgsqlDataReader reader = PG_ExecuteDataReader(query, ref conn);
+                    while (reader.Read())
+                    {
+                        try
+                        {
+                            optionName = reader.GetString(0);
+                            _appConfig.Add(optionName,
+                                new FDAConfig()
+                                {
+                                    OptionName = reader.GetString(reader.GetOrdinal("OptionName")),
+                                    OptionValue = reader.GetString(reader.GetOrdinal("OptionValue")),
+                                    ConfigType = reader.GetInt32(reader.GetOrdinal("ConfigType"))
+                                });
+                        }
+                        catch (Exception ex)
+                        {
+                            Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Failed to parse option '" + optionName);
+                            conn.Close();
+                            conn.Dispose();
+                            return false;
+                        }
+                    }  
+                }
+
             }
             catch (Exception ex)
             {
@@ -983,55 +972,38 @@ namespace Common
         private void LogTrimTimerTick(object o)
         {
             Globals.SystemManager.LogApplicationEvent(this, "", "Trimming the event log and comms history tables");
-            using (SqlConnection conn = new SqlConnection(AppDBConnectionString))
+   
+            string CommsLog = GetTableName("CommsLog");
+            string AppLog = GetTableName("AppLog");
+            int CommsLogDel = 0;
+            int AppLogDel = 0;
+
+            string query = "DELETE FROM " + AppLog + " where Timestamp < DATEADD(HOUR," + Globals.UTCOffset + ",GETUTCDATE()) - " + _eventLogMaxDays;
+            try
             {
-                try
-                {
-                    conn.Open();
-                }
-                catch (Exception ex)
-                {
-                    // failed to connect to DB, log the error and exit the function
-                    LogApplicationError(Globals.FDANow(), ex, "Event Logger: Unable to connect to the Application database");
-                    return;
-                }
-
-                using (SqlCommand sqlCommand = conn.CreateCommand())
-                {
-                    string CommsLog = GetTableName("CommsLog");
-                    string AppLog = GetTableName("AppLog");
-                    int CommsLogDel = 0;
-                    int AppLogDel = 0;
-
-                    sqlCommand.CommandText = "DELETE FROM " + AppLog + " where [Timestamp] < DATEADD(HOUR," + Globals.UTCOffset + ",GETUTCDATE()) - " + _eventLogMaxDays;
-                    try
-                    {
-                        AppLogDel = sqlCommand.ExecuteNonQuery();
-                    }
-                    catch (Exception ex)
-                    {
-                        LogApplicationError(Globals.FDANow(), ex, "Trim log tables failed: query = " + sqlCommand.CommandText);
-                        return;
-                    }
-                    Globals.SystemManager.LogApplicationEvent(this, "", "Trimmed " + AppLogDel + " rows from " + AppLog);
-
-                    sqlCommand.CommandText = "DELETE FROM " + CommsLog + " where [TimestampUTC1] < DATEADD(HOUR," + Globals.UTCOffset + ",GETUTCDATE()) - " + _commsLogMaxDays;
-                    try
-                    {
-                        CommsLogDel = sqlCommand.ExecuteNonQuery();
-                    }
-                    catch (Exception ex)
-                    {
-                        LogApplicationError(Globals.FDANow(), ex, "Trim log tables failed: query = " + sqlCommand.CommandText);
-                        return;
-                    }
-                    Globals.SystemManager.LogApplicationEvent(this, "", "Trimmed " + CommsLogDel + " rows from " + CommsLog);
-
-                }
+                AppLogDel = PG_ExecuteNonQuery(query);
             }
+            catch (Exception ex)
+            {
+                LogApplicationError(Globals.FDANow(), ex, "Trim log tables failed: query = " + query);
+                return;
+            }
+            Globals.SystemManager.LogApplicationEvent(this, "", "Trimmed " + AppLogDel + " rows from " + AppLog);
 
+            query = "DELETE FROM " + CommsLog + " where TimestampUTC1 < DATEADD(HOUR," + Globals.UTCOffset + ",GETUTCDATE()) - " + _commsLogMaxDays;
+            try
+            {
+                CommsLogDel = PG_ExecuteNonQuery(query);
+            }
+            catch (Exception ex)
+            {
+                LogApplicationError(Globals.FDANow(), ex, "Trim log tables failed: query = " + query);
+                return;
+            }
+            Globals.SystemManager.LogApplicationEvent(this, "", "Trimmed " + CommsLogDel + " rows from " + CommsLog);
 
         }
+
         public void LogApplicationError(DateTime timestamp, Exception ex, string description = "")
         {
             // temporary: display it in the console too
@@ -1307,6 +1279,155 @@ namespace Common
             sb.Append(" (FDAExecutionID, connectionID, DeviceAddress, Attempt, TimestampUTC1, TimestampUTC2, ElapsedPeriod, TransCode, TransStatus, ApplicationMessage,DBRGUID,DBRGIdx,DBRGSize,Details01,TxSize,Details02,RxSize,ProtocolNote,Protocol) values ");
         }
 
+
+        private NpgsqlDataReader PG_ExecuteDataReader(string sql, ref NpgsqlConnection conn)
+        {
+            int maxRetries = 3;
+            int retries = 0;
+            NpgsqlDataReader reader;
+        Retry:
+
+            if (conn.State != System.Data.ConnectionState.Open)
+            {
+                try
+                {
+                    conn.Open();
+                }
+                catch (Exception ex)
+                {
+                    Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "PG_ExecuteDataReader() Failed to connect to database");
+                    return null;
+                }
+            }
+
+            using (NpgsqlCommand command = conn.CreateCommand())
+            {
+                command.CommandText = sql;
+
+                try
+                {
+                    reader = command.ExecuteReader();
+                }
+                catch (Exception ex)
+                {
+                    retries++;
+                    if (retries < maxRetries)
+                    {
+                        Thread.Sleep(250);
+                        goto Retry;
+                    }
+                    else
+                    {
+                        Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "PG_ExecuteScalar() Failed to execute query after " + (maxRetries + 1) + " attempts.");
+                        return null;
+                    }
+                }
+                return reader;
+            }
+
+        }
+
+
+        private int PG_ExecuteNonQuery(string sql)
+        {
+            int rowsaffected = -99;
+            int retries = 0;
+            int maxRetries = 3;
+        Retry:
+
+            using (NpgsqlConnection conn = new NpgsqlConnection(SystemDBConnectionString))
+            {
+                try
+                {
+                    conn.Open();
+                }
+                catch (Exception ex)
+                {
+                    Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "PG_ExecuteNonQuery() Failed to connect to database");
+                    return -99;
+                }
+
+                try
+                {
+                    using (NpgsqlCommand sqlCommand = conn.CreateCommand())
+                    {
+                        retries++;
+                        sqlCommand.CommandText = sql;
+                        rowsaffected = sqlCommand.ExecuteNonQuery();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    retries++;
+                    if (retries < maxRetries)
+                    {
+                        Thread.Sleep(250);
+                        goto Retry;
+                    }
+                    else
+                    {
+                        Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "PG_ExecuteScalar() Failed to execute query after " + (maxRetries + 1) + " attempts. Query = " + sql);
+                        return -99;
+                    }
+
+                }
+
+                conn.Close();
+            }
+
+            return rowsaffected;
+        }
+
+
+
+
+        private object PG_ExecuteScalar(string sql)
+        {
+            int maxRetries = 3;
+            int retries = 0;
+
+        Retry:
+            using (NpgsqlConnection conn = new NpgsqlConnection(SystemDBConnectionString))
+            {
+                try
+                {
+                    conn.Open();
+                }
+                catch (Exception ex)
+                {
+                    Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "PG_ExecuateScalar() Failed to connect to database");
+                    return null;
+                }
+
+
+                using (NpgsqlCommand sqlCommand = conn.CreateCommand())
+                {
+                    sqlCommand.CommandText = sql;
+
+                    try
+                    {
+                        return sqlCommand.ExecuteScalar();
+                    }
+                    catch (Exception ex)
+                    {
+                        retries++;
+                        if (retries < maxRetries)
+                        {
+                            Thread.Sleep(250);
+                            goto Retry;
+                        }
+                        else
+                        {
+                            Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "PG_ExecuteScalar() Failed to execute query after " + (maxRetries + 1) + " attempts.");
+                            return null;
+                        }
+                    }
+
+                }
+
+            }
+        }
+
         private int ExecuteSQLSync(string sql, bool isScalar = false)
         {
             int result = 0;
@@ -1369,7 +1490,7 @@ namespace Common
             {
                 sql = "insert into FDAStarts(FDAExecutionID, UTCTimestamp) values('" + instanceID.ToString() + "', '" + Helpers.FormatDateTime(timestamp) + "'); ";
             }
-
+          
             ExecuteSQLSync(sql, false);
 
         }
