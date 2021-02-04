@@ -315,7 +315,7 @@ namespace FDAApp
                 Globals.MQTT.Publish("FDA/executionid", Encoding.UTF8.GetBytes(ExecutionID.ToString()), 0, true);
 
                 // publish the DB connection string (with retain)
-                Globals.MQTT.Publish("FDA/dbconnstring", Encoding.UTF8.GetBytes(Globals.SystemManager.GetAppDBConnectionString()), 0, true);
+                //Globals.MQTT.Publish("FDA/dbconnstring", Encoding.UTF8.GetBytes(Globals.SystemManager.GetAppDBConnectionString()), 0, true);
 
                 // publish the run status
                 Globals.MQTT.Publish("FDA/runstatus", new byte[] { (byte)Globals.AppState.Normal }, 0, true);
@@ -391,18 +391,19 @@ namespace FDAApp
                     string command = Encoding.UTF8.GetString(e.Message).ToUpper();
                     switch (command)
                     {
-                        case "SHUTDOWN":
-                            DoShutdown();
-                            break;
-                        case "PAUSE":
-                            Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "FDA Application", "", "Pause command received from FDA Manager", false, true);
-                            Console2.Flush();
-                            Globals.FDAStatus = Globals.AppState.Pausing;
-                            break;
-                        case "RESUME":
-                            Globals.FDAStatus = Globals.AppState.Normal;
-                            Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "FDA Application", "", "Resume command received from FDA Manager", false, true);
-                            break;
+                        // these commands will come over TCP from the FDAController service now
+                        //case "SHUTDOWN":
+                        //    DoShutdown();
+                        //    break;
+                        //case "PAUSE":
+                        //    Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "FDA Application", "", "Pause command received from FDA Manager", false, true);
+                        //    Console2.Flush();
+                        //    Globals.FDAStatus = Globals.AppState.Pausing;
+                        //    break;
+                        //case "RESUME":
+                        //    Globals.FDAStatus = Globals.AppState.Normal;
+                        //    Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "FDA Application", "", "Resume command received from FDA Manager", false, true);
+                        //    break;
                     }
                 }
             }
@@ -473,131 +474,140 @@ namespace FDAApp
                     LogEvent("Replying with the count (" + count.ToString() + ")");
                     _TCPServer.Send(e.ClientID, count.ToString());
                     break;
+                case "PAUSE":
+                    Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "FDA Application", "", "Pause command received", false, true);
+                    Console2.Flush();
+                    Globals.FDAStatus = Globals.AppState.Pausing;
+                    break;
+                case "RESUME":
+                    Globals.FDAStatus = Globals.AppState.Normal;
+                    Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "FDA Application", "", "Resume command received", false, true);
+                    break;
 
-        //        case "ELEVATE":
-        //            Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "FDA Application", "", "Received request for elevated permissions from TCP client " + e.Host, false, true);
-        //            string auth = parsedCommand[1];
-        //            string decrypted = Common.Encrypt.DecryptString(auth, "KVvvc5thpcrsc5Hkpkof");
-        //            double diff = double.MinValue;
+                //        case "ELEVATE":
+                //            Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "FDA Application", "", "Received request for elevated permissions from TCP client " + e.Host, false, true);
+                //            string auth = parsedCommand[1];
+                //            string decrypted = Common.Encrypt.DecryptString(auth, "KVvvc5thpcrsc5Hkpkof");
+                //            double diff = double.MinValue;
 
-        //            double OAtimestamp;
-        //            if (!double.TryParse(decrypted, out OAtimestamp))
-        //                goto Rejected;
+                //            double OAtimestamp;
+                //            if (!double.TryParse(decrypted, out OAtimestamp))
+                //                goto Rejected;
 
-        //            DateTime messageTimestamp = DateTime.FromOADate(OAtimestamp);
-        //            DateTime currentTime = DateTime.UtcNow;
+                //            DateTime messageTimestamp = DateTime.FromOADate(OAtimestamp);
+                //            DateTime currentTime = DateTime.UtcNow;
 
-        //            // elevated permissions request is only good for 5 seconds, becomes invalid after that
-        //            diff = currentTime.Subtract(messageTimestamp).TotalSeconds;
-        //            if (diff > 5 || diff < 0)
-        //                goto Rejected;
+                //            // elevated permissions request is only good for 5 seconds, becomes invalid after that
+                //            diff = currentTime.Subtract(messageTimestamp).TotalSeconds;
+                //            if (diff > 5 || diff < 0)
+                //                goto Rejected;
 
-        //            if (!elevatedClients.Contains(e.ClientID))
-        //            {
-        //                Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "FDA Application", "", "TCP Client (" + e.Host + ") identified as FDAManager - elevated permissions granted", false, true);
-        //                elevatedClients.Add(e.ClientID);
-        //                _TCPServer.Send(e.ClientID, "ELEVATE:Success");
-        //                return;
-        //            }
-        //            else
-        //            {
-        //                Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "FDA Application", "", "TCP Client (" + e.Host + ") already has elevated permissions", false, true);
-        //                return;
-        //            }
-
-
-        //        Rejected:
-        //            _TCPServer.Send(e.ClientID, "ELEVATE:Failed");
-        //            Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "FDA Application", "", "TCP Client (" + e.Host + ") request for elevated permission rejected", false, true);
-        //            break;
-        //        case "PAUSE":
-        //            if (!PermissionCheck(e.ClientID, e.Host, parsedCommand[0]))
-        //                return;
-
-        //            Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "FDA Application", "", "Pause command received from FDA Manager (" + e.Host + ")", false, true);
-        //            Console2.Flush();
-        //            Globals.FDAStatus = Globals.AppState.Pausing;
-        //            break;
-        //        case "RESUME":
-        //            if (!PermissionCheck(e.ClientID, e.Host, parsedCommand[0]))
-        //                return;
-        //            Globals.FDAStatus = Globals.AppState.Normal;
-        //            Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "FDA Application", "", "Resume command received from FDA Manager (" + e.Host + ")", false, true);
-        //            break;
-        //        /*               
-        //        case "CONNOVERVIEW":
-        //            if (!PermissionCheck(e.ClientID, e.Host, parsedCommand[0]))
-        //                return;
+                //            if (!elevatedClients.Contains(e.ClientID))
+                //            {
+                //                Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "FDA Application", "", "TCP Client (" + e.Host + ") identified as FDAManager - elevated permissions granted", false, true);
+                //                elevatedClients.Add(e.ClientID);
+                //                _TCPServer.Send(e.ClientID, "ELEVATE:Success");
+                //                return;
+                //            }
+                //            else
+                //            {
+                //                Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "FDA Application", "", "TCP Client (" + e.Host + ") already has elevated permissions", false, true);
+                //                return;
+                //            }
 
 
-        //            Dictionary<Guid, ConnectionManager> connList = DataAcqManager._connectionsDictionary;
-        //            sb = new StringBuilder("CONNOVERVIEW:");
-        //            ushort[] Qcounts;
-        //            if (DataAcqManager._connectionsDictionary != null)
-        //            {
-        //                foreach (KeyValuePair<Guid, ConnectionManager> kvp in DataAcqManager._connectionsDictionary)
-        //                {
-        //                    sb.Append(kvp.Value.ConnectionStatus.ToString());
-        //                    sb.Append(".");
-        //                    sb.Append(kvp.Value.Description);
-        //                    sb.Append(".");
-        //                    sb.Append(kvp.Key.ToString());
-        //                    sb.Append(".");
-        //                    sb.Append(kvp.Value.ConnectionEnabled ? 1 : 0);
-        //                    sb.Append(".");
-        //                    sb.Append(kvp.Value.CommunicationsEnabled ? 1 : 0);
-        //                    sb.Append(".");
-        //                    Qcounts = kvp.Value._queueManager.GetQueueCounts();
-        //                    foreach (ushort count in Qcounts)
-        //                    {
-        //                        sb.Append(count);
-        //                        sb.Append(".");
-        //                    }
-        //                    //remove the last .
-        //                    if (sb.Length > 0)
-        //                        sb.Remove(sb.Length - 1, 1);
-        //                    sb.Append("|");
-        //                }
-        //            }
-        //            //remove the last |
-        //            if (sb.Length > 0)
-        //                sb.Remove(sb.Length - 1, 1);
+                //        Rejected:
+                //            _TCPServer.Send(e.ClientID, "ELEVATE:Failed");
+                //            Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "FDA Application", "", "TCP Client (" + e.Host + ") request for elevated permission rejected", false, true);
+                //            break;
+                //        case "PAUSE":
+                //            if (!PermissionCheck(e.ClientID, e.Host, parsedCommand[0]))
+                //                return;
 
-        //            //send the response to the client
-        //            if (_TCPServer.Send(e.ClientID, sb.ToString()))
-        //                Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "FDA Application", "", "Responded to TCP Client: " + sb.ToString(), false, true);
-        //            else
-        //                Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "FDA Application", "", "Attempted to respond to TCP Client, but the attempt failed", false, true);
-        //            break;
+                //            Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "FDA Application", "", "Pause command received from FDA Manager (" + e.Host + ")", false, true);
+                //            Console2.Flush();
+                //            Globals.FDAStatus = Globals.AppState.Pausing;
+                //            break;
+                //        case "RESUME":
+                //            if (!PermissionCheck(e.ClientID, e.Host, parsedCommand[0]))
+                //                return;
+                //            Globals.FDAStatus = Globals.AppState.Normal;
+                //            Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "FDA Application", "", "Resume command received from FDA Manager (" + e.Host + ")", false, true);
+                //            break;
+                //        /*               
+                //        case "CONNOVERVIEW":
+                //            if (!PermissionCheck(e.ClientID, e.Host, parsedCommand[0]))
+                //                return;
 
-        //        case "QUEUECOUNTS":
-        //            if (!PermissionCheck(e.ClientID, e.Host, parsedCommand[0]))
-        //                return;
-        //            if (parsedCommand.Length < 2)
-        //            {
-        //                Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "FDA Application", "", "Received invalid command from FDA Manager, QueueCounts command must specify a connection", false, true);
-        //                return;
-        //            }
 
-        //            connectionIDstr = parsedCommand[1];
-        //            connectionID = Guid.Parse(connectionIDstr);
-        //            if (DataAcqManager._connectionsDictionary.ContainsKey(connectionID))
-        //            {
-        //                ushort[] counts = DataAcqManager._connectionsDictionary[connectionID]._queueManager.GetQueueCounts();
-        //                sb = new StringBuilder();
-        //                for (int i = 0; i < counts.Length; i++)
-        //                {
-        //                    sb.Append(i);
-        //                    sb.Append(":");
-        //                    sb.Append(counts[i]);
-        //                    sb.Append("|");
-        //                }
-        //                if (sb.Length > 0)
-        //                    sb.Remove(sb.Length - 1, 1);
-        //                _TCPServer.Send(e.ClientID, sb.ToString());
-        //            }
-        //            break;
-        //         */
+                //            Dictionary<Guid, ConnectionManager> connList = DataAcqManager._connectionsDictionary;
+                //            sb = new StringBuilder("CONNOVERVIEW:");
+                //            ushort[] Qcounts;
+                //            if (DataAcqManager._connectionsDictionary != null)
+                //            {
+                //                foreach (KeyValuePair<Guid, ConnectionManager> kvp in DataAcqManager._connectionsDictionary)
+                //                {
+                //                    sb.Append(kvp.Value.ConnectionStatus.ToString());
+                //                    sb.Append(".");
+                //                    sb.Append(kvp.Value.Description);
+                //                    sb.Append(".");
+                //                    sb.Append(kvp.Key.ToString());
+                //                    sb.Append(".");
+                //                    sb.Append(kvp.Value.ConnectionEnabled ? 1 : 0);
+                //                    sb.Append(".");
+                //                    sb.Append(kvp.Value.CommunicationsEnabled ? 1 : 0);
+                //                    sb.Append(".");
+                //                    Qcounts = kvp.Value._queueManager.GetQueueCounts();
+                //                    foreach (ushort count in Qcounts)
+                //                    {
+                //                        sb.Append(count);
+                //                        sb.Append(".");
+                //                    }
+                //                    //remove the last .
+                //                    if (sb.Length > 0)
+                //                        sb.Remove(sb.Length - 1, 1);
+                //                    sb.Append("|");
+                //                }
+                //            }
+                //            //remove the last |
+                //            if (sb.Length > 0)
+                //                sb.Remove(sb.Length - 1, 1);
+
+                //            //send the response to the client
+                //            if (_TCPServer.Send(e.ClientID, sb.ToString()))
+                //                Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "FDA Application", "", "Responded to TCP Client: " + sb.ToString(), false, true);
+                //            else
+                //                Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "FDA Application", "", "Attempted to respond to TCP Client, but the attempt failed", false, true);
+                //            break;
+
+                //        case "QUEUECOUNTS":
+                //            if (!PermissionCheck(e.ClientID, e.Host, parsedCommand[0]))
+                //                return;
+                //            if (parsedCommand.Length < 2)
+                //            {
+                //                Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "FDA Application", "", "Received invalid command from FDA Manager, QueueCounts command must specify a connection", false, true);
+                //                return;
+                //            }
+
+                //            connectionIDstr = parsedCommand[1];
+                //            connectionID = Guid.Parse(connectionIDstr);
+                //            if (DataAcqManager._connectionsDictionary.ContainsKey(connectionID))
+                //            {
+                //                ushort[] counts = DataAcqManager._connectionsDictionary[connectionID]._queueManager.GetQueueCounts();
+                //                sb = new StringBuilder();
+                //                for (int i = 0; i < counts.Length; i++)
+                //                {
+                //                    sb.Append(i);
+                //                    sb.Append(":");
+                //                    sb.Append(counts[i]);
+                //                    sb.Append("|");
+                //                }
+                //                if (sb.Length > 0)
+                //                    sb.Remove(sb.Length - 1, 1);
+                //                _TCPServer.Send(e.ClientID, sb.ToString());
+                //            }
+                //            break;
+                //         */
 
 
                 default:
