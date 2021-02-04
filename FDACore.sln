@@ -21,7 +21,11 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DataAquisitionManagar", "Da
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FDATimer", "FDAScheduler\FDATimer.csproj", "{8866B87E-99CD-4A4E-9D87-9999A3BB9216}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TCPServer", "TCPServer\TCPServer.csproj", "{9A3DA37E-6D93-4B3F-A415-E07A4F71C697}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TCPServer", "TCPServer\TCPServer.csproj", "{9A3DA37E-6D93-4B3F-A415-E07A4F71C697}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FDAManager", "FDAInterface\FDAManager.csproj", "{51005AE1-2609-4BC2-846A-0589AED12AED}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FDAControllerService", "FDAController\FDAControllerService.csproj", "{C6579F79-C046-41FE-B1B3-5C11F68CD197}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -69,6 +73,14 @@ Global
 		{9A3DA37E-6D93-4B3F-A415-E07A4F71C697}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{9A3DA37E-6D93-4B3F-A415-E07A4F71C697}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{9A3DA37E-6D93-4B3F-A415-E07A4F71C697}.Release|Any CPU.Build.0 = Release|Any CPU
+		{51005AE1-2609-4BC2-846A-0589AED12AED}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{51005AE1-2609-4BC2-846A-0589AED12AED}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{51005AE1-2609-4BC2-846A-0589AED12AED}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{51005AE1-2609-4BC2-846A-0589AED12AED}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C6579F79-C046-41FE-B1B3-5C11F68CD197}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C6579F79-C046-41FE-B1B3-5C11F68CD197}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C6579F79-C046-41FE-B1B3-5C11F68CD197}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C6579F79-C046-41FE-B1B3-5C11F68CD197}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
