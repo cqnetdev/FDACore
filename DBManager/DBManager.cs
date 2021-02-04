@@ -195,16 +195,15 @@ namespace FDA
             }
         }
 
-        // returning a datareader doesn't work, it's closed as soon as we exit the 'using' and becomes unusable
-        // try making some kind of copy of the data and returning that instead
-        // then, use this function for all datareader operations
-        private NpgsqlDataReader PG_ExecuteDataReader(string sql)
+       
+        private NpgsqlDataReader PG_ExecuteDataReader(string sql,ref NpgsqlConnection conn)
         {
             int maxRetries = 3;
             int retries = 0;
             NpgsqlDataReader reader;
-            Retry:
-            using (NpgsqlConnection conn = new NpgsqlConnection(ConnectionString))
+        Retry:
+
+            if (conn.State != System.Data.ConnectionState.Open)
             {
                 try
                 {
@@ -215,33 +214,33 @@ namespace FDA
                     Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "PG_ExecuteDataReader() Failed to connect to database");
                     return null;
                 }
-
-                using (NpgsqlCommand command = conn.CreateCommand())
-                {
-                    command.CommandText = sql;
-
-                    try
-                    {
-                        reader = command.ExecuteReader(System.Data.CommandBehavior.CloseConnection);
-                    }
-                    catch (Exception ex)
-                    {
-                        retries++;
-                        if (retries < maxRetries)
-                        {
-                            Thread.Sleep(250);
-                            goto Retry;
-                        }
-                        else
-                        {
-                            Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "PG_ExecuteScalar() Failed to execute query after " + (maxRetries + 1) + " attempts.");
-                            return null;
-                        }
-                    }
-                    return reader;
-                }
-
             }
+
+            using (NpgsqlCommand command = conn.CreateCommand())
+            {
+                command.CommandText = sql;
+
+                try
+                {
+                    reader = command.ExecuteReader();
+                }
+                catch (Exception ex)
+                {
+                    retries++;
+                    if (retries < maxRetries)
+                    {
+                        Thread.Sleep(250);
+                        goto Retry;
+                    }
+                    else
+                    {
+                        Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "PG_ExecuteScalar() Failed to execute query after " + (maxRetries + 1) + " attempts.");
+                        return null;
+                    }
+                }
+                return reader;
+            }
+
         }
           
 
@@ -251,6 +250,7 @@ namespace FDA
             int retries = 0;
             int maxRetries = 3;
             Retry:
+
             using (NpgsqlConnection conn = new NpgsqlConnection(ConnectionString))
             {
                 try
@@ -270,8 +270,7 @@ namespace FDA
                         retries++;
                         sqlCommand.CommandText = sql;
                         rowsaffected = sqlCommand.ExecuteNonQuery();                       
-                    }
-                   
+                    }                   
                 }
                 catch (Exception ex)
                 {
@@ -295,17 +294,7 @@ namespace FDA
             return rowsaffected;         
         }
 
-        private DateTime PG_GetDBStartTime()
-        {
-            object scalarResult = PG_ExecuteScalar("SELECT pg_postmaster_start_time()");
-            DateTime startTime = DateTime.MinValue;
-
-            if (scalarResult != null)
-                startTime = (DateTime)scalarResult;
-
-            return startTime;
-               
-        }
+     
 
 
         private object PG_ExecuteScalar(string sql)
@@ -322,7 +311,7 @@ namespace FDA
                 }
                 catch (Exception ex)
                 {
-                    Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "PG_ExecuateScalar() Failed to connect to database");
+                    Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "PG_ExecuteScalar() Failed to connect to database");
                     return null;
                 }
 
@@ -355,8 +344,18 @@ namespace FDA
             }
         }
 
- 
 
+        private DateTime PG_GetDBStartTime()
+        {
+            object scalarResult = PG_ExecuteScalar("SELECT pg_postmaster_start_time()");
+            DateTime startTime = DateTime.MinValue;
+
+            if (scalarResult != null)
+                startTime = (DateTime)scalarResult;
+
+            return startTime;
+
+        }
         public void WriteDataToDB(DataRequest completedRequest)
         {
             ///Globals.SystemManager.LogApplicationEvent(this, "", "Received completed request");
@@ -374,81 +373,72 @@ namespace FDA
 
         public void GetLastValues(string table, Dictionary<Guid, double> values)
         {
-                StringBuilder query = new StringBuilder("select A.DPDUID,A.Value FROM ");
-                query.Append(table);
-                query.Append(" A inner join (select DPDUID, MAX(Timestamp) as LastEntry FROM ");
-                query.Append(table);
-                query.Append(" Group by DPDUID having DPDUID in (");
-                bool first = true;
-                foreach (Guid id in values.Keys)
+            StringBuilder query = new StringBuilder("select A.DPDUID,A.Value FROM ");
+            query.Append(table);
+            query.Append(" A inner join (select DPDUID, MAX(Timestamp) as LastEntry FROM ");
+            query.Append(table);
+            query.Append(" Group by DPDUID having DPDUID in (");
+            bool first = true;
+            foreach (Guid id in values.Keys)
+            {
+                if (!first)
+                    query.Append(",");
+                else
+                    first = false;
+
+                query.Append("'");
+                query.Append(id);
+                query.Append("'");
+            }
+            query.Append(")) B on A.DPDUID = B.DPDUID and A.Timestamp = B.LastEntry");
+
+            NpgsqlConnection conn = new NpgsqlConnection(ConnectionString);
+              
+            try
+            {
+
+                //sqlCommand.CommandText = query.ToString();
+                using (NpgsqlDataReader reader = PG_ExecuteDataReader(query.ToString(), ref conn))
                 {
-                    if (!first)
-                        query.Append(",");
-                    else
-                        first = false;
-
-                    query.Append("'");
-                    query.Append(id);
-                    query.Append("'");
-                }
-                query.Append(")) B on A.DPDUID = B.DPDUID and A.Timestamp = B.LastEntry");
-
-                using (NpgsqlConnection conn = new NpgsqlConnection(ConnectionString))
-                {
-                    try
+                    Guid key;
+                    while (reader.Read())
                     {
-                        conn.Open();
+                        key = reader.GetGuid(reader.GetOrdinal("DPDUID"));
+                        values[key] = reader.GetDouble(reader.GetOrdinal("Value"));
                     }
-                    catch (Exception ex)
-                    {
-                        Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Failed to connect to database while retrieving values to write to device");
-                        return;
-                    }
-
-
-
-                    try
-                    {
-                        using (NpgsqlCommand sqlCommand = conn.CreateCommand())
-                        {
-                            sqlCommand.CommandText = query.ToString();
-                            using (NpgsqlDataReader reader = sqlCommand.ExecuteReader())
-                            {
-                                Guid key;
-                                while (reader.Read())
-                                {
-                                    key = reader.GetGuid(reader.GetOrdinal("DPDUID"));
-                                    values[key] = reader.GetDouble(reader.GetOrdinal("Value"));
-                                }
-                            }
-
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Failed to retrieve values to write to field device: query = " + query);
-                        return;
-                    }
-
-                    // look for any tags that did not get a value, mention them in an event message
-                    StringBuilder errorList = new StringBuilder();
-                    foreach (KeyValuePair<Guid, double> kvp in values)
-                    {
-                        if (double.IsNaN(kvp.Value))
-                        {
-                            errorList.Append(kvp.Key);
-                            errorList.Append(",");
-                        }
-                    }
-
-                    if (errorList.Length > 0)
-                    {
-                        Globals.SystemManager.LogApplicationEvent(this, "", "The tag(s) " + errorList + " were not found in the table " + table + " while looking for values to be written to the device. This/these tag(s) will be dropped from the write request ");
-                    }
-
                 }
 
+            }
+            catch (Exception ex)
+            {
+                Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Failed to retrieve values to write to field device: query = " + query);
+                conn.Close();
+                conn.Dispose();
                 return;
+            }
+
+
+            // look for any tags that did not get a value, mention them in an event message
+            StringBuilder errorList = new StringBuilder();
+            foreach (KeyValuePair<Guid, double> kvp in values)
+            {
+                if (double.IsNaN(kvp.Value))
+                {
+                    errorList.Append(kvp.Key);
+                    errorList.Append(",");
+                }
+            }
+
+            if (errorList.Length > 0)
+            {
+                Globals.SystemManager.LogApplicationEvent(this, "", "The tag(s) " + errorList + " were not found in the table " + table + " while looking for values to be written to the device. This/these tag(s) will be dropped from the write request ");
+            }
+
+
+
+            conn.Close();
+            conn.Dispose();
+            return;
             
         }
 
@@ -1232,393 +1222,386 @@ namespace FDA
             lock (_taskConfig) { _taskConfig.Clear(); }
             lock (_deviceConfig) { _deviceConfig.Clear(); }
 
-            using (NpgsqlConnection conn = new NpgsqlConnection(ConnectionString))
+            NpgsqlConnection conn = new NpgsqlConnection(ConnectionString);
+           
+            try
+            {
+                conn.Open();
+            }
+            catch (Exception ex)
+            {
+                // failed to connect
+                Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Unable to connect to the database");
+                return false;
+            }
+
+
+
+            string tableName = "";
+
+
+            //bool MQTTColumnExists;
+            string ID; // a temporary place to store the ID (as a string) of whatever we're trying to parse, so we can include it in the error message if parsing fails 
+            string query = "";
+
+            // ***********************    load connections ******************************************
+            tableName = Globals.SystemManager.GetTableName("FDASourceConnections");
+            query = "select * from " + tableName;
+           
+            //sqlCommand.CommandText = query;
+            using (NpgsqlDataReader reader = PG_ExecuteDataReader(query,ref conn))
+            {
+                //MQTTColumnExists = HasColumn(sqlDataReader, "MQTTEnabled");
+                FDASourceConnection newConnConfig;
+                while (reader.Read())
+                {
+                    ID = "(unknown)";
+                    try
+                    {
+                        ID = reader.GetGuid(reader.GetOrdinal("SCUID")).ToString();
+                        newConnConfig = new FDASourceConnection()
+                        {
+                            SCUID = reader.GetGuid(reader.GetOrdinal("SCUID")),
+                            SCType = reader.GetString(reader.GetOrdinal("SCType")),
+                            SCDetail01 = reader.GetString(reader.GetOrdinal("SCDetail01")),
+                            SCDetail02 = reader.GetString(reader.GetOrdinal("SCDetail02")),
+                            Description = reader.GetString(reader.GetOrdinal("Description")),
+                            RequestRetryDelay = reader.GetInt32(reader.GetOrdinal("RequestRetryDelay")),
+                            SocketConnectionAttemptTimeout = reader.GetInt32(reader.GetOrdinal("SocketConnectionAttemptTimeout")),
+                            MaxSocketConnectionAttempts = reader.GetInt32(reader.GetOrdinal("MaxSocketConnectionAttempts")),
+                            SocketConnectionRetryDelay = reader.GetInt32(reader.GetOrdinal("SocketConnectionRetryDelay")),
+                            PostConnectionCommsDelay = reader.GetInt32(reader.GetOrdinal("PostConnectionCommsDelay")),
+                            InterRequestDelay = reader.GetInt32(reader.GetOrdinal("InterRequestDelay")),
+                            MaxRequestAttempts = reader.GetInt32(reader.GetOrdinal("maxRequestAttempts")),
+                            RequestResponseTimeout = reader.GetInt32(reader.GetOrdinal("RequestResponseTimeout")),
+                            ConnectionEnabled = reader.GetBoolean(reader.GetOrdinal("ConnectionEnabled")),
+                            CommunicationsEnabled = reader.GetBoolean(reader.GetOrdinal("CommunicationsEnabled")),
+                            CommsLogEnabled = reader.GetBoolean(reader.GetOrdinal("CommsLogEnabled")),
+                            //MQTTEnabled = false
+                        };
+
+                        //if (MQTTColumnExists)
+                        //    newConnConfig.MQTTEnabled = sqlDataReader.GetBoolean(sqlDataReader.GetOrdinal("MQTTEnabled"));
+
+                        lock (_connectionsConfig)
+                        {
+                            _connectionsConfig.Add(newConnConfig.SCUID, newConnConfig);
+                                        
+                        }
+                    }
+                    catch
+                    {
+                        Globals.SystemManager.LogApplicationEvent(this, "", "FDA Start, Config Error - SCUID '" + ID + "' rejected", true);
+                    }
+                }
+            }
+                    
+            
+                  
+                
+            try
+            {
+
+                // load datapoint (tag) definitions
+                DateTime currentTime = Globals.FDANow();
+                tableName = Globals.SystemManager.GetTableName("DataPointDefinitionStructures");
+                                  
+                query = "select *," + 
+                        "case when backfill_enabled is NULL then cast(0 as bit) else backfill_enabled END as nullsafe_backfill_enabled," +
+                        "case when backfill_data_id is NULL then - 1 else backfill_data_id END as nullsafe_backfill_data_id," +
+                        "case when backfill_data_structure_type is NULL then 0 else backfill_data_structure_type END as nullsafe_backfill_data_structure_type," +
+                        "case when backfill_data_lapse_limit is NULL then 60 else backfill_data_lapse_limit END as nullsafe_backfill_data_lapse_limit," +
+                        "case when backfill_data_interval is NULL then 1 else backfill_data_interval END as nullsafe_backfill_data_interval " +
+                        "from DataPointDefinitionStructures;";
+                //query = "select *, isnull(backfill_enabled,0) as nullsafe_backfill_enabled, isnull(backfill_data_id,-1) as nullsafe_backfill_data_id,isnull(backfill_data_structure_type,0) as nullsafe_backfill_data_structure_type,isnull(backfill_data_lapse_limit,60) as nullsafe_backfill_data_lapse_limit,isnull(backfill_data_interval,1) as nullsafe_backfill_data_interval from "
+                //        + tableName + ";";
+                FDADataPointDefinitionStructure newTag;
+
+                //sqlCommand.CommandText = query;
+                using (NpgsqlDataReader sqlDataReader = PG_ExecuteDataReader(query, ref conn))
+                {
+                    //MQTTColumnExists = HasColumn(sqlDataReader, "MQTTEnabled");
+                    while (sqlDataReader.Read())
+                    {
+                        ID = "(unknown)";
+                        try
+                        {
+                            ID = sqlDataReader.GetGuid(sqlDataReader.GetOrdinal("DPDUID")).ToString();
+                            newTag = new FDADataPointDefinitionStructure()
+                            {
+                                DPDUID = sqlDataReader.GetGuid(sqlDataReader.GetOrdinal("DPDUID")),
+                                DPDSEnabled = sqlDataReader.GetBoolean(sqlDataReader.GetOrdinal("DPDSEnabled")),
+                                DPSType = sqlDataReader.GetString(sqlDataReader.GetOrdinal("DPSType")),
+                                read_scaling = sqlDataReader.GetBoolean(sqlDataReader.GetOrdinal("read_scaling")),
+                                read_scale_raw_low = sqlDataReader.GetDouble(sqlDataReader.GetOrdinal("read_scale_raw_low")),
+                                read_scale_raw_high = sqlDataReader.GetDouble(sqlDataReader.GetOrdinal("read_scale_raw_high")),
+                                read_scale_eu_low = sqlDataReader.GetDouble(sqlDataReader.GetOrdinal("read_scale_eu_low")),
+                                read_scale_eu_high = sqlDataReader.GetDouble(sqlDataReader.GetOrdinal("read_scale_eu_high")),
+                                write_scaling = sqlDataReader.GetBoolean(sqlDataReader.GetOrdinal("write_scaling")),
+                                write_scale_raw_low = sqlDataReader.GetDouble(sqlDataReader.GetOrdinal("write_scale_raw_low")),
+                                write_scale_raw_high = sqlDataReader.GetDouble(sqlDataReader.GetOrdinal("write_scale_raw_high")),
+                                write_scale_eu_low = sqlDataReader.GetDouble(sqlDataReader.GetOrdinal("write_scale_eu_low")),
+                                write_scale_eu_high = sqlDataReader.GetDouble(sqlDataReader.GetOrdinal("write_scale_eu_high")),
+                                backfill_enabled = sqlDataReader.GetBoolean(sqlDataReader.GetOrdinal("nullsafe_backfill_enabled")),
+                                backfill_data_ID = sqlDataReader.GetInt32(sqlDataReader.GetOrdinal("nullsafe_backfill_data_id")),
+                                // Feb 12, 2020: ignore the last read columns from the database, default to 0 value at current timestamp
+                                LastReadDataValue = 0.0,// sqlDataReader.GetDouble(sqlDataReader.GetOrdinal("LastReadDataValue")),
+                                LastReadQuality = 32,
+                                LastReadDataTimestamp = currentTime,// sqlDataReader.GetDateTime(sqlDataReader.GetOrdinal("LastReadDataTimestamp")),
+                                backfill_data_structure_type = sqlDataReader.GetInt32(sqlDataReader.GetOrdinal("nullsafe_backfill_data_structure_type")),
+                                backfill_data_lapse_limit = sqlDataReader.GetDouble(sqlDataReader.GetOrdinal("nullsafe_backfill_data_lapse_limit")),
+                                backfill_data_interval = sqlDataReader.GetDouble(sqlDataReader.GetOrdinal("nullsafe_backfill_data_interval")),
+                                //MQTTEnabled = false
+                            };
+
+                            //if (MQTTColumnExists)
+                            //    newTag.MQTTEnabled = sqlDataReader.GetBoolean(sqlDataReader.GetOrdinal("MQTTEnabled"));
+
+                            lock (_dataPointConfig)
+                            {
+                                _dataPointConfig.Add(newTag.DPDUID, newTag);
+                            }
+                        }
+                        catch
+                        {
+                            Globals.SystemManager.LogApplicationEvent(this, "", "FDA Start, Config Error - DPDS ID '" + ID + "' rejected", true);
+                        }
+                    }
+                }
+                
+            }
+            catch (Exception ex)
+            {
+                Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Query of table " + tableName + " failed: query = " + query);
+            }
+
+            // new Mar 9, 2020  load last values from the FDALastDataValues table and update the DataPointDefinitionStructure objects in memory
+            try
+            {
+                Guid DPDUID;
+                tableName = Globals.SystemManager.GetTableName("FDALastDataValues");
+                query = "select DPDUID,value,timestamp,quality from " + tableName + ";";
+
+                //sqlCommand.CommandText = query;
+                using (NpgsqlDataReader sqlDataReader = PG_ExecuteDataReader(query, ref conn))
+                {
+                    while (sqlDataReader.Read())
+                    {
+                        ID = "(unknown)";
+                        try
+                        {
+                            ID = sqlDataReader.GetGuid(sqlDataReader.GetOrdinal("DPDUID")).ToString();
+                            lock (_dataPointConfig)
+                            {
+                                DPDUID = sqlDataReader.GetGuid(sqlDataReader.GetOrdinal("DPDUID"));
+                                if (_dataPointConfig.ContainsKey(DPDUID))
+                                {
+                                    _dataPointConfig[DPDUID].LastReadDataValue = sqlDataReader.GetDouble(sqlDataReader.GetOrdinal("value"));
+                                    _dataPointConfig[DPDUID].LastReadDataTimestamp = sqlDataReader.GetDateTime(sqlDataReader.GetOrdinal("timestamp"));
+                                    _dataPointConfig[DPDUID].LastReadQuality = sqlDataReader.GetInt32(sqlDataReader.GetOrdinal("quality"));
+                                }
+                            }
+                        }
+                        catch
+                        {
+                            Globals.SystemManager.LogApplicationEvent(this, "", "FDA Start, Config Error - DPDS ID '" + ID + "' rejected", true);
+                        }
+                    }
+                }
+                
+            }
+            catch (Exception ex)
+            {
+                Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Query of table " + tableName + " failed: query = " + query);
+            }
+
+
+            if (_devicesTableExists)
             {
                 try
                 {
-                    conn.Open();
-                }
-                catch (Exception ex)
-                {
-                    // failed to connect
-                    Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Unable to connect to the database");
-                    return false;
-                }
+                    tableName = Globals.SystemManager.GetTableName("FDADevices");
+                    query = "SELECT * from " + tableName + ";";
 
-
-
-                string tableName = "";
-
-
-                //bool MQTTColumnExists;
-                string ID; // a temporary place to store the ID (as a string) of whatever we're trying to parse, so we can include it in the error message if parsing fails 
-                string query = "";
-
-                // load connections
-                tableName = Globals.SystemManager.GetTableName("FDASourceConnections");
-                query = "select * from " + tableName;
-                using (NpgsqlCommand sqlCommand = conn.CreateCommand())
-                {
-                    sqlCommand.CommandText = query;
-                    using (NpgsqlDataReader reader = sqlCommand.ExecuteReader())
+                    //sqlCommand.CommandText = query;
+                    using (NpgsqlDataReader sqlDataReader = PG_ExecuteDataReader(query, ref conn))
                     {
-                        //MQTTColumnExists = HasColumn(sqlDataReader, "MQTTEnabled");
-                        FDASourceConnection newConnConfig;
-                        while (reader.Read())
+                        while (sqlDataReader.Read())
                         {
                             ID = "(unknown)";
                             try
                             {
-                                ID = reader.GetGuid(reader.GetOrdinal("SCUID")).ToString();
-                                newConnConfig = new FDASourceConnection()
+                                ID = sqlDataReader.GetGuid(sqlDataReader.GetOrdinal("device_id")).ToString();
+                                lock (_deviceConfig)
                                 {
-                                    SCUID = reader.GetGuid(reader.GetOrdinal("SCUID")),
-                                    SCType = reader.GetString(reader.GetOrdinal("SCType")),
-                                    SCDetail01 = reader.GetString(reader.GetOrdinal("SCDetail01")),
-                                    SCDetail02 = reader.GetString(reader.GetOrdinal("SCDetail02")),
-                                    Description = reader.GetString(reader.GetOrdinal("Description")),
-                                    RequestRetryDelay = reader.GetInt32(reader.GetOrdinal("RequestRetryDelay")),
-                                    SocketConnectionAttemptTimeout = reader.GetInt32(reader.GetOrdinal("SocketConnectionAttemptTimeout")),
-                                    MaxSocketConnectionAttempts = reader.GetInt32(reader.GetOrdinal("MaxSocketConnectionAttempts")),
-                                    SocketConnectionRetryDelay = reader.GetInt32(reader.GetOrdinal("SocketConnectionRetryDelay")),
-                                    PostConnectionCommsDelay = reader.GetInt32(reader.GetOrdinal("PostConnectionCommsDelay")),
-                                    InterRequestDelay = reader.GetInt32(reader.GetOrdinal("InterRequestDelay")),
-                                    MaxRequestAttempts = reader.GetInt32(reader.GetOrdinal("maxRequestAttempts")),
-                                    RequestResponseTimeout = reader.GetInt32(reader.GetOrdinal("RequestResponseTimeout")),
-                                    ConnectionEnabled = reader.GetBoolean(reader.GetOrdinal("ConnectionEnabled")),
-                                    CommunicationsEnabled = reader.GetBoolean(reader.GetOrdinal("CommunicationsEnabled")),
-                                    CommsLogEnabled = reader.GetBoolean(reader.GetOrdinal("CommsLogEnabled")),
-                                    //MQTTEnabled = false
-                                };
-
-                                //if (MQTTColumnExists)
-                                //    newConnConfig.MQTTEnabled = sqlDataReader.GetBoolean(sqlDataReader.GetOrdinal("MQTTEnabled"));
-
-                                lock (_connectionsConfig)
-                                {
-                                _connectionsConfig.Add(newConnConfig.SCUID, newConnConfig);
-                                        
+                                    _deviceConfig.Add(sqlDataReader.GetGuid(sqlDataReader.GetOrdinal("device_id")),
+                                        new FDADevice()
+                                        {
+                                            device_id = sqlDataReader.GetGuid(sqlDataReader.GetOrdinal("device_id")),
+                                            request_timeout = sqlDataReader.GetInt32(sqlDataReader.GetOrdinal("request_timeout")),
+                                            max_request_attempts = sqlDataReader.GetInt32(sqlDataReader.GetOrdinal("max_request_attempts")),
+                                            inter_request_delay = sqlDataReader.GetInt32(sqlDataReader.GetOrdinal("inter_request_delay")),
+                                            request_retry_delay = sqlDataReader.GetInt32(sqlDataReader.GetOrdinal("request_retry_delay")),
+                                        });
                                 }
                             }
                             catch
                             {
-                                Globals.SystemManager.LogApplicationEvent(this, "", "FDA Start, Config Error - SCUID '" + ID + "' rejected", true);
+                                Globals.SystemManager.LogApplicationEvent(this, "", "FDA Start, Config Error - Device ID '" + ID + "' rejected", true);
                             }
                         }
                     }
                     
-                }
-                  
-                
-                try
-                {
 
-                    // load datapoint (tag) definitions
-                    DateTime currentTime = Globals.FDANow();
-                    tableName = Globals.SystemManager.GetTableName("DataPointDefinitionStructures");
-                                  
-                    query = "select *," + 
-                            "case when backfill_enabled is NULL then cast(0 as bit) else backfill_enabled END as nullsafe_backfill_enabled," +
-                            "case when backfill_data_id is NULL then - 1 else backfill_data_id END as nullsafe_backfill_data_id," +
-                            "case when backfill_data_structure_type is NULL then 0 else backfill_data_structure_type END as nullsafe_backfill_data_structure_type," +
-                            "case when backfill_data_lapse_limit is NULL then 60 else backfill_data_lapse_limit END as nullsafe_backfill_data_lapse_limit," +
-                            "case when backfill_data_interval is NULL then 1 else backfill_data_interval END as nullsafe_backfill_data_interval " +
-                            "from DataPointDefinitionStructures;";
-                    //query = "select *, isnull(backfill_enabled,0) as nullsafe_backfill_enabled, isnull(backfill_data_id,-1) as nullsafe_backfill_data_id,isnull(backfill_data_structure_type,0) as nullsafe_backfill_data_structure_type,isnull(backfill_data_lapse_limit,60) as nullsafe_backfill_data_lapse_limit,isnull(backfill_data_interval,1) as nullsafe_backfill_data_interval from "
-                    //        + tableName + ";";
-                    FDADataPointDefinitionStructure newTag;
-                    using (NpgsqlCommand sqlCommand = conn.CreateCommand())
-                    {
-                        sqlCommand.CommandText = query;
-                        using (NpgsqlDataReader sqlDataReader = sqlCommand.ExecuteReader())
-                        {
-                            //MQTTColumnExists = HasColumn(sqlDataReader, "MQTTEnabled");
-                            while (sqlDataReader.Read())
-                            {
-                                ID = "(unknown)";
-                                try
-                                {
-                                    ID = sqlDataReader.GetGuid(sqlDataReader.GetOrdinal("DPDUID")).ToString();
-                                    newTag = new FDADataPointDefinitionStructure()
-                                    {
-                                        DPDUID = sqlDataReader.GetGuid(sqlDataReader.GetOrdinal("DPDUID")),
-                                        DPDSEnabled = sqlDataReader.GetBoolean(sqlDataReader.GetOrdinal("DPDSEnabled")),
-                                        DPSType = sqlDataReader.GetString(sqlDataReader.GetOrdinal("DPSType")),
-                                        read_scaling = sqlDataReader.GetBoolean(sqlDataReader.GetOrdinal("read_scaling")),
-                                        read_scale_raw_low = sqlDataReader.GetDouble(sqlDataReader.GetOrdinal("read_scale_raw_low")),
-                                        read_scale_raw_high = sqlDataReader.GetDouble(sqlDataReader.GetOrdinal("read_scale_raw_high")),
-                                        read_scale_eu_low = sqlDataReader.GetDouble(sqlDataReader.GetOrdinal("read_scale_eu_low")),
-                                        read_scale_eu_high = sqlDataReader.GetDouble(sqlDataReader.GetOrdinal("read_scale_eu_high")),
-                                        write_scaling = sqlDataReader.GetBoolean(sqlDataReader.GetOrdinal("write_scaling")),
-                                        write_scale_raw_low = sqlDataReader.GetDouble(sqlDataReader.GetOrdinal("write_scale_raw_low")),
-                                        write_scale_raw_high = sqlDataReader.GetDouble(sqlDataReader.GetOrdinal("write_scale_raw_high")),
-                                        write_scale_eu_low = sqlDataReader.GetDouble(sqlDataReader.GetOrdinal("write_scale_eu_low")),
-                                        write_scale_eu_high = sqlDataReader.GetDouble(sqlDataReader.GetOrdinal("write_scale_eu_high")),
-                                        backfill_enabled = sqlDataReader.GetBoolean(sqlDataReader.GetOrdinal("nullsafe_backfill_enabled")),
-                                        backfill_data_ID = sqlDataReader.GetInt32(sqlDataReader.GetOrdinal("nullsafe_backfill_data_id")),
-                                        // Feb 12, 2020: ignore the last read columns from the database, default to 0 value at current timestamp
-                                        LastReadDataValue = 0.0,// sqlDataReader.GetDouble(sqlDataReader.GetOrdinal("LastReadDataValue")),
-                                        LastReadQuality = 32,
-                                        LastReadDataTimestamp = currentTime,// sqlDataReader.GetDateTime(sqlDataReader.GetOrdinal("LastReadDataTimestamp")),
-                                        backfill_data_structure_type = sqlDataReader.GetInt32(sqlDataReader.GetOrdinal("nullsafe_backfill_data_structure_type")),
-                                        backfill_data_lapse_limit = sqlDataReader.GetDouble(sqlDataReader.GetOrdinal("nullsafe_backfill_data_lapse_limit")),
-                                        backfill_data_interval = sqlDataReader.GetDouble(sqlDataReader.GetOrdinal("nullsafe_backfill_data_interval")),
-                                        //MQTTEnabled = false
-                                    };
-
-                                    //if (MQTTColumnExists)
-                                    //    newTag.MQTTEnabled = sqlDataReader.GetBoolean(sqlDataReader.GetOrdinal("MQTTEnabled"));
-
-                                    lock (_dataPointConfig)
-                                    {
-                                        _dataPointConfig.Add(newTag.DPDUID, newTag);                                            
-                                    }
-                                }
-                                catch
-                                {
-                                    Globals.SystemManager.LogApplicationEvent(this, "", "FDA Start, Config Error - DPDS ID '" + ID + "' rejected", true);
-                                }
-                            }
-                        }
-                    }
                 }
                 catch (Exception ex)
                 {
                     Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Query of table " + tableName + " failed: query = " + query);
-                }
-
-                // new Mar 9, 2020  load last values from the FDALastDataValues table and update the DataPointDefinitionStructure objects in memory
-                try
-                {
-                    Guid DPDUID;
-                    tableName = Globals.SystemManager.GetTableName("FDALastDataValues");
-                    query = "select DPDUID,value,timestamp,quality from " + tableName + ";";
-                    using (NpgsqlCommand sqlCommand = conn.CreateCommand())
-                    {
-                        sqlCommand.CommandText = query;
-                        using (NpgsqlDataReader sqlDataReader = sqlCommand.ExecuteReader())
-                        {
-                            while (sqlDataReader.Read())
-                            {
-                                ID = "(unknown)";
-                                try
-                                {
-                                    ID = sqlDataReader.GetGuid(sqlDataReader.GetOrdinal("DPDUID")).ToString();
-                                    lock (_dataPointConfig)
-                                    {
-                                        DPDUID = sqlDataReader.GetGuid(sqlDataReader.GetOrdinal("DPDUID"));
-                                        if (_dataPointConfig.ContainsKey(DPDUID))
-                                        {
-                                            _dataPointConfig[DPDUID].LastReadDataValue = sqlDataReader.GetDouble(sqlDataReader.GetOrdinal("value"));
-                                            _dataPointConfig[DPDUID].LastReadDataTimestamp = sqlDataReader.GetDateTime(sqlDataReader.GetOrdinal("timestamp"));
-                                            _dataPointConfig[DPDUID].LastReadQuality = sqlDataReader.GetInt32(sqlDataReader.GetOrdinal("quality"));
-                                        }
-                                    }
-                                }
-                                catch
-                                {
-                                    Globals.SystemManager.LogApplicationEvent(this, "", "FDA Start, Config Error - DPDS ID '" + ID + "' rejected", true);
-                                }
-                            }
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Query of table " + tableName + " failed: query = " + query);
-                }
-
-
-                if (_devicesTableExists)
-                {
-                    try
-                    {
-                        tableName = Globals.SystemManager.GetTableName("FDADevices");
-                        query = "SELECT * from " + tableName + ";";
-                        using (NpgsqlCommand sqlCommand = conn.CreateCommand())
-                        {
-                            sqlCommand.CommandText = query;
-                            using (NpgsqlDataReader sqlDataReader = sqlCommand.ExecuteReader())
-                            {
-                                while (sqlDataReader.Read())
-                                {
-                                    ID = "(unknown)";
-                                    try
-                                    {
-                                        ID = sqlDataReader.GetGuid(sqlDataReader.GetOrdinal("device_id")).ToString();
-                                        lock (_deviceConfig)
-                                        {
-                                            _deviceConfig.Add(sqlDataReader.GetGuid(sqlDataReader.GetOrdinal("device_id")),
-                                                new FDADevice()
-                                                {
-                                                    device_id = sqlDataReader.GetGuid(sqlDataReader.GetOrdinal("device_id")),
-                                                    request_timeout = sqlDataReader.GetInt32(sqlDataReader.GetOrdinal("request_timeout")),
-                                                    max_request_attempts = sqlDataReader.GetInt32(sqlDataReader.GetOrdinal("max_request_attempts")),
-                                                    inter_request_delay = sqlDataReader.GetInt32(sqlDataReader.GetOrdinal("inter_request_delay")),
-                                                    request_retry_delay = sqlDataReader.GetInt32(sqlDataReader.GetOrdinal("request_retry_delay")),
-                                                });
-                                        }
-                                    }
-                                    catch
-                                    {
-                                        Globals.SystemManager.LogApplicationEvent(this, "", "FDA Start, Config Error - Device ID '" + ID + "' rejected", true);
-                                    }
-                                }
-                            }
-                        }
-
-                    }
-                    catch (Exception ex)
-                    {
-                        Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Query of table " + tableName + " failed: query = " + query);
-                    }
-                }
-
-                if (_tasksTableExists)
-                {
-                    try
-                    {
-                        tableName = Globals.SystemManager.GetTableName("FDATasks");
-                        query = "SELECT * from " + tableName + ";";
-                        using (NpgsqlCommand sqlCommand = conn.CreateCommand())
-                        {
-                            sqlCommand.CommandText = query;
-                            using (NpgsqlDataReader sqlDataReader = sqlCommand.ExecuteReader())
-                            {
-                                while (sqlDataReader.Read())
-                                {
-                                    ID = "(unknown)";
-                                    try
-                                    {
-                                        ID = sqlDataReader.GetGuid(sqlDataReader.GetOrdinal("task_id")).ToString();
-                                        lock (_taskConfig)
-                                        {
-                                            _taskConfig.Add(sqlDataReader.GetGuid(sqlDataReader.GetOrdinal("task_id")),
-                                                new FDATask()
-                                                {
-                                                    task_id = sqlDataReader.GetGuid(sqlDataReader.GetOrdinal("task_id")),
-                                                    task_type = sqlDataReader.GetString(sqlDataReader.GetOrdinal("task_type")),
-                                                    task_details = sqlDataReader.GetString(sqlDataReader.GetOrdinal("task_details"))
-                                                });
-                                        }
-                                    }
-                                    catch
-                                    {
-                                        Globals.SystemManager.LogApplicationEvent(this, "", "FDA Start, Config Error - Task ID '" + ID + "' rejected", true);
-                                    }
-                                }
-                            }
-                        }
-
-                    }
-                    catch (Exception ex)
-                    {
-                        Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Query of table " + tableName + " failed: query = " + query);
-                    }
-                }
-
-                try
-                {
-                    // load Datablock Request Groups (groups of individual requests)
-                    tableName = Globals.SystemManager.GetTableName("FDADataBlockRequestGroup");
-                    query = "SELECT DRGUID,Description,DRGEnabled,DPSType,DataPointBlockRequestListVals,CommsLogEnabled from " + tableName + ";";
-                    using (NpgsqlCommand sqlCommand = conn.CreateCommand())
-                    {
-                        sqlCommand.CommandText = query;
-                        using (NpgsqlDataReader sqlDataReader = sqlCommand.ExecuteReader())
-                        {
-                            while (sqlDataReader.Read())
-                            {
-                                ID = "(unknown)";
-                                try
-                                {
-                                    ID = sqlDataReader.GetGuid(0).ToString();
-                                    //if (sqlDataReader.GetBoolean(sqlDataReader.GetOrdinal("DRGEnabled")))
-                                    // {
-                                    lock (_requestgroupConfig)
-                                    {
-                                        _requestgroupConfig.Add(sqlDataReader.GetGuid(sqlDataReader.GetOrdinal("DRGUID")),
-                                            new FDADataBlockRequestGroup()
-                                            {
-                                                DRGUID = sqlDataReader.GetGuid(sqlDataReader.GetOrdinal("DRGUID")),
-                                                Description = sqlDataReader.GetString(sqlDataReader.GetOrdinal("Description")),
-                                                DRGEnabled = sqlDataReader.GetBoolean(sqlDataReader.GetOrdinal("DRGEnabled")),
-                                                DPSType = sqlDataReader.GetString(sqlDataReader.GetOrdinal("DPSType")),
-                                                DataPointBlockRequestListVals = sqlDataReader.GetString(sqlDataReader.GetOrdinal("DataPointBlockRequestListVals")),
-                                                CommsLogEnabled = sqlDataReader.GetBoolean(sqlDataReader.GetOrdinal("CommsLogEnabled"))
-                                            });
-                                    }
-                                    //}
-                                }
-                                catch
-                                {
-                                    Globals.SystemManager.LogApplicationEvent(this, "", "FDA Start, Config Error - DBRG ID '" + ID + "' rejected", true);
-                                }
-                            }
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Query of table " + tableName + " failed: query = " + query);
-                }
-
-                try
-                {
-                    // load Schedules
-                    tableName = Globals.SystemManager.GetTableName("FDARequestGroupScheduler");
-                    query = "SELECT FRGSUID,Description,FRGSEnabled,FRGSType,RealTimeRate,Year,Month,Day,Hour,Minute,Second,Priority,RequestGroupList from " + tableName + ";";
-
-                    using (NpgsqlCommand sqlCommand = conn.CreateCommand())
-                    {
-
-                        sqlCommand.CommandText = query;
-                        using (NpgsqlDataReader sqlDataReader = sqlCommand.ExecuteReader())
-                        {
-                            while (sqlDataReader.Read())
-                            {
-                                ID = "(unknown)";
-
-                                try
-                                {
-                                    ID = sqlDataReader.GetGuid(sqlDataReader.GetOrdinal("FRGSUID")).ToString();
-                                    FDARequestGroupScheduler scheduler = new FDARequestGroupScheduler()
-                                    {
-                                        FRGSUID = sqlDataReader.GetGuid(sqlDataReader.GetOrdinal("FRGSUID")),
-                                        Description = sqlDataReader.GetString(sqlDataReader.GetOrdinal("Description")),
-                                        FRGSEnabled = sqlDataReader.GetBoolean(sqlDataReader.GetOrdinal("FRGSEnabled")),
-                                        FRGSType = sqlDataReader.GetString(sqlDataReader.GetOrdinal("FRGSType")),
-                                        RealTimeRate = sqlDataReader.GetInt32(sqlDataReader.GetOrdinal("RealTimeRate")),
-                                        Year = sqlDataReader.GetInt32(sqlDataReader.GetOrdinal("Year")),
-                                        Month = sqlDataReader.GetInt32(sqlDataReader.GetOrdinal("Month")),
-                                        Day = sqlDataReader.GetInt32(sqlDataReader.GetOrdinal("Day")),
-                                        Hour = sqlDataReader.GetInt32(sqlDataReader.GetOrdinal("Hour")),
-                                        Minute = sqlDataReader.GetInt32(sqlDataReader.GetOrdinal("Minute")),
-                                        Second = sqlDataReader.GetInt32(sqlDataReader.GetOrdinal("Second")),
-                                        Priority = sqlDataReader.GetInt32(sqlDataReader.GetOrdinal("Priority")),
-                                        RequestGroupList = sqlDataReader.GetString(sqlDataReader.GetOrdinal("RequestGroupList")),  // requestgroupID:connectionID:DestinationID | requestgroupID:connectionID:DestinationID | .....
-                                    };
-                                    if (scheduler.Year == 0) scheduler.Year = 1;
-                                    if (scheduler.Month == 0) scheduler.Month = 1;
-                                    if (scheduler.Day == 0) scheduler.Day = 1;
-
-                                    lock (_schedConfig) { _schedConfig.Add(scheduler.FRGSUID, scheduler); }
-                                }
-                                catch
-                                {
-                                    Globals.SystemManager.LogApplicationEvent(this, "", "FDA Start, Config Error - FRGS ID '" + ID + "' rejected", true);
-                                }
-                            }
-                        }
-                    }
-                    conn.Close();
-                }
-                catch (Exception ex)
-                {
-                    Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Query of table " + tableName + " failed: query = " + query);
-                    return false;
                 }
             }
+
+            if (_tasksTableExists)
+            {
+                try
+                {
+                    tableName = Globals.SystemManager.GetTableName("FDATasks");
+                    query = "SELECT * from " + tableName + ";";
+
+                    //sqlCommand.CommandText = query;
+                    using (NpgsqlDataReader sqlDataReader = PG_ExecuteDataReader(query, ref conn))
+                    {
+                        while (sqlDataReader.Read())
+                        {
+                            ID = "(unknown)";
+                            try
+                            {
+                                ID = sqlDataReader.GetGuid(sqlDataReader.GetOrdinal("task_id")).ToString();
+                                lock (_taskConfig)
+                                {
+                                    _taskConfig.Add(sqlDataReader.GetGuid(sqlDataReader.GetOrdinal("task_id")),
+                                        new FDATask()
+                                        {
+                                            task_id = sqlDataReader.GetGuid(sqlDataReader.GetOrdinal("task_id")),
+                                            task_type = sqlDataReader.GetString(sqlDataReader.GetOrdinal("task_type")),
+                                            task_details = sqlDataReader.GetString(sqlDataReader.GetOrdinal("task_details"))
+                                        });
+                                }
+                            }
+                            catch
+                            {
+                                Globals.SystemManager.LogApplicationEvent(this, "", "FDA Start, Config Error - Task ID '" + ID + "' rejected", true);
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Query of table " + tableName + " failed: query = " + query);
+                }
+            }
+
+            try
+            {
+                // load Datablock Request Groups (groups of individual requests)
+                tableName = Globals.SystemManager.GetTableName("FDADataBlockRequestGroup");
+                query = "SELECT DRGUID,Description,DRGEnabled,DPSType,DataPointBlockRequestListVals,CommsLogEnabled from " + tableName + ";";
+
+                //sqlCommand.CommandText = query;
+                using (NpgsqlDataReader sqlDataReader = PG_ExecuteDataReader(query, ref conn))
+                {
+                    while (sqlDataReader.Read())
+                    {
+                        ID = "(unknown)";
+                        try
+                        {
+                            ID = sqlDataReader.GetGuid(0).ToString();
+                            //if (sqlDataReader.GetBoolean(sqlDataReader.GetOrdinal("DRGEnabled")))
+                            // {
+                            lock (_requestgroupConfig)
+                            {
+                                _requestgroupConfig.Add(sqlDataReader.GetGuid(sqlDataReader.GetOrdinal("DRGUID")),
+                                    new FDADataBlockRequestGroup()
+                                    {
+                                        DRGUID = sqlDataReader.GetGuid(sqlDataReader.GetOrdinal("DRGUID")),
+                                        Description = sqlDataReader.GetString(sqlDataReader.GetOrdinal("Description")),
+                                        DRGEnabled = sqlDataReader.GetBoolean(sqlDataReader.GetOrdinal("DRGEnabled")),
+                                        DPSType = sqlDataReader.GetString(sqlDataReader.GetOrdinal("DPSType")),
+                                        DataPointBlockRequestListVals = sqlDataReader.GetString(sqlDataReader.GetOrdinal("DataPointBlockRequestListVals")),
+                                        CommsLogEnabled = sqlDataReader.GetBoolean(sqlDataReader.GetOrdinal("CommsLogEnabled"))
+                                    });
+                            }
+                            //}
+                        }
+                        catch
+                        {
+                            Globals.SystemManager.LogApplicationEvent(this, "", "FDA Start, Config Error - DBRG ID '" + ID + "' rejected", true);
+                        }
+                    }
+                }
+                
+            }
+            catch (Exception ex)
+            {
+                Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Query of table " + tableName + " failed: query = " + query);
+            }
+
+            try
+            {
+                // load Schedules
+                tableName = Globals.SystemManager.GetTableName("FDARequestGroupScheduler");
+                query = "SELECT FRGSUID,Description,FRGSEnabled,FRGSType,RealTimeRate,Year,Month,Day,Hour,Minute,Second,Priority,RequestGroupList from " + tableName + ";";
+
+              
+
+                // sqlCommand.CommandText = query;
+                using (NpgsqlDataReader sqlDataReader = PG_ExecuteDataReader(query,ref conn))
+                {
+                    while (sqlDataReader.Read())
+                    {
+                        ID = "(unknown)";
+
+                        try
+                        {
+                            ID = sqlDataReader.GetGuid(sqlDataReader.GetOrdinal("FRGSUID")).ToString();
+                            FDARequestGroupScheduler scheduler = new FDARequestGroupScheduler()
+                            {
+                                FRGSUID = sqlDataReader.GetGuid(sqlDataReader.GetOrdinal("FRGSUID")),
+                                Description = sqlDataReader.GetString(sqlDataReader.GetOrdinal("Description")),
+                                FRGSEnabled = sqlDataReader.GetBoolean(sqlDataReader.GetOrdinal("FRGSEnabled")),
+                                FRGSType = sqlDataReader.GetString(sqlDataReader.GetOrdinal("FRGSType")),
+                                RealTimeRate = sqlDataReader.GetInt32(sqlDataReader.GetOrdinal("RealTimeRate")),
+                                Year = sqlDataReader.GetInt32(sqlDataReader.GetOrdinal("Year")),
+                                Month = sqlDataReader.GetInt32(sqlDataReader.GetOrdinal("Month")),
+                                Day = sqlDataReader.GetInt32(sqlDataReader.GetOrdinal("Day")),
+                                Hour = sqlDataReader.GetInt32(sqlDataReader.GetOrdinal("Hour")),
+                                Minute = sqlDataReader.GetInt32(sqlDataReader.GetOrdinal("Minute")),
+                                Second = sqlDataReader.GetInt32(sqlDataReader.GetOrdinal("Second")),
+                                Priority = sqlDataReader.GetInt32(sqlDataReader.GetOrdinal("Priority")),
+                                RequestGroupList = sqlDataReader.GetString(sqlDataReader.GetOrdinal("RequestGroupList")),  // requestgroupID:connectionID:DestinationID | requestgroupID:connectionID:DestinationID | .....
+                            };
+                            if (scheduler.Year == 0) scheduler.Year = 1;
+                            if (scheduler.Month == 0) scheduler.Month = 1;
+                            if (scheduler.Day == 0) scheduler.Day = 1;
+
+                            lock (_schedConfig) { _schedConfig.Add(scheduler.FRGSUID, scheduler); }
+                        }
+                        catch
+                        {
+                            Globals.SystemManager.LogApplicationEvent(this, "", "FDA Start, Config Error - FRGS ID '" + ID + "' rejected", true);
+                        }
+                    }
+                }
+                
+                conn.Close();
+            }
+            catch (Exception ex)
+            {
+                Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Query of table " + tableName + " failed: query = " + query);
+                return false;
+            }
+            
+            conn.Close();
+            conn.Dispose();
 
 
             // after loading the Schedule configs, turn the requestgroup strings in the schedulers into actual RequestGroup objects, ready to be passed to a connection manager          
@@ -3204,44 +3187,43 @@ namespace FDA
             int lastRead = 0;
             int currPtr = 0;
 
+            NpgsqlConnection conn = new NpgsqlConnection(ConnectionString);
             try
             {
-                using (NpgsqlConnection conn = new NpgsqlConnection(ConnectionString))
-                {
-                    conn.Open();
+               
+               
+                    //conn.Open();
 
-                    using (NpgsqlCommand sqlCommand = conn.CreateCommand())
+                   
+                    // update the alarm or event current ptr and timestamp
+                    sql = "select " + ptrType + "CurPtrPosition,"+ptrType+"LastPtrReadPosition from " + Globals.SystemManager.GetTableName("FDAHistoricReferences");
+                    sql += " where NodeDetails = '" + NodeID + "' and ConnectionUID = '" + connID + "';";
+                    //sqlCommand.CommandText = sql;
+                    using (NpgsqlDataReader sqlDataReader = PG_ExecuteDataReader(sql, ref conn))
                     {
-                        // update the alarm or event current ptr and timestamp
-                        sql = "select " + ptrType + "CurPtrPosition,"+ptrType+"LastPtrReadPosition from " + Globals.SystemManager.GetTableName("FDAHistoricReferences");
-                        sql += " where NodeDetails = '" + NodeID + "' and ConnectionUID = '" + connID + "';";
-                        sqlCommand.CommandText = sql;
-                        using (NpgsqlDataReader sqlDataReader = sqlCommand.ExecuteReader())
+                        while (sqlDataReader.Read())
                         {
-                            while (sqlDataReader.Read())
+                            try
                             {
-                                try
-                                {
-                                    lastRead = (byte)sqlDataReader.GetInt32(sqlDataReader.GetOrdinal(ptrType + "LastPtrReadPosition"));
-                                    currPtr = (byte)sqlDataReader.GetInt32(sqlDataReader.GetOrdinal(ptrType + "CurPtrPosition"));
-                                }
-                                catch (Exception ex)
-                                {
-                                    Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "DBManager: out of range current or last read pointer in FDAHistoricReferences table (connectionID " + connID + ", Node " + NodeID);
-                                    return null;
-                                }
+                                lastRead = (byte)sqlDataReader.GetInt32(sqlDataReader.GetOrdinal(ptrType + "LastPtrReadPosition"));
+                                currPtr = (byte)sqlDataReader.GetInt32(sqlDataReader.GetOrdinal(ptrType + "CurPtrPosition"));
+                            }
+                            catch (Exception ex)
+                            {
+                                Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "DBManager: out of range current or last read pointer in FDAHistoricReferences table (connectionID " + connID + ", Node " + NodeID);
+                                return null;
                             }
                         }
-                        conn.Close();
-                    }                              
-                }
+                    }               
             }
             catch
             {
                 Globals.SystemManager.LogApplicationEvent(this, "", "Query Failed: " + sql);
                 return null;
             }
-
+            conn.Close();
+            conn.Dispose();
+            
             lastRead = Helpers.AddCircular(lastRead, -1, 0, 239);
 
             return new byte[] {Convert.ToByte(lastRead),Convert.ToByte(currPtr) };
