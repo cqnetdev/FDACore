@@ -47,6 +47,10 @@ namespace FDA
         private bool _tasksTableExists;
         public RemoteQueryManager RemoteQueryManager;
 
+        private readonly Timer _logTrimTimer;
+        //private double _commsLogMaxDays = 1;
+        //private double _eventLogMaxDays = 1;
+
         /*
         SqlTableDependency<FDARequestGroupScheduler> _schedMonitor;
         SqlTableDependency<FDARequestGroupDemand> _demandMonitor;
@@ -70,7 +74,9 @@ namespace FDA
 
         public delegate void DemandRequestHandler(object sender, DemandEventArgs e);
         public event DemandRequestHandler DemandRequest;
-      
+
+       // public double CommsLogMaxDays { get => _commsLogMaxDays; set => _commsLogMaxDays = value; }
+        //public double EventLogMaxDays { get => _eventLogMaxDays; set => _eventLogMaxDays = value; }
 
         public string ConnectionString { get; set; }
 
@@ -117,7 +123,53 @@ namespace FDA
 
             // check if tasks table exists
             _tasksTableExists = ((int)PG_ExecuteScalar("SELECT cast(count(1) as integer) from information_schema.tables where table_name = '" + Globals.SystemManager.GetTableName("fdatasks") + "';") > 0);
+
+            // start the log trimming timer
+
+            //find the amount of time between now and midnight and set the timer to execute then, and every 24 hours from then
+            DateTime currentDateTime = DateTime.Now;
+            DateTime tomorrow = DateTime.Now.AddDays(1);
+            DateTime timeOfFirstRun = new DateTime(tomorrow.Year, tomorrow.Month, tomorrow.Day, 0, 0, 0); 
+            TimeSpan timeFromNowToFirstRun = timeOfFirstRun.Subtract(currentDateTime);
+
+
+            _logTrimTimer = new Timer(LogTrimTimerTick, null, timeFromNowToFirstRun, TimeSpan.FromDays(1));
         }
+
+        private void LogTrimTimerTick(object o)
+        {
+             Globals.SystemManager.LogApplicationEvent(this, "", "Trimming the event log and comms history tables");
+
+            string CommsLog = Globals.SystemManager.GetTableName("CommsLog");
+            string AppLog = Globals.SystemManager.GetTableName("AppLog");
+            int result = 0;
+
+            // SQL Server version
+            //string query = "DELETE FROM " + AppLog + " where Timestamp < DATEADD(HOUR," + Globals.UTCOffset + ",GETUTCDATE()) - " + Globals.SystemManager.EventLogMaxDays;
+            
+            // PostgreSQL version
+            string query = "DELETE FROM " + AppLog + " where Timestamp < (current_timestamp at time zone 'UTC' + INTERVAL '" + Globals.UTCOffset + " hours') - INTERVAL '" +  Globals.SystemManager.EventLogMaxDays + " days'";
+
+            result = PG_ExecuteNonQuery(query);
+
+            if (result >= 0)
+            {
+                Globals.SystemManager.LogApplicationEvent(this, "", "Trimmed " + result + " rows from " + AppLog);
+            }
+
+            //SQL Server version
+            //string query = "DELETE FROM " + CommsLog + " where Timestamp < DATEADD(HOUR," + Globals.UTCOffset + ",GETUTCDATE()) - " + Globals.SystemManager.CommsLogMaxDays;
+            
+            // PostgreSQL version
+            query = "DELETE FROM " + CommsLog + " where TimestampUTC1 < (current_timestamp at time zone 'UTC' + INTERVAL '" + Globals.UTCOffset + " hours') - INTERVAL '" + Globals.SystemManager.CommsLogMaxDays + " days'";
+
+            result = PG_ExecuteNonQuery(query);
+            if (result >= 0)
+            {
+                Globals.SystemManager.LogApplicationEvent(this, "", "Trimmed " + result + " rows from " + CommsLog);
+            }
+        }
+
 
         public void UpdateCacheSize(int cacheLimit)
         {
@@ -322,7 +374,8 @@ namespace FDA
 
                     try
                     {
-                        return sqlCommand.ExecuteScalar();
+                        object result = sqlCommand.ExecuteScalar();
+                        return result;
                     }
                     catch (Exception ex)
                     {
@@ -657,6 +710,7 @@ namespace FDA
             _requestGroupDefMonitor.Notification += _requestGroupDefMonitor_Notification;
             _connectionDefMonitor.Notification += _connectionDefMonitor_Notification;
             _dataPointDefMonitor.Notification += _dataPointDefMonitor_Notification;
+
             if (_deviceDefMonitor != null)
                 _deviceDefMonitor.Notification += _deviceDefMonitor_Notification;
             if (_taskDefMonitor != null)
@@ -2020,8 +2074,15 @@ namespace FDA
                 switch (changeType)
                 {
                     case "DELETE":
-                        _taskConfig.Remove(affectedRow.task_id);
-                        action = "deleted";
+                        if (_taskConfig.ContainsKey(affectedRow.task_id))
+                        {
+                            _taskConfig.Remove(affectedRow.task_id);
+                            action = "deleted";
+                        }
+                        else
+                        {
+                            action = "was deleted from the database but not found in the FDA, so no action was taken";
+                        }
                         break;
                     case "INSERT":
                         _taskConfig.Add(affectedRow.task_id, affectedRow);
@@ -2095,8 +2156,16 @@ namespace FDA
                 switch (changeType)
                 {
                     case "DELETE":
-                        _deviceConfig.Remove(affectedRow.device_id);
-                        action = "deleted";
+                        if (_deviceConfig.ContainsKey(affectedRow.device_id))
+                        {
+                            _deviceConfig.Remove(affectedRow.device_id);
+                            action = "deleted";
+                        }
+                        else
+                        {
+                            action = "deleted from the database but was not found in the FDA, so no action was taken";
+                        }
+                        
                         break;
                     case "INSERT":
                         _deviceConfig.Add(affectedRow.device_id, affectedRow);
@@ -2172,8 +2241,16 @@ namespace FDA
                         action = "added";
                         break;
                     case "DELETE":
-                        _dataPointConfig.Remove(affectedRow.DPDUID);
-                        action = "deleted";
+                        if (_dataPointConfig.ContainsKey(affectedRow.DPDUID))
+                        {
+                            _dataPointConfig.Remove(affectedRow.DPDUID);
+                            action = "deleted";
+                        }
+                        else
+                        {
+                            action = "deleted from the database but was not found in the FDA so no action was taken";
+                        }
+                        
                         break;
                     case "UPDATE":
                         if (_dataPointConfig.ContainsKey(affectedRow.DPDUID))
@@ -2356,8 +2433,15 @@ namespace FDA
 
                         break;
                     case "DELETE":
-                        _requestgroupConfig.Remove(affectedRow.DRGUID);
-                        action = "deleted";
+                        if (_requestgroupConfig.ContainsKey(affectedRow.DRGUID))
+                        {
+                            _requestgroupConfig.Remove(affectedRow.DRGUID);
+                            action = "deleted";
+                        }
+                        else
+                        {
+                            action = " was deleted from the database but was not found in the FDA, so no action was taken";
+                        }
                         break;
                 }
             }

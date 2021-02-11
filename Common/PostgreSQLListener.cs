@@ -9,7 +9,7 @@ namespace Common
 {
     public class PostgreSQLListener<T> : IDisposable
     {
-        private readonly string _notify_id = "db_notifications";
+        private readonly string _channel = "db_notifications";
         private string _connstring;
         private NpgsqlConnection _conn;
         private string _table;
@@ -30,7 +30,7 @@ namespace Common
             _table = tablename.ToLower();
 
             // Connect to the database
-            _connstring = connString;
+            _connstring = connString;// + ";Keepalive=1";
 
 
             _conn = new NpgsqlConnection(connString);
@@ -44,6 +44,7 @@ namespace Common
                 return;
             }
 
+            // add handlers for notifications and state changes
             _conn.Notification += _conn_Notification;
             _conn.StateChange += _conn_StateChange;
         }
@@ -66,7 +67,7 @@ namespace Common
             // start listening for notifications
             try
             {
-                using (NpgsqlCommand command = new NpgsqlCommand("listen " + _notify_id + ";", _conn))
+                using (NpgsqlCommand command = new NpgsqlCommand("listen " + _channel + ";", _conn))
                 {
                     command.ExecuteNonQuery();
                 }
@@ -85,7 +86,7 @@ namespace Common
             // start listening for notifications
             try
             {
-                using (NpgsqlCommand command = new NpgsqlCommand("unlisten " + _notify_id + ";", _conn))
+                using (NpgsqlCommand command = new NpgsqlCommand("unlisten " + _channel + ";", _conn))
                 {
                     command.ExecuteNonQuery();
                 }

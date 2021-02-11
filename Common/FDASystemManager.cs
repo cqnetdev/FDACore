@@ -42,7 +42,7 @@ namespace Common
         private double _commsLogMaxDays = 1;
         private double _eventLogMaxDays = 1;
         private bool _enableDebugMessages;
-        private readonly Timer _logTrimTimer;
+        //private readonly Timer _logTrimTimer;
         private readonly Guid _executionID;
         private readonly string systemDBSQLInstance;
         private readonly string systemDBLogin;
@@ -63,9 +63,9 @@ namespace Common
 
             // sql server conn string
             //SystemDBConnectionString = "Server=" + SQLInstance + "; Database = " + systemDBName + "; user = " + login + "; password = " + pass + ";";
-            
+
             // postgresql conn string
-            SystemDBConnectionString = "Server=" + SQLInstance + ";Port=5432;User Id=" + login + ";Password=" + pass + ";Database=" + systemDBName + ";Keepalive=1";
+            SystemDBConnectionString = "Server=" + SQLInstance + ";Port=5432;User Id=" + login + ";Password=" + pass + ";Database=" + systemDBName + ";Keepalive=1;";
 
             systemDBSQLInstance = SQLInstance;
             systemDBLogin = login;
@@ -77,14 +77,15 @@ namespace Common
             _eventLogInputBuffer = new Queue<EventLogItem>();
 
             //find the amount of time between now and midnight and set the timer to execute then, and every 24 hours from then
-            DateTime currentDateTime = DateTime.Now.AddDays(1);
-            DateTime tomorrow = currentDateTime.AddDays(1);
+            //DateTime currentDateTime = DateTime.Now.AddDays(1);
+            //DateTime tomorrow = currentDateTime;//.AddDays(1);
 
-            DateTime midnightTomorrow = new DateTime(tomorrow.Year, tomorrow.Month, tomorrow.Day, 0, 0, 0);
+            //DateTime midnightTomorrow = new DateTime(tomorrow.Year, tomorrow.Month, tomorrow.Day, 13, 57, 0);
+        
 
-            TimeSpan timeToFirstRun = midnightTomorrow.Subtract(currentDateTime);
+            //TimeSpan timeToFirstRun = midnightTomorrow.Subtract(currentDateTime);
 
-            _logTrimTimer = new Timer(LogTrimTimerTick, null, timeToFirstRun, TimeSpan.FromDays(1));
+            //_logTrimTimer = new Timer(LogTrimTimerTick, null, timeToFirstRun, TimeSpan.FromDays(1));
 
             _bgCommsLogger = new BackgroundWorker();
             _bgCommsLogger.DoWork += _bgCommsLogger_DoWork;
@@ -784,7 +785,7 @@ namespace Common
                     FDAPass = options["FDADBPass"].OptionValue;
             }
 
-            AppDBConnectionString = "Server=" + FDASqlInstance + ";port=5432; Database = " + FDAdb + ";User Id = " + FDALogin + "; password = " + FDAPass + ";Keepalive=1";
+            AppDBConnectionString = "Server=" + FDASqlInstance + ";port=5432; Database = " + FDAdb + ";User Id = " + FDALogin + "; password = " + FDAPass + ";Keepalive=1;";
 
             return AppDBConnectionString;
         }
@@ -862,8 +863,12 @@ namespace Common
                     if (_appConfig.ContainsKey(notifyEvent.Notification.row.OptionName))
                     {
                         if (!isReadOnly)
-                            _appConfig.Remove(notifyEvent.Notification.row.OptionName);
-
+                        {
+                            if (_appConfig.ContainsKey(notifyEvent.Notification.row.OptionName))
+                            {
+                                _appConfig.Remove(notifyEvent.Notification.row.OptionName);
+                            }
+                        }
                         message = "FDAConfig option deleted, reverting to default : " + notifyEvent.Notification.row.OptionName;
 
                         if (notifyEvent.Notification.row.OptionName.ToUpper() == "COMMSSTATS")
@@ -969,40 +974,42 @@ namespace Common
         }
 
 
-        private void LogTrimTimerTick(object o)
-        {
-            Globals.SystemManager.LogApplicationEvent(this, "", "Trimming the event log and comms history tables");
+        //private void LogTrimTimerTick(object o)
+        //{
+        //    Globals.SystemManager.LogApplicationEvent(this, "", "Trimming the event log and comms history tables");
    
-            string CommsLog = GetTableName("CommsLog");
-            string AppLog = GetTableName("AppLog");
-            int CommsLogDel = 0;
-            int AppLogDel = 0;
+        //    string CommsLog = GetTableName("CommsLog");
+        //    string AppLog = GetTableName("AppLog");
+        //    int CommsLogDel = 0;
+        //    int AppLogDel = 0;
 
-            string query = "DELETE FROM " + AppLog + " where Timestamp < DATEADD(HOUR," + Globals.UTCOffset + ",GETUTCDATE()) - " + _eventLogMaxDays;
-            try
-            {
-                AppLogDel = PG_ExecuteNonQuery(query);
-            }
-            catch (Exception ex)
-            {
-                LogApplicationError(Globals.FDANow(), ex, "Trim log tables failed: query = " + query);
-                return;
-            }
-            Globals.SystemManager.LogApplicationEvent(this, "", "Trimmed " + AppLogDel + " rows from " + AppLog);
+        //    string query = "DELETE FROM " + AppLog + " where Timestamp < DATEADD(HOUR," + Globals.UTCOffset + ",GETUTCDATE()) - " + _eventLogMaxDays;
+        //    try
+        //    {
+        //        AppLogDel = PG_ExecuteNonQuery(query);
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        LogApplicationError(Globals.FDANow(), ex, "Trim log tables failed: query = " + query);
+        //        return;
+        //    }
+        //    Globals.SystemManager.LogApplicationEvent(this, "", "Trimmed " + AppLogDel + " rows from " + AppLog);
 
-            query = "DELETE FROM " + CommsLog + " where TimestampUTC1 < DATEADD(HOUR," + Globals.UTCOffset + ",GETUTCDATE()) - " + _commsLogMaxDays;
-            try
-            {
-                CommsLogDel = PG_ExecuteNonQuery(query);
-            }
-            catch (Exception ex)
-            {
-                LogApplicationError(Globals.FDANow(), ex, "Trim log tables failed: query = " + query);
-                return;
-            }
-            Globals.SystemManager.LogApplicationEvent(this, "", "Trimmed " + CommsLogDel + " rows from " + CommsLog);
-
-        }
+        //    query = "DELETE FROM " + CommsLog + " where TimestampUTC1 < DATEADD(HOUR," + Globals.UTCOffset + ",GETUTCDATE()) - " + _commsLogMaxDays;
+        //    try
+        //    {
+        //        CommsLogDel = PG_ExecuteNonQuery(query);
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        LogApplicationError(Globals.FDANow(), ex, "Trim log tables failed: query = " + query);
+        //        return;
+        //    }
+        //    if (CommsLogDel >= 0)
+        //    {
+        //        Globals.SystemManager.LogApplicationEvent(this, "", "Trimmed " + CommsLogDel + " rows from " + CommsLog);
+        //    }
+        //}
 
         public void LogApplicationError(DateTime timestamp, Exception ex, string description = "")
         {
@@ -1366,7 +1373,7 @@ namespace Common
                     }
                     else
                     {
-                        Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "PG_ExecuteScalar() Failed to execute query after " + (maxRetries + 1) + " attempts. Query = " + sql);
+                        Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "PG_ExecuteScalar() Failed to execute query after " + (maxRetries + 1) + " attempts. Error=" + ex.Message + ",Query = " + sql);
                         return -99;
                     }
 

@@ -469,9 +469,9 @@ namespace FDAApp
                     DoShutdown();
                     break;
                 case "TOTALQUEUECOUNT":
-                    LogEvent("Getting queue counts");
+                    //LogEvent("Getting queue counts");
                     int count = _dataAquisitionManager.GetTotalQueueCounts();
-                    LogEvent("Replying with the count (" + count.ToString() + ")");
+                    //LogEvent("Replying with the count (" + count.ToString() + ")");
                     _TCPServer.Send(e.ClientID, count.ToString());
                     break;
                 case "PAUSE":
