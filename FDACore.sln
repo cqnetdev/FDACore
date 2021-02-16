@@ -27,6 +27,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FDAManager", "FDAInterface\
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FDAControllerService", "FDAController\FDAControllerService.csproj", "{C6579F79-C046-41FE-B1B3-5C11F68CD197}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tests", "Tests\Tests.csproj", "{02CEA272-3757-42BC-B54A-81AB9B83D2AD}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -81,6 +83,10 @@ Global
 		{C6579F79-C046-41FE-B1B3-5C11F68CD197}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C6579F79-C046-41FE-B1B3-5C11F68CD197}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C6579F79-C046-41FE-B1B3-5C11F68CD197}.Release|Any CPU.Build.0 = Release|Any CPU
+		{02CEA272-3757-42BC-B54A-81AB9B83D2AD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{02CEA272-3757-42BC-B54A-81AB9B83D2AD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{02CEA272-3757-42BC-B54A-81AB9B83D2AD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{02CEA272-3757-42BC-B54A-81AB9B83D2AD}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
