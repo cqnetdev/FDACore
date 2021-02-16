@@ -132,6 +132,8 @@ namespace FDA
             DateTime timeOfFirstRun = new DateTime(tomorrow.Year, tomorrow.Month, tomorrow.Day, 0, 0, 0); 
             TimeSpan timeFromNowToFirstRun = timeOfFirstRun.Subtract(currentDateTime);
 
+            // temporary
+            timeFromNowToFirstRun = TimeSpan.FromMinutes(1);
 
             _logTrimTimer = new Timer(LogTrimTimerTick, null, timeFromNowToFirstRun, TimeSpan.FromDays(1));
         }
@@ -148,7 +150,11 @@ namespace FDA
             //string query = "DELETE FROM " + AppLog + " where Timestamp < DATEADD(HOUR," + Globals.UTCOffset + ",GETUTCDATE()) - " + Globals.SystemManager.EventLogMaxDays;
             
             // PostgreSQL version
-            string query = "DELETE FROM " + AppLog + " where Timestamp < (current_timestamp at time zone 'UTC' + INTERVAL '" + Globals.UTCOffset + " hours') - INTERVAL '" +  Globals.SystemManager.EventLogMaxDays + " days'";
+            //string query = "DELETE FROM " + AppLog + " where Timestamp < (current_timestamp at time zone 'UTC' + INTERVAL '" + Globals.UTCOffset + " hours') - INTERVAL '" +  Globals.SystemManager.EventLogMaxDays + " days'";
+
+            // general version
+            DateTime oldestLimit = DateTime.UtcNow.Subtract(TimeSpan.FromDays(Globals.SystemManager.EventLogMaxDays));
+            string query = "DELETE FROM " + AppLog + " where Timestamp < '" + Helpers.FormatDateTime(oldestLimit) + "'";
 
             result = PG_ExecuteNonQuery(query);
 
@@ -159,9 +165,13 @@ namespace FDA
 
             //SQL Server version
             //string query = "DELETE FROM " + CommsLog + " where Timestamp < DATEADD(HOUR," + Globals.UTCOffset + ",GETUTCDATE()) - " + Globals.SystemManager.CommsLogMaxDays;
-            
+
             // PostgreSQL version
-            query = "DELETE FROM " + CommsLog + " where TimestampUTC1 < (current_timestamp at time zone 'UTC' + INTERVAL '" + Globals.UTCOffset + " hours') - INTERVAL '" + Globals.SystemManager.CommsLogMaxDays + " days'";
+            //query = "DELETE FROM " + CommsLog + " where TimestampUTC1 < (current_timestamp at time zone 'UTC' + INTERVAL '" + Globals.UTCOffset + " hours') - INTERVAL '" + Globals.SystemManager.CommsLogMaxDays + " days'";
+
+            // general version
+            oldestLimit = DateTime.UtcNow.Subtract(TimeSpan.FromDays(Globals.SystemManager.CommsLogMaxDays));
+            query = "DELETE FROM " + CommsLog + " where TimestampUTC1 < '" + Helpers.FormatDateTime(oldestLimit) + "'";
 
             result = PG_ExecuteNonQuery(query);
             if (result >= 0)
@@ -1639,7 +1649,7 @@ namespace FDA
 
                             lock (_schedConfig) { _schedConfig.Add(scheduler.FRGSUID, scheduler); }
                         }
-                        catch
+                        catch (Exception ex)
                         {
                             Globals.SystemManager.LogApplicationEvent(this, "", "FDA Start, Config Error - FRGS ID '" + ID + "' rejected", true);
                         }
