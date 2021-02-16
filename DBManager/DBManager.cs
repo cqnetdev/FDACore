@@ -1651,7 +1651,7 @@ namespace FDA
                         }
                         catch (Exception ex)
                         {
-                            Globals.SystemManager.LogApplicationEvent(this, "", "FDA Start, Config Error - FRGS ID '" + ID + "' rejected", true);
+                            Globals.SystemManager.LogApplicationEvent(this, "", "FDA Start, Config Error - FRGS ID '" + ID + "' rejected (exception:" + ex.Message + ")", true);
                         }
                     }
                 }

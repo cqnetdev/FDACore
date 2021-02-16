@@ -384,8 +384,10 @@ namespace FDAApp
             if (topic.Length < 2)
                 return;
 
+             /* these commands don't come through MQTT anymore
             if (topic[0].ToUpper() == "FDAMANAGER")
             {
+
                 if (topic[1].ToUpper() == "COMMAND")
                 {
                     string command = Encoding.UTF8.GetString(e.Message).ToUpper();
@@ -407,6 +409,7 @@ namespace FDAApp
                     }
                 }
             }
+            */
 
             if (topic.Length < 3)
                 return;
