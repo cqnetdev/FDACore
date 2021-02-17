@@ -25,7 +25,6 @@ namespace Common
         //public string DataPointBlockRequestListUIds { get; set; }
         public string DataPointBlockRequestListVals { get; set; }
 
-
         public object Clone()
         {
             FDADataBlockRequestGroup copy = new FDADataBlockRequestGroup()
@@ -167,7 +166,7 @@ namespace Common
 
     public class FDADevice
     {
-        public Guid device_id { get; set; }
+        public Guid DEVICE_ID { get; set; }
         public int request_timeout { get; set;}
         public int max_request_attempts { get; set;}
         public int inter_request_delay { get; set; }
@@ -176,14 +175,14 @@ namespace Common
 
     public class FDATask
     {
-        public Guid task_id { get; set; }
+        public Guid TASK_ID { get; set; }
         public string task_type { get; set; }
         public string task_details { get; set; }
     }
 
     public class FDAConfig
     {
-        public string OptionName { get; set; }
+        public string OPTIONNAME { get; set; }
         public string OptionValue { get; set; }
         public int ConfigType {get; set; }
     }
@@ -191,19 +190,19 @@ namespace Common
 
     public class RocDataTypes
     {
-        public int PointType { get; set; }
-        public int Parm { get; set; }
+        public int POINTTYPE { get; set; }
+        public int PARM { get; set; }
         public string DataType { get; set; }
         public string DescShort { get; set; }
         public string DescLong { get; set; }
-        public string Key { get { return PointType + ":" + Parm; } }
+        public string Key { get { return POINTTYPE + ":" + PARM; } }
     }
 
 
     public class RocEventFormats
     {
-        public int PointType { get; set; }
-        public int Format { get; set; }
+        public int POINTTYPE { get; set; }
+        public int FORMAT { get; set; }
         public string DescShort { get; set; }
         public string DescLong { get; set; }
     }

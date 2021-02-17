@@ -785,7 +785,7 @@ namespace FDA
                         // find any schedulers that reference this group
                         foreach (FDAScheduler scheduler in _schedulersDictionary.Values)
                         {
-                            FDATask taskToUpdate = scheduler.TasksList.Find(task => task.task_id == updatedTask.task_id);
+                            FDATask taskToUpdate = scheduler.TasksList.Find(task => task.TASK_ID == updatedTask.TASK_ID);
                             if (taskToUpdate != null)
                             {
                                 taskToUpdate.task_type = updatedTask.task_type;
@@ -798,11 +798,11 @@ namespace FDA
                     {
                         foreach (FDAScheduler scheduler in _schedulersDictionary.Values)
                         {
-                            FDATask deletedTask = scheduler.TasksList.Find(task => task.task_id == e.ID);
+                            FDATask deletedTask = scheduler.TasksList.Find(task => task.TASK_ID == e.ID);
                             while (deletedTask != null)
                             {
                                 scheduler.TasksList.Remove(deletedTask);
-                                deletedTask = scheduler.TasksList.Find(task => task.task_id == e.ID);
+                                deletedTask = scheduler.TasksList.Find(task => task.TASK_ID == e.ID);
                             }
                         }
                     }
@@ -998,7 +998,7 @@ namespace FDA
                             }
                             else
                             {
-                                Globals.SystemManager.LogApplicationEvent(this, "", "invalid task_details in task " + task.task_id + ": " + error +". The task will not be exectuted");
+                                Globals.SystemManager.LogApplicationEvent(this, "", "invalid task_details in task " + task.TASK_ID + ": " + error +". The task will not be exectuted");
                             }
                             break;
 
