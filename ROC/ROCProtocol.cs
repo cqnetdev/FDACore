@@ -3497,14 +3497,14 @@ namespace ROC
                     }
                     
 
-                    Format = eventFormat.Format;
+                    Format = eventFormat.FORMAT;
 
                     ValuesConverted = true;
 
                     RocDataTypes dataType = null;
                     EventText = "";
                     EventDesc = "";
-                    switch (eventFormat.Format)
+                    switch (eventFormat.FORMAT)
                     {
                         case 1: ReadFormat1(eventData); break;
                         case 2:

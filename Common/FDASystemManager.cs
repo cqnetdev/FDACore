@@ -425,32 +425,32 @@ namespace Common
                 case "INSERT":
                     if (_RocEventFormats == null)
                         _RocEventFormats = new Dictionary<int, RocEventFormats>();
-                    if (!_RocEventFormats.ContainsKey(notifyEvent.Notification.row.PointType))
-                        _RocEventFormats.Add(notifyEvent.Notification.row.PointType, notifyEvent.Notification.row);
-                    message = "RocEventFormats new row: PointType = " + notifyEvent.Notification.row.PointType;
+                    if (!_RocEventFormats.ContainsKey(notifyEvent.Notification.row.POINTTYPE))
+                        _RocEventFormats.Add(notifyEvent.Notification.row.POINTTYPE, notifyEvent.Notification.row);
+                    message = "RocEventFormats new row: PointType = " + notifyEvent.Notification.row.POINTTYPE;
 
                     break;
                 case "DELETE":
                     if (_rocDataTypes != null)
                     {
-                        if (_RocEventFormats.ContainsKey(notifyEvent.Notification.row.PointType))
-                            _RocEventFormats.Remove(notifyEvent.Notification.row.PointType);
+                        if (_RocEventFormats.ContainsKey(notifyEvent.Notification.row.POINTTYPE))
+                            _RocEventFormats.Remove(notifyEvent.Notification.row.POINTTYPE);
                     }
-                    message = "RocEventFormats row deleted: PointType = " + notifyEvent.Notification.row.PointType;
+                    message = "RocEventFormats row deleted: PointType = " + notifyEvent.Notification.row.POINTTYPE;
 
                     break;
                 case "UPDATE":
                     if (_RocEventFormats == null)
                         _RocEventFormats = new Dictionary<int, RocEventFormats>();
-                    if (_RocEventFormats.ContainsKey(notifyEvent.Notification.row.PointType))
+                    if (_RocEventFormats.ContainsKey(notifyEvent.Notification.row.POINTTYPE))
                     {
-                        _RocEventFormats.Remove(notifyEvent.Notification.row.PointType);
-                        _RocEventFormats.Add(notifyEvent.Notification.row.PointType, notifyEvent.Notification.row);
+                        _RocEventFormats.Remove(notifyEvent.Notification.row.POINTTYPE);
+                        _RocEventFormats.Add(notifyEvent.Notification.row.POINTTYPE, notifyEvent.Notification.row);
                     }
                     else
-                        _RocEventFormats.Add(notifyEvent.Notification.row.PointType, notifyEvent.Notification.row);
+                        _RocEventFormats.Add(notifyEvent.Notification.row.POINTTYPE, notifyEvent.Notification.row);
 
-                    message = "RocEventFormats row updated: PointType = " + notifyEvent.Notification.row.PointType;
+                    message = "RocEventFormats row updated: PointType = " + notifyEvent.Notification.row.POINTTYPE;
                     break;
             }
             Globals.SystemManager.LogApplicationEvent(this, "", message);
@@ -578,8 +578,8 @@ namespace Common
                                 _RocEventFormats.Add(pointType,
                                     new RocEventFormats()
                                     {
-                                        PointType = dataReader.GetInt32(dataReader.GetOrdinal("PointType")),
-                                        Format = dataReader.GetInt32(dataReader.GetOrdinal("Format")),
+                                        POINTTYPE = dataReader.GetInt32(dataReader.GetOrdinal("PointType")),
+                                        FORMAT = dataReader.GetInt32(dataReader.GetOrdinal("Format")),
                                         DescShort = dataReader.GetString(dataReader.GetOrdinal("DescShort")),
                                         DescLong = dataReader.GetString(dataReader.GetOrdinal("DescLong"))
                                     });
@@ -630,8 +630,8 @@ namespace Common
                                 pointType = dataReader.GetInt32(dataReader.GetOrdinal("PointType"));
                                 datatypeEntry = new RocDataTypes()
                                 {
-                                    PointType = dataReader.GetInt32(dataReader.GetOrdinal("PointType")),
-                                    Parm = dataReader.GetInt32(dataReader.GetOrdinal("Parm")),
+                                    POINTTYPE = dataReader.GetInt32(dataReader.GetOrdinal("PointType")),
+                                    PARM = dataReader.GetInt32(dataReader.GetOrdinal("Parm")),
                                     DataType = dataReader.GetString(dataReader.GetOrdinal("DataType")),
                                     DescShort = dataReader.GetString(dataReader.GetOrdinal("DescShort")),
                                     DescLong = dataReader.GetString(dataReader.GetOrdinal("DescLong"))
@@ -704,7 +704,7 @@ namespace Common
                             _appConfig.Add(optionName,
                                 new FDAConfig()
                                 {
-                                    OptionName = reader.GetString(reader.GetOrdinal("OptionName")),
+                                    OPTIONNAME = reader.GetString(reader.GetOrdinal("OptionName")),
                                     OptionValue = reader.GetString(reader.GetOrdinal("OptionValue")),
                                     ConfigType = reader.GetInt32(reader.GetOrdinal("ConfigType"))
                                 });
@@ -812,21 +812,21 @@ namespace Common
             string message = "";
 
             /* Mar 9, 2020 Ignore BackfillDataLapseLimit global setting */
-            if (notifyEvent.Notification.row.OptionName == "BackfillDataLapseLimit")
+            if (notifyEvent.Notification.row.OPTIONNAME == "BackfillDataLapseLimit")
                 return;
             bool isReadOnly = false;
             if (notifyEvent.Notification.operation != "NONE")
             {
-                isReadOnly = ReadOnlyOptions.Contains(notifyEvent.Notification.row.OptionName);
+                isReadOnly = ReadOnlyOptions.Contains(notifyEvent.Notification.row.OPTIONNAME);
                 if (notifyEvent.Notification.operation == "INSERT")
                 {
                     if (!isReadOnly)
-                        _appConfig.Add(notifyEvent.Notification.row.OptionName, notifyEvent.Notification.row);
+                        _appConfig.Add(notifyEvent.Notification.row.OPTIONNAME, notifyEvent.Notification.row);
 
-                    message = "FDAConfig new option entered : " + notifyEvent.Notification.row.OptionName + " = " + notifyEvent.Notification.row.OptionValue;
+                    message = "FDAConfig new option entered : " + notifyEvent.Notification.row.OPTIONNAME + " = " + notifyEvent.Notification.row.OptionValue;
 
                     // publish the default comms stats table to MQTT
-                    if (notifyEvent.Notification.row.OptionName.ToUpper() == "COMMSSTATS")
+                    if (notifyEvent.Notification.row.OPTIONNAME.ToUpper() == "COMMSSTATS")
                     {
                         PublishCommsStatsTable(notifyEvent.Notification.row.OptionValue);
                     }
@@ -834,14 +834,14 @@ namespace Common
 
                 if (notifyEvent.Notification.operation == "UPDATE")
                 {
-                    if (_appConfig.ContainsKey(notifyEvent.Notification.row.OptionName))
+                    if (_appConfig.ContainsKey(notifyEvent.Notification.row.OPTIONNAME))
                     {
                         if (!isReadOnly)
-                            _appConfig[notifyEvent.Notification.row.OptionName] = notifyEvent.Notification.row;
+                            _appConfig[notifyEvent.Notification.row.OPTIONNAME] = notifyEvent.Notification.row;
 
-                        message = "FDAConfig option change : " + notifyEvent.Notification.row.OptionName + " = " + notifyEvent.Notification.row.OptionValue;
+                        message = "FDAConfig option change : " + notifyEvent.Notification.row.OPTIONNAME + " = " + notifyEvent.Notification.row.OptionValue;
 
-                        if (notifyEvent.Notification.row.OptionName.ToUpper() == "COMMSSTATS")
+                        if (notifyEvent.Notification.row.OPTIONNAME.ToUpper() == "COMMSSTATS")
                         {
                             PublishCommsStatsTable(notifyEvent.Notification.row.OptionValue);
                         }
@@ -849,10 +849,10 @@ namespace Common
                     else
                     {
                         if (!isReadOnly)
-                            _appConfig.Add(notifyEvent.Notification.row.OptionName, notifyEvent.Notification.row);
+                            _appConfig.Add(notifyEvent.Notification.row.OPTIONNAME, notifyEvent.Notification.row);
 
-                        message = "FDAConfig new option : " + notifyEvent.Notification.row.OptionName + " = " + notifyEvent.Notification.row.OptionValue;
-                        if (notifyEvent.Notification.row.OptionName.ToUpper() == "COMMSSTATS")
+                        message = "FDAConfig new option : " + notifyEvent.Notification.row.OPTIONNAME + " = " + notifyEvent.Notification.row.OptionValue;
+                        if (notifyEvent.Notification.row.OPTIONNAME.ToUpper() == "COMMSSTATS")
                         {
                             PublishCommsStatsTable(notifyEvent.Notification.row.OptionValue);
                         }
@@ -860,20 +860,20 @@ namespace Common
                 }
 
                 if (notifyEvent.Notification.operation == "DELETE")
-                    if (_appConfig.ContainsKey(notifyEvent.Notification.row.OptionName))
+                    if (_appConfig.ContainsKey(notifyEvent.Notification.row.OPTIONNAME))
                     {
                         if (!isReadOnly)
                         {
-                            if (_appConfig.ContainsKey(notifyEvent.Notification.row.OptionName))
+                            if (_appConfig.ContainsKey(notifyEvent.Notification.row.OPTIONNAME))
                             {
-                                _appConfig.Remove(notifyEvent.Notification.row.OptionName);
+                                _appConfig.Remove(notifyEvent.Notification.row.OPTIONNAME);
                             }
                         }
-                        message = "FDAConfig option deleted, reverting to default : " + notifyEvent.Notification.row.OptionName;
+                        message = "FDAConfig option deleted, reverting to default : " + notifyEvent.Notification.row.OPTIONNAME;
 
-                        if (notifyEvent.Notification.row.OptionName.ToUpper() == "COMMSSTATS")
+                        if (notifyEvent.Notification.row.OPTIONNAME.ToUpper() == "COMMSSTATS")
                         {
-                            PublishCommsStatsTable(notifyEvent.Notification.row.OptionName);
+                            PublishCommsStatsTable(notifyEvent.Notification.row.OPTIONNAME);
                         }
 
                     }

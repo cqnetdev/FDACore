@@ -4,10 +4,12 @@ using System.Text;
 using Npgsql;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using System.Data;
+using System.Reflection;
 
 namespace Common
 {
-    public class PostgreSQLListener<T> : IDisposable
+    public class PostgreSQLListener<T> : IDisposable where T : new() 
     {
         private readonly string _channel = "db_notifications";
         private string _connstring;
@@ -106,10 +108,67 @@ namespace Common
             // get the name of the table that changed, check if it's the table we're looking for
             string table = (string)json["table"];
 
+  
             if (table.ToLower() != _table)
                 return;
 
-            DBNotification<T> notificationData = JsonConvert.DeserializeObject<DBNotification<T>>(e.Payload, new CustomJsonConvert());
+            string operation = (string)json["operation"];
+
+            DBNotification<T> notificationData = new DBNotification<T>();
+            notificationData.operation = operation;
+            notificationData.table = (string)json["table"];
+            notificationData.schema = (string)json["schema"];
+            notificationData.Timestamp = (DateTime)json["timestamp"];
+
+
+            // get the key column name(s), and the key value(s) of the row that set off the trigger
+            string key_columns =((string)json["keycolumns"]).ToUpper();
+            string key_values = (string)json["keyvalues"];
+
+            string[] keycolsarray = key_columns.Split(",");
+            string[] keyvalsarray = key_values.Split(",");
+
+            PropertyInfo pi;
+            if (operation == "DELETE")
+            {
+                notificationData.row = new T();
+                for (int i = 0; i < keycolsarray.Length; i++)
+                {
+                    pi = notificationData.row.GetType().GetProperty(keycolsarray[i]);
+                    if (pi.PropertyType == typeof(Guid))
+                        pi.SetValue(notificationData.row, Guid.Parse(keyvalsarray[i]));
+                    if (pi.PropertyType == typeof(Int32))
+                        pi.SetValue(notificationData.row, Int32.Parse(keyvalsarray[i]));
+                }
+            }
+            else
+            {
+                string where = " where ";
+                for (int i=0;i<keycolsarray.Length;i++)
+                {
+                    if (i > 0)
+                        where += " and ";
+
+                    where += keycolsarray[i] + " = '" + keyvalsarray[i] + "'";
+                }
+
+                // query for the row
+                string query = "select row_to_json(t) from( select * from " + table + where + ") t;";
+                string jsonResult;
+
+                using (NpgsqlConnection conn = new NpgsqlConnection(_connstring))
+                {
+                    conn.Open();
+                    using (NpgsqlCommand command = conn.CreateCommand())
+                    {
+                        command.CommandText = query;
+                        jsonResult = (string)command.ExecuteScalar();
+                    }
+                }
+
+                // convert the row into an object of type T (very cool! I could use this elsewhere, like in LoadConfig() )
+                notificationData.row = JsonConvert.DeserializeObject<T>(jsonResult, new CustomJsonConvert());
+            }
             Notification?.Invoke(this, new PostgreSQLNotification(notificationData));
         }
 
@@ -207,6 +266,7 @@ namespace Common
             public string table;
             public T row;
         }
+
 
     }
 }

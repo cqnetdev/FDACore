@@ -132,9 +132,7 @@ namespace FDA
             DateTime timeOfFirstRun = new DateTime(tomorrow.Year, tomorrow.Month, tomorrow.Day, 0, 0, 0); 
             TimeSpan timeFromNowToFirstRun = timeOfFirstRun.Subtract(currentDateTime);
 
-            // temporary
-            timeFromNowToFirstRun = TimeSpan.FromMinutes(1);
-
+            
             _logTrimTimer = new Timer(LogTrimTimerTick, null, timeFromNowToFirstRun, TimeSpan.FromDays(1));
         }
 
@@ -1501,7 +1499,7 @@ namespace FDA
                                     _deviceConfig.Add(sqlDataReader.GetGuid(sqlDataReader.GetOrdinal("device_id")),
                                         new FDADevice()
                                         {
-                                            device_id = sqlDataReader.GetGuid(sqlDataReader.GetOrdinal("device_id")),
+                                            DEVICE_ID = sqlDataReader.GetGuid(sqlDataReader.GetOrdinal("device_id")),
                                             request_timeout = sqlDataReader.GetInt32(sqlDataReader.GetOrdinal("request_timeout")),
                                             max_request_attempts = sqlDataReader.GetInt32(sqlDataReader.GetOrdinal("max_request_attempts")),
                                             inter_request_delay = sqlDataReader.GetInt32(sqlDataReader.GetOrdinal("inter_request_delay")),
@@ -1545,7 +1543,7 @@ namespace FDA
                                     _taskConfig.Add(sqlDataReader.GetGuid(sqlDataReader.GetOrdinal("task_id")),
                                         new FDATask()
                                         {
-                                            task_id = sqlDataReader.GetGuid(sqlDataReader.GetOrdinal("task_id")),
+                                            TASK_ID = sqlDataReader.GetGuid(sqlDataReader.GetOrdinal("task_id")),
                                             task_type = sqlDataReader.GetString(sqlDataReader.GetOrdinal("task_type")),
                                             task_details = sqlDataReader.GetString(sqlDataReader.GetOrdinal("task_details"))
                                         });
@@ -2072,7 +2070,7 @@ namespace FDA
                 string[] nulls = FindNulls(affectedRow);
                 if (nulls.Length > 0)
                 {
-                    Globals.SystemManager.LogApplicationEvent(this, "", "task_id " + affectedRow.task_id + " " + changeType.ToString().ToLower() + " rejected, null values in field(s) " + string.Join(",", nulls));
+                    Globals.SystemManager.LogApplicationEvent(this, "", "task_id " + affectedRow.TASK_ID + " " + changeType.ToString().ToLower() + " rejected, null values in field(s) " + string.Join(",", nulls));
                     return;
                 }
             }
@@ -2084,9 +2082,9 @@ namespace FDA
                 switch (changeType)
                 {
                     case "DELETE":
-                        if (_taskConfig.ContainsKey(affectedRow.task_id))
+                        if (_taskConfig.ContainsKey(affectedRow.TASK_ID))
                         {
-                            _taskConfig.Remove(affectedRow.task_id);
+                            _taskConfig.Remove(affectedRow.TASK_ID);
                             action = "deleted";
                         }
                         else
@@ -2095,16 +2093,16 @@ namespace FDA
                         }
                         break;
                     case "INSERT":
-                        _taskConfig.Add(affectedRow.task_id, affectedRow);
+                        _taskConfig.Add(affectedRow.TASK_ID, affectedRow);
                         action = "added";
                         break;
 
                     case "UPDATE":
 
-                        if (_taskConfig.ContainsKey(affectedRow.task_id))
+                        if (_taskConfig.ContainsKey(affectedRow.TASK_ID))
                         {
                             action = "updated";
-                            _taskConfig[affectedRow.task_id] = affectedRow;
+                            _taskConfig[affectedRow.TASK_ID] = affectedRow;
                         }
                         else
                         {
@@ -2127,7 +2125,7 @@ namespace FDA
                             }
                             */
                             // record not found, so do an insert instead
-                            _taskConfig.Add(affectedRow.task_id, affectedRow);
+                            _taskConfig.Add(affectedRow.TASK_ID, affectedRow);
                             action = "not found, adding it as a new FDA Task";
                             changeType = "INSERT";
                             break;
@@ -2137,9 +2135,9 @@ namespace FDA
                 }
             }
 
-            Globals.SystemManager.LogApplicationEvent(this, "", "task_id  " + affectedRow.task_id + " " + action);
+            Globals.SystemManager.LogApplicationEvent(this, "", "task_id  " + affectedRow.TASK_ID + " " + action);
 
-            RaiseConfigChangeEvent(changeType.ToString(), Globals.SystemManager.GetTableName("FDATasks"), affectedRow.task_id);
+            RaiseConfigChangeEvent(changeType.ToString(), Globals.SystemManager.GetTableName("FDATasks"), affectedRow.TASK_ID);
         }
     
 
@@ -2154,7 +2152,7 @@ namespace FDA
                 string[] nulls = FindNulls(affectedRow);
                 if (nulls.Length > 0)
                 {
-                    Globals.SystemManager.LogApplicationEvent(this, "", "device_id " + affectedRow.device_id + " " + changeType.ToString().ToLower() + " rejected, null values in field(s) " + string.Join(",", nulls));
+                    Globals.SystemManager.LogApplicationEvent(this, "", "device_id " + affectedRow.DEVICE_ID + " " + changeType.ToString().ToLower() + " rejected, null values in field(s) " + string.Join(",", nulls));
                     return;
                 }
             }
@@ -2166,9 +2164,9 @@ namespace FDA
                 switch (changeType)
                 {
                     case "DELETE":
-                        if (_deviceConfig.ContainsKey(affectedRow.device_id))
+                        if (_deviceConfig.ContainsKey(affectedRow.DEVICE_ID))
                         {
-                            _deviceConfig.Remove(affectedRow.device_id);
+                            _deviceConfig.Remove(affectedRow.DEVICE_ID);
                             action = "deleted";
                         }
                         else
@@ -2178,16 +2176,16 @@ namespace FDA
                         
                         break;
                     case "INSERT":
-                        _deviceConfig.Add(affectedRow.device_id, affectedRow);
+                        _deviceConfig.Add(affectedRow.DEVICE_ID, affectedRow);
                         action = "added";
                         break;
 
                     case "UPDATE":
 
-                        if (_deviceConfig.ContainsKey(affectedRow.device_id))
+                        if (_deviceConfig.ContainsKey(affectedRow.DEVICE_ID))
                         {
                             action = "updated";
-                            _deviceConfig[affectedRow.device_id] = affectedRow;
+                            _deviceConfig[affectedRow.DEVICE_ID] = affectedRow;
                         }
                         else
                         {
@@ -2209,7 +2207,7 @@ namespace FDA
                                 break;
                             }
                             */
-                            _deviceConfig.Add(affectedRow.device_id, affectedRow);
+                            _deviceConfig.Add(affectedRow.DEVICE_ID, affectedRow);
                             action = "not found, adding it as a new FDADevice";
                             changeType = "INSERT";
 
@@ -2218,9 +2216,9 @@ namespace FDA
                 }
             }
 
-            Globals.SystemManager.LogApplicationEvent(this, "", "device_id " + affectedRow.device_id + " " + action);
+            Globals.SystemManager.LogApplicationEvent(this, "", "device_id " + affectedRow.DEVICE_ID + " " + action);
 
-            RaiseConfigChangeEvent(changeType.ToString(), Globals.SystemManager.GetTableName("FDADevices"), affectedRow.device_id);
+            RaiseConfigChangeEvent(changeType.ToString(), Globals.SystemManager.GetTableName("FDADevices"), affectedRow.DEVICE_ID);
         }
 
         private void _dataPointDefMonitor_Notification(object sender, PostgreSQLListener<FDADataPointDefinitionStructure>.PostgreSQLNotification notifyEvent)
@@ -2606,7 +2604,7 @@ namespace FDA
                                             }
                                             else
                                             {
-                                                Globals.SystemManager.LogApplicationEvent(this, "", "invalid task_details in task " + task.task_id + ": " + error + ". The task will not be executed");
+                                                Globals.SystemManager.LogApplicationEvent(this, "", "invalid task_details in task " + task.TASK_ID + ": " + error + ". The task will not be executed");
                                             }
                                             break;
                                         default:
