@@ -54,7 +54,7 @@ namespace Common
         //public delegate void AppConfigMonitorError(object sender, ErrorEventArgs e);
         //public event AppConfigMonitorError AppconfigMonitorError;
 
-        public FDASystemManager(string SQLInstance, string systemDBName, string login, string pass, string version, Guid executionID)
+        public FDASystemManager(string DBInstance, string systemDBName, string login, string pass, string version, Guid executionID)
         {
             Globals.SystemManager = this;
 
@@ -65,9 +65,9 @@ namespace Common
             //SystemDBConnectionString = "Server=" + SQLInstance + "; Database = " + systemDBName + "; user = " + login + "; password = " + pass + ";";
 
             // postgresql conn string
-            SystemDBConnectionString = "Server=" + SQLInstance + ";Port=5432;User Id=" + login + ";Password=" + pass + ";Database=" + systemDBName + ";Keepalive=1;";
+            SystemDBConnectionString = "Server=" + DBInstance + ";Port=5432;User Id=" + login + ";Password=" + pass + ";Database=" + systemDBName + ";Keepalive=1;";
 
-            systemDBSQLInstance = SQLInstance;
+            systemDBSQLInstance = DBInstance;
             systemDBLogin = login;
             systemDBPass = pass;
 

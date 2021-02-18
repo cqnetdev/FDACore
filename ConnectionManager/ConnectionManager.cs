@@ -95,7 +95,7 @@ namespace FDA
 
         private Timer _connectionIdleTimer;
 
-        private DBManager _dbManager;
+        private PG_DBManager _dbManager;
 
         //private delegate void RequeueHandler(object sender,EventArgs e);
         //private event RequeueHandler RequeueGroup;
@@ -245,7 +245,7 @@ namespace FDA
             ConnectionStatus = ConnStatus.Disconnected;
             TCPLocalConnected = false;
             TCPRemoteConnected = false;
-            _dbManager = (DBManager)Globals.DBManager;
+            _dbManager = (PG_DBManager)Globals.DBManager;
 
             //this.PropertyChanged += PropertyChangedHandler;
 

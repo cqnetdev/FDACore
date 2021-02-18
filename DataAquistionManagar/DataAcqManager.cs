@@ -28,9 +28,10 @@ namespace FDA
         // temporary test variable
         //private bool firstGoAround = true;
 
-        public DataAcqManager(string FDAID,string connString,Guid executionID)
+        public DataAcqManager(string FDAID,DBManager dbManager,Guid executionID)
         {
-            _dbManager = new DBManager(connString);
+            _dbManager = dbManager;
+
 
             _backfillManager = new BackfillManager(_dbManager);
             _backfillManager.BackfillAnalysisComplete += BackfillAnalysisCompleteHandler;
@@ -60,10 +61,7 @@ namespace FDA
             
             return count;
         }
-        private void Logger_AppconfigMonitorError(object sender, Exception e)
-        {
-            _dbManager?.HandleTableMonitorError(e);
-        }
+
 
         public bool TestDBConnection()
         {
@@ -78,6 +76,8 @@ namespace FDA
                 _dbManager.LoadConfig();
 
                 _dbManager.Initialize();
+
+                Globals.SystemManager.LogApplicationEvent(this, "", "FDA initialization complete");
 
                 Globals.DBManager = _dbManager;
 
@@ -922,7 +922,7 @@ namespace FDA
 
         }
 
-        private void DemandRequestHandler(object sender, DBManager.DemandEventArgs e)
+        private void DemandRequestHandler(object sender, PG_DBManager.DemandEventArgs e)
         {
             if (Globals.FDAStatus == Globals.AppState.ShuttingDown || Globals.FDAStatus == Globals.AppState.Pausing || Globals.FDAStatus == Globals.AppState.Paused)
                 return;

@@ -137,9 +137,6 @@ namespace FDAApp
                 FDAIsElevated = false;
                 FDAIsElevated = MQTTUtils.ThisProcessIsAdmin();
 
-                //if (Environment.OSVersion.Platform == PlatformID.Win32NT)
-                //    FDAIsElevated = new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator);
-
                 ExecutionID = Guid.NewGuid();
                 string FDAID = appConfig["FDAID"];
                 string exePath = System.Reflection.Assembly.GetEntryAssembly().Location;
@@ -150,15 +147,16 @@ namespace FDAApp
                 // start the FDASystemManager
 
                 // use intricate values here
-                string SQLServer = appConfig["SQLServerInstance"]; //Properties.Settings.Default.SQLServerInstance;
-                string DBName = appConfig["SystemDBName"]; // Properties.Settings.Default.SystemDBName;
-                string userName = appConfig["SystemLogin"]; // Properties.Settings.Default.SystemLogin;
-                string userPass = appConfig["SystemDBPass"]; //Properties.Settings.Default.SystemDBPass;
+                string DBInstance = appConfig["DatabaseInstance"]; 
+                string DBType = appConfig["DatabaseType"];
+                string DBName = appConfig["SystemDBName"]; 
+                string userName = appConfig["SystemLogin"]; 
+                string userPass = appConfig["SystemDBPass"]; 
 
-                if (SQLServer.Contains("(default"))
+                if (DBInstance.Contains("(default"))
                 {
-                    SQLServer = SQLServer.Replace("(default)", "");
-                    LogEvent("SQLServerInstance setting not found, using the default value");
+                    DBInstance = DBInstance.Replace("(default)", "");
+                    LogEvent("DatabaseInstance setting not found, using the default value");
                 }
 
                 if (DBName.Contains("(default"))
@@ -188,7 +186,7 @@ namespace FDAApp
 
                 //this.ThreadExit += FDAContext_ThreadExit;
 
-                FDASystemManager systemManager = new FDASystemManager(SQLServer, DBName, userName, userPass, versionInfo.FileVersion, ExecutionID);
+                FDASystemManager systemManager = new FDASystemManager(DBInstance, DBName, userName, userPass, versionInfo.FileVersion, ExecutionID);
 
                 Dictionary<string, FDAConfig> options = systemManager.GetAppConfig();
                 //if (options.ContainsKey("FDAIdentifier"))
@@ -224,9 +222,20 @@ namespace FDAApp
 
                 Globals.FDAStatus = Globals.AppState.Starting;
 
-                // start the DataAcqManager
+                // create a DBManager of the selected type
                 string FDADBConnString = systemManager.GetAppDBConnectionString();
-                _dataAquisitionManager = new DataAcqManager(FDAID, FDADBConnString, ExecutionID);
+                DBManager dbManager;
+                switch (DBType.ToUpper())
+                {
+                    case "SQLSERVER": dbManager = new SQLServer_DBManager(FDADBConnString); break;
+                    case "POSTGRESQL": dbManager = new PG_DBManager(FDADBConnString); break;
+                    default:
+                        Globals.SystemManager.LogApplicationEvent("FDA App", "", "unrecognized database server type '" + DBType + "', unable to continue");
+                        return;
+                }
+
+                // start the DataAcqManager             
+                _dataAquisitionManager = new DataAcqManager(FDAID, dbManager, ExecutionID);
 
 
                 if (_dataAquisitionManager.TestDBConnection())

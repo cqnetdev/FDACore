@@ -4,12 +4,25 @@ using Npgsql;
 using System.Threading;
 using System.Diagnostics;
 using System;
+using System.Data;
 
 namespace Tests
 {
     [TestClass]
+    public class DataBaseTests
+    {
+        private string connectionstring = "Server=localhost;port=5432; Database = FDA;User Id = Intricatesql; password = Intricate2790!";
 
+        [TestMethod]
+        public void PostgresQuery()
+        {
+            DataTable result = new DataTable();
+            //result = FDA.PG_DBManager.ExecuteQuery("select * from FDASourceConnections",connectionstring);
+            Assert.AreEqual(result.Rows.Count, 13, "wrong number of rows (" + result.Rows.Count + " in results, expected 13");
+        }
+    }
 
+    [TestClass]
     public class PostgreSQLListenerTests
     {
         Guid rowID = new Guid("c3d43f69-bee6-445b-8ba1-ff6172e0427a");
