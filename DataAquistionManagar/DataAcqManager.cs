@@ -922,7 +922,7 @@ namespace FDA
 
         }
 
-        private void DemandRequestHandler(object sender, PG_DBManager.DemandEventArgs e)
+        private void DemandRequestHandler(object sender, DBManagerPG.DemandEventArgs e)
         {
             if (Globals.FDAStatus == Globals.AppState.ShuttingDown || Globals.FDAStatus == Globals.AppState.Pausing || Globals.FDAStatus == Globals.AppState.Paused)
                 return;
