@@ -186,7 +186,16 @@ namespace FDAApp
 
                 //this.ThreadExit += FDAContext_ThreadExit;
 
-                FDASystemManager systemManager = new FDASystemManager(DBInstance, DBName, userName, userPass, versionInfo.FileVersion, ExecutionID);
+
+                FDASystemManager systemManager;
+                switch (DBType.ToUpper())
+                {
+                    case "POSTGRESQL": systemManager = new FDASystemManagerPG(DBInstance, DBName, userName, userPass, versionInfo.FileVersion, ExecutionID); break;
+                    case "SQLSERVER": systemManager = new FDASystemManagerSQL(DBInstance, DBName, userName, userPass, versionInfo.FileVersion, ExecutionID); break;
+                    default:
+                        LogEvent("Unrecognized database server type '" + DBType + "'. Should be 'POSTGRESQL' or 'SQLSERVER'");
+                        return;
+                }
 
                 Dictionary<string, FDAConfig> options = systemManager.GetAppConfig();
                 //if (options.ContainsKey("FDAIdentifier"))
@@ -227,8 +236,8 @@ namespace FDAApp
                 DBManager dbManager;
                 switch (DBType.ToUpper())
                 {
-                    case "SQLSERVER": dbManager = new SQLServer_DBManager(FDADBConnString); break;
-                    case "POSTGRESQL": dbManager = new PG_DBManager(FDADBConnString); break;
+                    case "SQLSERVER": dbManager = new DBManagerSQL(FDADBConnString); break;
+                    case "POSTGRESQL": dbManager = new DBManagerPG(FDADBConnString); break;
                     default:
                         Globals.SystemManager.LogApplicationEvent("FDA App", "", "unrecognized database server type '" + DBType + "', unable to continue");
                         return;
