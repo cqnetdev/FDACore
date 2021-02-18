@@ -139,6 +139,9 @@ namespace Common
                         pi.SetValue(notificationData.row, Guid.Parse(keyvalsarray[i]));
                     if (pi.PropertyType == typeof(Int32))
                         pi.SetValue(notificationData.row, Int32.Parse(keyvalsarray[i]));
+
+                    if (pi.PropertyType == typeof(string))
+                        pi.SetValue(notificationData.row, keyvalsarray[i]);
                 }
             }
             else
