@@ -99,20 +99,18 @@ namespace FDA
 
             _logTrimTimer = new Timer(LogTrimTimerTick, null, timeFromNowToFirstRun, TimeSpan.FromDays(1));
 
-
             // check if device table exists
             _devicesTableExists = ((int)ExecuteScalar("SELECT cast(count(1) as integer) from information_schema.tables where table_name = '" + Globals.SystemManager.GetTableName("fdadevices") + "';") > 0);
 
             // check if tasks table exists
             _tasksTableExists = ((int)ExecuteScalar("SELECT cast(count(1) as integer) from information_schema.tables where table_name = '" + Globals.SystemManager.GetTableName("fdatasks") + "';") > 0);
 
-
             _writeQueue = new Queue<DataRequest>();
 
             _keepAliveTimer = new Timer(DBCheckTimerTick, this, Timeout.Infinite, Timeout.Infinite);
         }
 
-        public void Initialize()
+        public virtual void Initialize()
         {
             Globals.SystemManager.LogApplicationEvent(this, "", "Initializing database manager");
 
@@ -445,7 +443,7 @@ namespace FDA
                     // write it out to the database
                     if (batch.Length != 0)
                     {
-                        // retries and error messages are handled in PG_ExecuteNonQuery()
+                        // retries and error messages are handled in ExecuteNonQuery()
                         int result = ExecuteNonQuery(batch.ToString());
                         if (result > 0)
                         {
@@ -825,7 +823,7 @@ namespace FDA
             result = ExecuteScalar(query);
             if (result != null)
             {
-                appLogexists = ((long)result > 0);
+                appLogexists = ((Int32)Convert.ChangeType(result, typeof(Int32)) > 0);
             }
 
 
@@ -833,7 +831,7 @@ namespace FDA
             result = ExecuteScalar(query);
             if (result != null)
             {
-                commsLogExists = ((long)result > 0);
+                commsLogExists = ((Int32)Convert.ChangeType(result, typeof(Int32)) > 0);
             }
 
 
