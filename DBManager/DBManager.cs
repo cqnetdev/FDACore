@@ -116,7 +116,7 @@ namespace FDA
 
             // start the remote query manager (handles queries from FDAManagers)
             Globals.SystemManager.LogApplicationEvent(this, "", "Starting Remote Query Manager");
-            RemoteQueryManager = new RemoteQueryManager(ConnectionString);
+            RemoteQueryManager = new RemoteQueryManager(this.GetType().Name,ConnectionString);
 
 
             // get the last DB start time

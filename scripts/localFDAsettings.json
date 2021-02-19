@@ -2,8 +2,8 @@
 	"AppSettings": 
 	{
 		"FDAID": "FDA1234",
-		"DatabaseType": "POSTGRESQL",
-		"DatabaseInstance": "localhost",
+		"DatabaseType": "SQLSERVER",
+		"DatabaseInstance": "LAPTOP-HM4ID092",
 		"SystemDBName": "FDASystem",
 		"SystemDBPass": "Intricate2790!",
 		"SystemLogin": "Intricatesql",

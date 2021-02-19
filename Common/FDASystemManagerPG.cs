@@ -193,8 +193,8 @@ namespace Common
         protected override void StartListening()
         {
             _appConfigMonitor?.StartListening();
-            _rocDataTypesMonitor?.StartListening();
-            _RocEventsFormatsMonitor?.StartListening();
+            //_rocDataTypesMonitor?.StartListening();
+            //_RocEventsFormatsMonitor?.StartListening();
         }
 
         protected override string GetSystemDBConnectionString(string instance,string dbname,string user,string pass)

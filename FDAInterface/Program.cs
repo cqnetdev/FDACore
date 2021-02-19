@@ -126,16 +126,16 @@ namespace FDAInterface
             ResumeCommand = Encoding.ASCII.GetBytes("Resume");
 
             // temporary ... connect to MQTT on linux machine
-            ChangeHost("10.0.0.186", "DevelopmentFDA");
+            //ChangeHost("10.0.0.186", "DevelopmentFDA");
 
             // if a running MQTT service is found on the local machine, automatically connect to it
-            /*
+          
             if (ProcessRunning("mosquitto"))
             {
                 string localFDAID = Settings.Default.LocalFDAIdentifier;
                 ChangeHost("127.0.0.1", localFDAID);
             }
-            */
+            
             
             // get the details of the previous connection
             /*

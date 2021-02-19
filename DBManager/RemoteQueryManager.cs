@@ -19,14 +19,25 @@ namespace FDA
 
         private static string _storedProcCheck = "";
         private static string _createStoredProc = "";
+
+        private readonly string _DBManagerType;
  
-        public RemoteQueryManager(string connString)
+        public RemoteQueryManager(string dbType, string connString)
         {
+            _DBManagerType = dbType;
             _connString = connString;
             Globals.MQTT.Subscribe(new string[] { "DBQUERY/#" }, new byte[] { 0 });
             Globals.MQTT.MqttMsgPublishReceived += MQTT_MqttMsgPublishReceived;
 
-            _storedProcCheck = "SELECT count(1) FROM pg_catalog.pg_proc JOIN pg_namespace ON pg_catalog.pg_proc.pronamespace = pg_namespace.oid WHERE proname = 'calcstats' AND pg_namespace.nspname = 'public';";
+            switch (_DBManagerType)
+            {
+                case "DBManagerPG": 
+                    _storedProcCheck = "SELECT count(1) FROM pg_catalog.pg_proc JOIN pg_namespace ON pg_catalog.pg_proc.pronamespace = pg_namespace.oid WHERE proname = 'calcstats' AND pg_namespace.nspname = 'public';";
+                    break;
+                case "DBManagerSQL":
+                    _storedProcCheck = ""; // to do
+                    break;
+            }
         }
 
 
@@ -65,7 +76,13 @@ namespace FDA
             query += ",@saveOutput=1";
 
             BackgroundWorker worker = new BackgroundWorker();
-            worker.DoWork += Worker_DoWork;
+
+            switch (_DBManagerType)
+            {
+                case "DBManagerPG": worker.DoWork += Worker_DoWorkPG; break;
+                case "DBManagerSQL": worker.DoWork += Worker_DoWorkSQL; break;
+
+            }
             worker.RunWorkerCompleted += Worker_RunWorkerCompleted;
             worker.RunWorkerAsync(new QueryParameters(Guid.Empty.ToString(), query));
         }
@@ -83,12 +100,85 @@ namespace FDA
             string query = Encoding.UTF8.GetString(e.Message);
 
             BackgroundWorker worker = new BackgroundWorker();
-            worker.DoWork += Worker_DoWork;
+            switch (_DBManagerType)
+            {
+                case "DBManagerPG": worker.DoWork += Worker_DoWorkPG; break;
+                case "DBManagerSQL": worker.DoWork += Worker_DoWorkSQL; break;
+
+            }
             worker.RunWorkerCompleted += Worker_RunWorkerCompleted;
             worker.RunWorkerAsync(new QueryParameters(topic[1],query));
         }
 
-        private void Worker_DoWork(object sender, DoWorkEventArgs e)
+        private void Worker_DoWorkSQL(object sender, DoWorkEventArgs e)
+        {
+            QueryParameters queryParams = (QueryParameters)e.Argument;
+            SqlDataAdapter da = new SqlDataAdapter();
+            DataSet ds = new DataSet();
+            StringWriter resultXML = new StringWriter();
+            e.Result = ""; // default to empty string as result
+
+            using (SqlConnection conn = new SqlConnection(_connString))
+            {
+                try
+                {
+                    conn.Open();
+                }
+                catch (Exception ex)
+                {
+                    Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Failed to connect to database");
+                }
+
+                try
+                {
+                    using (SqlCommand sqlCommand = conn.CreateCommand())
+                    {
+                        // special case, CommStats query: first check if the stored proc exists, create if not
+                        if (queryParams.QueryText.ToUpper().Contains("CALCSTATS"))
+                        {
+                            if (_storedProcCheck == "")
+                            {
+                                // if not previously loaded, load the embedded text file containing the script that creates the stored procedure
+                                var assembly = Assembly.GetExecutingAssembly();
+                                var resourceName = assembly.GetManifestResourceNames().Single(str => str.EndsWith("CreateStoredProc.txt"));
+
+                                using (Stream stream = assembly.GetManifestResourceStream(resourceName))
+                                using (StreamReader reader = new StreamReader(stream))
+                                {
+                                    _createStoredProc = reader.ReadToEnd();
+                                }
+                            }
+
+                            sqlCommand.CommandText = _storedProcCheck;
+                            int exists = (int)sqlCommand.ExecuteScalar();
+                            if (exists == 0)
+                            {
+                                sqlCommand.CommandText = _createStoredProc;
+                                sqlCommand.ExecuteNonQuery();
+                            }
+                        }
+
+                        // now run the original query                      
+                        sqlCommand.CommandText = queryParams.QueryText;
+                        da.SelectCommand = sqlCommand;
+                        da.Fill(ds);
+
+                        ds.WriteXml(resultXML);
+                        e.Result = new QueryResult(queryParams.QueryID, resultXML.ToString(), "");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Query failed : " + queryParams.QueryText);
+                    e.Result = new QueryResult(queryParams.QueryID, "", "Error: " + ex.Message);
+                }
+            }
+            ds.Dispose();
+            da.Dispose();
+            return;
+        }
+
+        private void Worker_DoWorkPG(object sender, DoWorkEventArgs e)
         {
             QueryParameters queryParams = (QueryParameters)e.Argument;
             NpgsqlDataAdapter da = new NpgsqlDataAdapter();
@@ -189,9 +279,14 @@ namespace FDA
                     Globals.MQTT.Publish("DBQUERYRESULT/" + result.QueryID, serializedResult);
             }
 
-            cleanup:
+        cleanup:
             BackgroundWorker worker = (BackgroundWorker)sender;
-            worker.DoWork -= Worker_DoWork;
+            switch (_DBManagerType)
+            {
+                case "DBManagerPG": worker.DoWork -= Worker_DoWorkPG; break;
+                case "DBManagerSQL": worker.DoWork -= Worker_DoWorkSQL; break;
+
+            }
             worker.RunWorkerCompleted -= Worker_RunWorkerCompleted;
             worker.Dispose();
             worker = null;

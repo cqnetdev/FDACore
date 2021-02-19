@@ -70,9 +70,7 @@ namespace FDAInterface
                 query += ",@saveOutput = 0";
             }
 
-           
-            
-
+         
 
             byte[] serializedQuery = Encoding.UTF8.GetBytes(query);
 
