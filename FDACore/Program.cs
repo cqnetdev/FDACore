@@ -197,6 +197,8 @@ namespace FDAApp
                         return;
                 }
 
+
+
                 Dictionary<string, FDAConfig> options = systemManager.GetAppConfig();
                 //if (options.ContainsKey("FDAIdentifier"))
                 //    FDAidentifier = options["FDAIdentifier"].OptionValue;
@@ -242,6 +244,8 @@ namespace FDAApp
                         Globals.SystemManager.LogApplicationEvent("FDA App", "", "unrecognized database server type '" + DBType + "', unable to continue");
                         return;
                 }
+
+                Globals.MQTT.Publish("FDA/DBType", Encoding.UTF8.GetBytes(DBType.ToUpper()),0,true);
 
                 // start the DataAcqManager             
                 _dataAquisitionManager = new DataAcqManager(FDAID, dbManager, ExecutionID);
