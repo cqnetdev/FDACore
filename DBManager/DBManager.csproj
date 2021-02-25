@@ -5,6 +5,16 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="Properties\CreateStoredProcPG.txt" />
+    <None Remove="Properties\CreateStoredProcSQL.txt" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Properties\CreateStoredProcPG.txt" />
+    <EmbeddedResource Include="Properties\CreateStoredProcSQL.txt" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Common\Common.csproj" />
   </ItemGroup>
 

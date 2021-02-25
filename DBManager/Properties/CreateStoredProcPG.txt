@@ -1,0 +1,360 @@
+﻿
+CREATE OR REPLACE FUNCTION public.calcstats(
+	_starttime character varying,
+	_endtime character varying,
+	_returnresults bit DEFAULT (0)::bit(1),
+	_description character varying DEFAULT NULL::character varying,
+	_connection character varying DEFAULT NULL::character varying,
+	_device character varying DEFAULT NULL::character varying,
+	_outputtable character varying DEFAULT NULL::character varying,
+	_saveoutput bit DEFAULT (1)::bit(1))
+    RETURNS TABLE(calculationtimestamp text, calculationdescription text, connectionid text, conndescription text, conndetails text, deviceaddress text, totaltransactions text, successpct double precision, incorrectresponsepct double precision, noresponsepct double precision, fastoutlieravgtime double precision, slowoutlieravgtime double precision, averagetime double precision, attempt1successpct double precision, attempt2successpct double precision, attempt3ormoresuccesspct double precision) 
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+    ROWS 1000
+
+AS $BODY$
+DECLARE _errortext text;
+DECLARE _errorline text;
+DECLARE _runTime timestamp;
+DECLARE _connID uuid;
+DECLARE _devAddr varchar(50);
+DECLARE _noRespPct float;
+DECLARE _badRespPct float;
+DECLARE _fastfiveAvgTime float;
+DECLARE _slowfiveAvgTime float;
+DECLARE _midRangeAvgTime float;
+DECLARE _attempt1successPct float;
+DECLARE _attempt2successPct float;
+DECLARE _attempt3ormoresuccessPct float;
+DECLARE _transCount float;
+DECLARE _goodPct float;
+DECLARE _divisor float;
+DECLARE _goodTransCount int;
+DECLARE _sql text; -- dynamic sql for inserting into the temp table with a variable table name
+DECLARE _output text;
+DECLARE _dtTest Timestamp;
+DECLARE _device RECORD;
+DECLARE _timestampFormat text;
+DECLARE _tempcount int;
+BEGIN 	
+	BEGIN
+		_timestampFormat := 'YYYY-MM-DD HH24:MI:SS.MS';
+		
+		-- get the time that this proc was run		
+		_runTime := now();
+
+		-- just in case the temp table is still hanging around from the last stats calculation
+	   IF (SELECT EXISTS (SELECT 1 FROM   information_schema.tables WHERE  table_schema like 'pg_temp_%' AND table_name='temptrans')) THEN
+	      DROP TABLE temptrans;
+	   END IF;
+	
+	   -- find the name of the output table (default is CommsStats)
+		   _output := 'CommsStats';
+		   
+		   -- if output table name was supplied in parameters, use that
+		   IF (_outputTable IS NOT NULL) THEN
+				_output := quote_ident(_outputTable);
+		   END IF;
+		   --ELSE
+				-- check the FDAConfig table for an alternate output table (nope, cross database queries not allowed)
+				--if (select count(1) from FDASystem.public.FDAConfig where ConfigType = 0 and OptionName = 'CommsStats') = 1 then
+				--	select _output = (select OptionValue from FDASystem.public.FDAConfig where ConfigType = 0 and OptionName = 'CommsStats');
+				--end if;
+		   --END IF;
+
+		   -- make sure the output table name is valid (starts with a letter and doesn't contain illegal characters)
+		   --IF (_output like  '%[^_A-Z0-9@$#]%' COLLATE Latin1_General_CI_AI or @output NOT LIKE '[A-Z]%' COLLATE Latin1_General_CI_AI) THEN
+			--IF (_output SIMILAR TO  '[^_A-Z0-9@$#]' or _output NOT SIMILAR TO '([A-Z]|[a-z])%' ) THEN
+		    --_output := REPLACE(_output,'''','''''');
+			--_errortext := 'Invalid table name ''' || _output || '''';
+			--RAISE EXCEPTION '%', _errortext;  -- make sure that raising an exception causes bail out of the stored proc
+			--RETURN; -- this isn't legal, the stored proc has to return something
+		   --END IF;
+		   
+		   -- escape any single quotes in the description or turn NULL into empty string
+		   IF (_Description IS NOT NULL) THEN
+			  _Description := REPLACE(_Description,'''','''''');
+		   ELSE
+			  _Description := '';
+		   END IF;
+
+	   
+	    -- make sure the supplied dates and times are valid
+		RAISE NOTICE 'checking start time "%"',_StartTime;
+		BEGIN
+			_dtTest := TO_TIMESTAMP(_StartTime,_timestampFormat);
+		EXCEPTION WHEN OTHERS THEN
+			_errortext := 'Invalid start timestamp ''' || _StartTime || '''';
+			RAISE EXCEPTION '%',_errortext;
+			--RAISERROR(_error,1,1)
+			--RETURN
+		END;
+		
+		RAISE NOTICE 'checking end time';
+		BEGIN
+			_dtTest := TO_TIMESTAMP(_EndTime,_timestampFormat);
+		EXCEPTION WHEN OTHERS THEN
+			_errortext := 'Invalid end timestamp ''' || _EndTime || '''';
+			RAISE EXCEPTION '%',_errortext;
+			--RAISERROR(_error,1,1)
+			--RETURN
+		END;
+
+		------------------ first, create a temp table of all transaction events (TransCode=1) in the timeframe-------------------------
+		------------------ if a connection or device was specified, filter out transactions from other connections ------------------------------
+		CREATE TEMP TABLE temptrans AS
+		SELECT row_number() over (order by TimestampUTC1)  as rowid,C.ConnectionID,C.DeviceAddress,C.Attempt,C.TransStatus as Success,C.ElapsedPeriod, C.Details01 as Request, C.RxSize, C.Protocol
+		FROM CommsLog C
+		WHERE TransCode = 1 and TimestampUTC1 BETWEEN _StartTime::timestamp AND _EndTime::timestamp
+		order by Protocol;
+		
+		_tempcount := (SELECT count(1) from temptrans);
+		RAISE NOTICE 'temptrans table created, % rows',_tempcount;
+
+		IF (_connection IS NOT NULL) THEN
+			delete from temptrans where ConnectionID <> _connection;
+		END IF;
+		
+		--------------------------- if restricted to a single device, remove transactions associated with other devices -----------------------------
+		IF (_connection IS NOT NULL and _device IS NOT NULL) THEN
+			delete from temptrans where ConnectionID <> _connection or DeviceAddress <> _device;
+		END IF;
+
+		-- create an index on the temp table to speed up queries for statistics calculations
+		CREATE INDEX tempidx2 on temptrans (ConnectionID,DeviceAddress) INCLUDE (RowID,Attempt,ElapsedPeriod,Success,RxSize);
+
+		------------------------ get a list of distinct connectionIDs/DeviceAddresss and loop through it, calculating a set of statistics for each --------------
+	
+		-- Create the temp output table
+		CREATE TEMP TABLE outputTemp(
+					CalculationTimestamp text NOT NULL,
+					CalculationDescription text NOT NULL,
+					ConnectionID text NOT NULL,
+					ConnDescription text NOT NULL,
+					ConnDetails text NOT NULL,
+					DeviceAddress text NOT NULL,
+					TotalTransactions text NOT NULL,
+					SuccessPct float NOT NULL,
+					IncorrectResponsePct float NOT NULL,
+					NoResponsePct float NOT NULL,
+					FastOutlierAvgTime float NOT NULL,
+					SlowOutlierAvgTime float NOT NULL,
+					AverageTime float NOT NULL,
+					Attempt1SuccessPct float NOT NULL,
+					Attempt2SuccessPct float NOT NULL,
+					Attempt3orMoreSuccessPct float NOT NULL);
+
+		--DECLARE _devices CURSOR FOR select distinct ConnectionID,DeviceAddress from temptrans where DeviceAddress is not null;
+		--OPEN _devices;
+
+		
+		FOR _device IN (select distinct T.ConnectionID,T.DeviceAddress from temptrans T where T.DeviceAddress is not null)
+		LOOP
+			RAISE NOTICE 'Calculating stats for device %',_device.deviceaddress;
+			_transCount := (select count(1) from temptrans T where T.ConnectionID = _device.connectionid and T.DeviceAddress = _device.deviceaddress);
+
+			-- good response %
+			_goodPct := 100*(select CASE
+								   WHEN _transCount=0 THEN 0 
+								   ELSE noResp/_transCount 
+								   END as pctfail 
+								   from 
+								   (select count(1) as noResp from temptrans T where T.ConnectionID = _device.connectionid  and T.DeviceAddress = _device.deviceaddress and T.Success = 1::bit) A);
+			_goodPct := (select ROUND(_goodPct::numeric,1::int));
+
+			-- no response %
+			_noRespPct := 100*(select CASE
+								   WHEN _transCount=0 THEN 0 
+								   ELSE noResp/_transCount 
+								   END as pctfail 
+								   from 
+								   (select count(1) as noResp from temptrans T where T.ConnectionID =  _device.connectionid and T.DeviceAddress = _device.deviceaddress and T.Success = 0::bit and  RxSize = 0) A);
+			_noRespPct := (select ROUND(_noRespPct::numeric,1::int));					
+
+			-- bad response %
+			_badRespPct := 100*(select CASE	
+									WHEN _transCount=0 THEN 0
+									ELSE badResp/_transCount
+									END 
+									from
+									(select count(1) as badResp from temptrans T where T.ConnectionID = _device.connectionid and T.DeviceAddress = _device.deviceaddress and T.Success = 0::bit and RxSize > 0) A);
+			_badRespPct := (SELECT ROUND(_badRespPct::numeric,1::int));
+
+			_goodTransCount := (SELECT COUNT(1) from temptrans T where T.ConnectionID = _device.connectionid and T.DeviceAddress = _device.deviceaddress and T.Success = 1::bit);
+
+			-- remove the 'no response' and 'bad response' transactions for this device from the temp table so they aren't counted in the other stats
+			delete from temptrans T where T.ConnectionID = _device.connectionid and T.DeviceAddress = _device.deviceaddress and  Success = 0::bit;
+
+			
+			-- fast outliers
+			IF (_goodTransCount >=15) THEN
+				_fastfiveAvgTime := (select AVG(ElapsedPeriod) from 
+			 		(select T.ElapsedPeriod from temptrans T where T.ConnectionID = _device.connectionid  and T.DeviceAddress = _device.deviceaddress  order by T.ElapsedPeriod) A LIMIT 5);
+			ELSE
+				-- not enough records for outliers
+				_fastfiveAvgTime := 0;
+			END IF;
+			_fastfiveAvgTime := (select ROUND(_fastfiveAvgTime::numeric,1::int));
+
+			-- average of slowest 5 transactions
+			IF (_goodTransCount >= 15) THEN
+				_slowfiveAvgTime = (select AVG(ElapsedPeriod) from
+				(select T.ElapsedPeriod from temptrans T where T.ConnectionID = _device.connectionid  and T.DeviceAddress = _device.deviceaddress  order by T.ElapsedPeriod desc) A limit 5);
+			ELSE
+				-- not enough records for outliers
+				_slowfiveAvgTime := 0;
+			END IF;
+			_slowfiveAvgTime := (select ROUND(_slowfiveAvgTime::numeric,1::int));
+
+			
+			-- average of transactions not including 5 fasted and 5 slowest
+			IF (_goodTransCount >= 15) THEN
+
+				_midRangeAvgTime := (SELECT AVG(ElapsedPeriod) from 
+				(
+					select T.ElapsedPeriod from temptrans T
+					   where T.ConnectionID =  _device.connectionid and T.DeviceAddress = _device.deviceaddress and
+						  rowid not in (select rowid from temptrans T where T.ConnectionID = _device.connectionid and T.DeviceAddress = _device.deviceaddress  order by T.ElapsedPeriod limit 5) and
+						  rowid not in (select rowid from temptrans T where T.ConnectionID = _device.connectionid and T.DeviceAddress = _device.deviceaddress  order by T.ElapsedPeriod desc limit 5)
+				) A);
+			ELSE
+				-- not enough records for outliers, just calulate the average of all transactions for this device
+				IF (_goodTransCount > 0) THEN
+				
+				 	_midRangeAvgTime = (select AVG(T.ElapsedPeriod) from temptrans T where ConnectionID = _device.connectionid and  _device.deviceaddress);
+				ELSE
+					_midRangeAvgTime := 0;
+				END IF;
+			END IF;
+			_midRangeAvgTime := (select ROUND(_midRangeAvgTime::numeric,1::int));
+
+			-- % success in 1 try
+			_attempt1successPct := 100*(SELECT CASE
+										WHEN _goodTransCount = 0 THEN 0.0
+										ELSE CAST(attemptsuccess as float)/_goodTransCount END
+										from
+										(select count(1) as attemptsuccess from temptrans T
+										 where T.ConnectionID =  _device.connectionid and T.DeviceAddress = _device.deviceaddress and  T.Success=1::bit and T.Attempt=1) A)	;		
+			_attempt1successPct := ROUND(_attempt1successPct::numeric,1::int);
+
+			-- % success in 2 tries
+			_attempt2successPct := 100*(SELECT CASE
+										WHEN _goodTransCount = 0 then 0.0
+										ELSE CAST(attemptsuccess as float)/_goodTransCount END
+										from
+										(select count(1) as attemptsuccess from temptrans T where T.ConnectionID =  _device.connectionid and T.DeviceAddress = _device.deviceaddress and  Success=1::bit and Attempt=2) A);
+			_attempt2successPct := ROUND(_attempt2successPct::numeric,1::int);
+
+			-- % success in 3+ tries
+			_attempt3ormoresuccessPct := 100*(SELECT CASE
+										WHEN _goodTransCount = 0 THEN 0.0
+										ELSE cast(attemptsuccess as float)/_goodTransCount END
+										from
+										(select count(1) as attemptsuccess from temptrans T where T.ConnectionID = _device.connectionid and T.DeviceAddress = _device.deviceaddress and  T.Success=1::bit and T.Attempt>=3) A);
+			_attempt3ormoresuccessPct := ROUND(_attempt3ormoresuccessPct::numeric,1::int);
+
+			--store the results in the temporary output table
+			_sql := 'insert into outputTemp (CalculationTimestamp,CalculationDescription,ConnectionID,ConnDescription,ConnDetails,DeviceAddress,TotalTransactions
+											   ,SuccessPct,NoResponsePct,IncorrectResponsePct,FastOutlierAvgTime,SlowOutlierAvgTime,AverageTime,Attempt1SuccessPct,
+											   Attempt2SuccessPct,Attempt3orMoreSuccessPct)
+				select 
+				''' || to_char(_runtime,_timestampformat) || ''',
+				''' || _Description || ''',            
+				''' || _device.connectionid::text || ''',       
+				CASE Description WHEN NULL THEN '''' ELSE Description END,
+				CASE SCDetail01 WHEN NULL THEN '''' ELSE SCDetail01 END,      
+				''' || _device.deviceaddress || ''',' || 
+				_transcount::text || ',' || 
+				_goodPct::text || ',' || 
+				_noRespPct::text || ',' ||
+				_badRespPct::text || ',' ||
+				_fastfiveAvgTime::text || ',' ||
+				_slowfiveAvgTime::text || ',' || 
+				_midRangeAvgTime::text || ',' || 
+				_attempt1successPct::text || ',' || 
+				_attempt2successPct::text || ',' ||
+				_attempt3ormoresuccessPct::text  ||
+				' from FDASourceConnections where SCUID = ''' || _device.connectionid::text || '''';
+
+			RAISE NOTICE 'recording commsstats record: %', _sql;
+			EXECUTE _sql;
+
+			-- move to the next device
+			--FETCH NEXT FROM devices into @connID,@devAddr
+		END LOOP;
+
+		-- save the results in the permament output table (if requested)
+		IF (_saveOutput = 1::bit) THEN
+			-- create the final output table if it doesn't exist
+			IF (SELECT NOT EXISTS (SELECT 1 FROM   information_schema.tables WHERE  table_schema = 'public' AND table_name= LOWER(_output))) THEN
+			RAISE NOTICE 'creating output table';
+				_sql := 'CREATE TABLE ' || _output || '(
+					CalculationTimestamp text NOT NULL,
+					CalculationDescription text NOT NULL,
+					ConnectionID text NOT NULL,
+					ConnDescription text NOT NULL,
+					ConnDetails text NOT NULL,
+					DeviceAddress text NOT NULL,
+					TotalTransactions text NOT NULL,
+					SuccessPct float NOT NULL,
+					IncorrectResponsePct float NOT NULL,
+					NoResponsePct float NOT NULL,
+					FastOutlierAvgTime float NOT NULL,
+					SlowOutlierAvgTime float NOT NULL,
+					AverageTime float NOT NULL,
+					Attempt1SuccessPct float NOT NULL,
+					Attempt2SuccessPct float NOT NULL,
+					Attempt3orMoreSuccessPct float NOT NULL)';
+				RAISE NOTICE 'creating output table %',_sql;
+				EXECUTE _sql;
+				RAISE NOTICE 'output table created';
+			END IF;
+
+			-- copy the temp output table to the final table
+			_sql := 'INSERT into ' || _output || ' select * from outputTemp';
+			EXECUTE _sql;
+		END IF;
+			
+		-- return the results of this calculation (if requested)
+		IF (_ReturnResults = 1::bit) THEN
+		   _sql := 'select * from outputTemp;';
+		   RETURN QUERY EXECUTE _sql;
+		END IF;
+
+	
+		-- clean up
+		--CLOSE _devices;
+		--DEALLOCATE _devices;
+		--DROP INDEX #trans.tempidx1
+		DROP INDEX tempidx2 ;
+		DROP TABLE temptrans;
+		DROP TABLE outputTemp;
+
+	EXCEPTION WHEN OTHERS THEN		
+		GET STACKED DIAGNOSTICS 
+			_errortext := MESSAGE_TEXT,
+			_errorline := pg_exception_context;
+	END;
+
+	-- cleanup
+	BEGIN
+		--CLOSE _devices;
+		--DEALLOCATE _devices;
+		DROP TABLE temptrans;
+		DROP INDEX tempidx1;
+		DROP INDEX tempidx2 ;
+	EXCEPTION WHEN OTHERS THEN
+	END;
+
+	
+	-- report any error that occured
+	IF (_errortext <> '') THEN
+		RAISE EXCEPTION 'error %, line %' ,_errortext,_errorline;
+	END IF;
+END;
+$BODY$;
+
+ALTER FUNCTION public.calcstats(character varying, character varying, bit, character varying, character varying, character varying, character varying, bit)
+    OWNER TO postgres;

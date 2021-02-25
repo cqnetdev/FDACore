@@ -29,15 +29,7 @@ namespace FDA
             Globals.MQTT.Subscribe(new string[] { "DBQUERY/#" }, new byte[] { 0 });
             Globals.MQTT.MqttMsgPublishReceived += MQTT_MqttMsgPublishReceived;
 
-            switch (_DBManagerType)
-            {
-                case "DBManagerPG": 
-                    _storedProcCheck = "SELECT count(1) FROM pg_catalog.pg_proc JOIN pg_namespace ON pg_catalog.pg_proc.pronamespace = pg_namespace.oid WHERE proname = 'calcstats' AND pg_namespace.nspname = 'public';";
-                    break;
-                case "DBManagerSQL":
-                    _storedProcCheck = ""; // to do
-                    break;
-            }
+           
         }
 
 
@@ -104,7 +96,6 @@ namespace FDA
             {
                 case "DBManagerPG": worker.DoWork += Worker_DoWorkPG; break;
                 case "DBManagerSQL": worker.DoWork += Worker_DoWorkSQL; break;
-
             }
             worker.RunWorkerCompleted += Worker_RunWorkerCompleted;
             worker.RunWorkerAsync(new QueryParameters(topic[1],query));
@@ -133,26 +124,27 @@ namespace FDA
                 {
                     using (SqlCommand sqlCommand = conn.CreateCommand())
                     {
-                        // special case, CommStats query: first check if the stored proc exists, create if not
+                        // special case for CommStats query: first check if the stored proc exists, create if not
                         if (queryParams.QueryText.ToUpper().Contains("CALCSTATS"))
                         {
-                            if (_storedProcCheck == "")
+                            // check if stored proc exist   
+                             _storedProcCheck = "SELECT cast(count(1) as int) FROM sys.procedures WHERE object_id = OBJECT_ID(N'CalcStats')";                  
+                            sqlCommand.CommandText = _storedProcCheck;
+                            int exists = (int)sqlCommand.ExecuteScalar();
+
+                            // if it does not exist, load the CREATE query from resources and run it to create the stored proc
+                            if (exists == 0)
                             {
                                 // if not previously loaded, load the embedded text file containing the script that creates the stored procedure
                                 var assembly = Assembly.GetExecutingAssembly();
-                                var resourceName = assembly.GetManifestResourceNames().Single(str => str.EndsWith("CreateStoredProc.txt"));
+                                var resourceName = assembly.GetManifestResourceNames().Single(str => str.EndsWith("CreateStoredProcSQL.txt"));
 
                                 using (Stream stream = assembly.GetManifestResourceStream(resourceName))
                                 using (StreamReader reader = new StreamReader(stream))
                                 {
                                     _createStoredProc = reader.ReadToEnd();
                                 }
-                            }
 
-                            sqlCommand.CommandText = _storedProcCheck;
-                            int exists = (int)sqlCommand.ExecuteScalar();
-                            if (exists == 0)
-                            {
                                 sqlCommand.CommandText = _createStoredProc;
                                 sqlCommand.ExecuteNonQuery();
                             }
@@ -163,6 +155,7 @@ namespace FDA
                         da.SelectCommand = sqlCommand;
                         da.Fill(ds);
 
+                        // return the results in XML format
                         ds.WriteXml(resultXML);
                         e.Result = new QueryResult(queryParams.QueryID, resultXML.ToString(), "");
                     }
@@ -185,7 +178,7 @@ namespace FDA
             DataSet ds = new DataSet();
             StringWriter resultXML = new StringWriter();
             e.Result = ""; // default to empty string as result
-         
+
             using (NpgsqlConnection conn = new NpgsqlConnection(_connString))
             {
                 try
@@ -201,26 +194,28 @@ namespace FDA
                 {
                     using (NpgsqlCommand sqlCommand = conn.CreateCommand())
                     {
-                        // special case, CommStats query: first check if the stored proc exists, create if not
+                        // special case for CommStats query: first check if the stored proc exists, create if not
                         if (queryParams.QueryText.ToUpper().Contains("CALCSTATS"))
                         {
-                            if (_storedProcCheck == "")
+                            // check if stored proc exist
+
+                            _storedProcCheck = "SELECT cast(count(1) as int) FROM pg_catalog.pg_proc JOIN pg_namespace ON pg_catalog.pg_proc.pronamespace = pg_namespace.oid WHERE proname = 'calcstats' AND pg_namespace.nspname = 'public';";
+                            sqlCommand.CommandText = _storedProcCheck;
+                            int exists = (int)sqlCommand.ExecuteScalar();
+
+                            // if it does not exist, load the CREATE query from resources and run it to create the stored proc
+                            if (exists == 0)
                             {
                                 // if not previously loaded, load the embedded text file containing the script that creates the stored procedure
                                 var assembly = Assembly.GetExecutingAssembly();
-                                var resourceName = assembly.GetManifestResourceNames().Single(str => str.EndsWith("CreateStoredProc.txt"));
+                                var resourceName = assembly.GetManifestResourceNames().Single(str => str.EndsWith("CreateStoredProcPG.txt"));
 
                                 using (Stream stream = assembly.GetManifestResourceStream(resourceName))
                                 using (StreamReader reader = new StreamReader(stream))
                                 {
                                     _createStoredProc = reader.ReadToEnd();
                                 }
-                            }
 
-                            sqlCommand.CommandText = _storedProcCheck;
-                            int exists = (int)sqlCommand.ExecuteScalar();
-                            if (exists == 0)
-                            {
                                 sqlCommand.CommandText = _createStoredProc;
                                 sqlCommand.ExecuteNonQuery();
                             }
@@ -230,9 +225,10 @@ namespace FDA
                         sqlCommand.CommandText = queryParams.QueryText;
                         da.SelectCommand = sqlCommand;
                         da.Fill(ds);
-                       
+
+                        // return the results in XML format
                         ds.WriteXml(resultXML);
-                        e.Result = new QueryResult(queryParams.QueryID,resultXML.ToString(),"");    
+                        e.Result = new QueryResult(queryParams.QueryID, resultXML.ToString(), "");
                     }
                 }
                 catch (Exception ex)
