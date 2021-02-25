@@ -409,6 +409,7 @@ namespace FDAInterface
                 MQTT.Subscribe(new string[] { "FDA/runstatus" }, new byte[] { 0 });
                 MQTT.Subscribe(new string[] { "FDA/identifier" }, new byte[] { 0 });
 
+
                 if (MainFormActive())
                 {
                     _mainForm.SetMQTT(MQTT);
@@ -467,6 +468,7 @@ namespace FDAInterface
                 case "FDA/identifier":
                     ConnectedFDAName = Encoding.UTF8.GetString(e.Message);
                     break;
+             
             }
         }
 

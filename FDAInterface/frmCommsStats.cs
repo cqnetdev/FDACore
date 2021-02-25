@@ -17,13 +17,15 @@ namespace FDAInterface
         private MqttClient _mqtt;
         private delegate void DataReceivedHandler(byte[] data);
         private string _queryID;
+        private string _dbtype;
 
         private delegate void ThreadsafeUpdateText(string text);
 
-        public frmCommsStats(MqttClient mqtt)
+        public frmCommsStats(MqttClient mqtt,string DBType)
         {
             InitializeComponent();
 
+            _dbtype = DBType;
             _mqtt = mqtt;
             _mqtt.MqttMsgPublishReceived += _mqtt_MqttMsgPublishReceived;
             _mqtt.Subscribe(new string[] { "FDA/DefaultCommsStatsTable" }, new byte[] { 1 });
@@ -39,39 +41,82 @@ namespace FDAInterface
             DateTime calcstarttime = startTime.Value;
             DateTime calcendtime = endtime.Value;
 
-            string startTimeString = calcstarttime.ToString("yyyy-MM-dd hh:mm:ss tt");
-            string endTimeString = calcendtime.ToString("yyyy-MM-dd hh:mm:ss tt");
+            string startTimeString = calcstarttime.ToString("yyyy-MM-dd H:mm:ss.fff");
+            string endTimeString = calcendtime.ToString("yyyy-MM-dd H:mm:ss.fff");
             
             string topic = "DBQUERY/" + _queryID;
+            string fulldescription = description.Text.Replace("%timestamp%", DateTime.Now.ToString("yyyy-MM-dd hh:mm:ss tt"));
+            ComboBoxConnection conn = (ComboBoxConnection)cb_connection.SelectedItem;
 
-            string query = "EXECUTE CalcStats @StartTime = '" + startTimeString + "',@EndTime = '" + endTimeString + "',@returnResults = 1";
-            if (description.Text != "")
+            // SQL Server version
+            string query = "";
+            switch (_dbtype)
             {
-                string originalDescription = description.Text;
-                string fulldescription = originalDescription.Replace("%timestamp%", DateTime.Now.ToString("yyyy-MM-dd hh:mm:ss tt"));
-                query += ",@description='" + fulldescription + "'";
-            }
-            if (cb_connection.SelectedItem != null && cb_connection.SelectedIndex > 0)
-            {
-                ComboBoxConnection conn = (ComboBoxConnection)cb_connection.SelectedItem;
-                query += ",@connection = '" + conn.ID + "'";
-            }
-            if (device.Text != "")
-                query += ",@device = '" + device.Text + "'";
+                case "SQLSERVER":
+                    query = "EXECUTE CalcStats @StartTime = '" + startTimeString + "',@EndTime = '" + endTimeString + "',@returnResults = 1";
+                    if (description.Text != "")
+                    {
+                        query += ",@description='" + fulldescription + "'";
+                    }
 
-            if (chkSaveToDB.Checked)
-            {
-                query += ",@saveOutput = 1";
-                if (outputtable.Text != "")
-                    query += ",@outputTable = '" + outputtable.Text + "'";
-            }
-            else
-            {
-                query += ",@saveOutput = 0";
-            }
+                    if (cb_connection.SelectedItem != null && cb_connection.SelectedIndex > 0)
+                    {
+                        query += ",@connection = '" + conn.ID + "'";
+                    }
 
-         
+                    if (device.Text != "")
+                        query += ",@device = '" + device.Text + "'";
 
+                    if (chkSaveToDB.Checked)
+                    {
+                        query += ",@saveOutput = 1";
+                        if (outputtable.Text != "")
+                            query += ",@outputTable = '" + outputtable.Text + "'";
+                    }
+                    else
+                    {
+                        query += ",@saveOutput = 0";
+                    }
+                    break;
+                case "POSTGRESQL":
+                    {
+                        // start time, end time, return results,description
+                        query = "SELECT * from calcstats('" + startTimeString + "','" + endTimeString + "',1::bit,'" + description.Text + "',";
+                        
+                        // connection filter
+                        if (cb_connection.SelectedItem != null && cb_connection.SelectedIndex > 0)
+                        {
+                            query += "'" + conn.ID + "',";
+                        }
+                        else
+                        {
+                            query += "null,";
+                        }
+
+                        // device filter
+                        if (device.Text != "")
+                            query += "'" + device.Text + "',";
+                        else
+                            query += "null,";
+
+                        // output table
+                        if (chkSaveToDB.Checked && outputtable.Text != "")
+                            query += "'" + outputtable.Text + "',";
+                        else
+                            query += "null,";
+
+                        // save to DB enabled
+                        if (chkSaveToDB.Checked)
+                            query += "1::bit";
+                        else
+                            query += "0::bit";
+
+                        query += ");";
+
+                        break;
+                    }
+            }
+      
             byte[] serializedQuery = Encoding.UTF8.GetBytes(query);
 
             // subscribe to the result
@@ -122,17 +167,23 @@ namespace FDAInterface
             {
                 CalcButton.Enabled = true;
                 progressBar.Visible = false;
+                try
+                {
+                    // convert the XML to a dataset that can be displayed in a datagridview
+                    string XMLresult = Encoding.UTF8.GetString(result);
+                    StringReader theReader = new StringReader(XMLresult);
+                    DataSet theDataSet = new DataSet();
+                    theDataSet.ReadXml(theReader);
 
-                // convert the XML to a dataset that can be displayed in a datagridview
-                string XMLresult = Encoding.UTF8.GetString(result);
-                StringReader theReader = new StringReader(XMLresult);
-                DataSet theDataSet = new DataSet();
-                theDataSet.ReadXml(theReader);
-          
-                if (theDataSet.Tables.Count == 0)
-                    dataGridView1.DataSource = null;
-                else
-                    dataGridView1.DataSource = theDataSet.Tables[0];
+                    if (theDataSet.Tables.Count == 0)
+                        dataGridView1.DataSource = null;
+                    else
+                        dataGridView1.DataSource = theDataSet.Tables[0];
+                }
+                catch
+                {
+                    MessageBox.Show(Encoding.UTF8.GetString(result));
+                }
 
                 
                 

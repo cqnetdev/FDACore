@@ -87,6 +87,7 @@ namespace FDAInterface
         private bool closing = false;
         private string SelectedConnID = "";
         private MqttClient _mqtt;
+        private string DBType = "";
         private string[] FDAState;
 
         private Dictionary<Guid, ConnectionNode> _connOverviewDict;        
@@ -256,6 +257,7 @@ namespace FDAInterface
                 FDAStatus.Text = "FDA Status: Stopped";
                 startToolStripMenuItem.Enabled = true;
                 startwithConsoleToolStripMenuItem.Enabled = true;
+
                 SubscribeToFDATopics(null);
                 if (_connOverviewDict != null)
                     foreach (ConnectionNode connNode in _connOverviewDict.Values)
@@ -354,6 +356,10 @@ namespace FDAInterface
                     case "FDA":
                         switch (topic[1])
                         {
+                            case "DBType": 
+                                DBType = Encoding.UTF8.GetString(e.Message);
+                                dbtypeDisplay.Text = "Database type: " + DBType;
+                                break;
                             case "version":
                                 Version.Text = "FDA Version: " + Encoding.UTF8.GetString(e.Message);
                                 break;
@@ -497,7 +503,9 @@ namespace FDAInterface
 
         private void SubscribeToFDATopics(object o)
         {
-            MQTT?.Subscribe(new string[] { "FDA/version", "FDA/uptime", "FDA/connectionlist" }, new byte[] { 0,0,0});
+            MQTT?.Subscribe(new string[] { "FDA/version", "FDA/uptime", "FDA/connectionlist", "FDA/DBType" }, new byte[] { 0, 0, 0, 0 });
+
+           
         }
 
         private void UnsubscribeFDATopics()
@@ -1067,7 +1075,7 @@ namespace FDAInterface
 
         private void communicationsStatsToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            frmCommsStats statsForm = new frmCommsStats(MQTT);
+            frmCommsStats statsForm = new frmCommsStats(MQTT,DBType);
             statsForm.SetConnectionList(_connOverviewDict);
             statsForm.Show();
         }

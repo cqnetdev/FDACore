@@ -52,14 +52,15 @@
             this.tabControl1 = new System.Windows.Forms.TabControl();
             this.tabDetails = new System.Windows.Forms.TabPage();
             this.panel1 = new System.Windows.Forms.Panel();
+            this.connDetails = new FDAInterface.ConnDetailsCtrl();
             this.tabQueues = new System.Windows.Forms.TabPage();
+            this.qHist = new FDAInterface.QueueHistory();
             this.panel2 = new System.Windows.Forms.Panel();
             this.btn_Connect = new System.Windows.Forms.Button();
             this.tb_activeFDA = new System.Windows.Forms.TextBox();
             this.label1 = new System.Windows.Forms.Label();
             this.tree = new System.Windows.Forms.TreeView();
-            this.connDetails = new FDAInterface.ConnDetailsCtrl();
-            this.qHist = new FDAInterface.QueueHistory();
+            this.dbtypeDisplay = new System.Windows.Forms.ToolStripStatusLabel();
             this.statusStrip1.SuspendLayout();
             this.menuStrip1.SuspendLayout();
             this.tabControl1.SuspendLayout();
@@ -92,7 +93,8 @@
             this.Version,
             this.FDAStatus,
             this.Uptime,
-            this.mqttStatus});
+            this.mqttStatus,
+            this.dbtypeDisplay});
             this.statusStrip1.Location = new System.Drawing.Point(0, 1014);
             this.statusStrip1.Name = "statusStrip1";
             this.statusStrip1.Padding = new System.Windows.Forms.Padding(2, 0, 21, 0);
@@ -274,6 +276,18 @@
             this.panel1.Size = new System.Drawing.Size(1413, 942);
             this.panel1.TabIndex = 38;
             // 
+            // connDetails
+            // 
+            this.connDetails.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+            this.connDetails.ConnDetailsObj = null;
+            this.connDetails.DbConnStr = "";
+            this.connDetails.FDAExecutionID = "";
+            this.connDetails.Location = new System.Drawing.Point(4, 5);
+            this.connDetails.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
+            this.connDetails.Name = "connDetails";
+            this.connDetails.Size = new System.Drawing.Size(1377, 934);
+            this.connDetails.TabIndex = 37;
+            // 
             // tabQueues
             // 
             this.tabQueues.Controls.Add(this.qHist);
@@ -284,6 +298,17 @@
             this.tabQueues.TabIndex = 1;
             this.tabQueues.Text = "Queues";
             this.tabQueues.UseVisualStyleBackColor = true;
+            // 
+            // qHist
+            // 
+            this.qHist.ConnectionID = new System.Guid("00000000-0000-0000-0000-000000000000");
+            this.qHist.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.qHist.Location = new System.Drawing.Point(3, 3);
+            this.qHist.Margin = new System.Windows.Forms.Padding(6, 8, 6, 8);
+            this.qHist.Name = "qHist";
+            this.qHist.Priority = 0;
+            this.qHist.Size = new System.Drawing.Size(1413, 942);
+            this.qHist.TabIndex = 34;
             // 
             // panel2
             // 
@@ -349,28 +374,11 @@
             this.tree.TabIndex = 31;
             this.tree.AfterSelect += new System.Windows.Forms.TreeViewEventHandler(this.tree_AfterSelect);
             // 
-            // connDetails
+            // dbtypeDisplay
             // 
-            this.connDetails.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            this.connDetails.ConnDetailsObj = null;
-            this.connDetails.DbConnStr = "";
-            this.connDetails.FDAExecutionID = "";
-            this.connDetails.Location = new System.Drawing.Point(4, 5);
-            this.connDetails.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
-            this.connDetails.Name = "connDetails";
-            this.connDetails.Size = new System.Drawing.Size(1377, 934);
-            this.connDetails.TabIndex = 37;
-            // 
-            // qHist
-            // 
-            this.qHist.ConnectionID = new System.Guid("00000000-0000-0000-0000-000000000000");
-            this.qHist.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.qHist.Location = new System.Drawing.Point(3, 3);
-            this.qHist.Margin = new System.Windows.Forms.Padding(6, 8, 6, 8);
-            this.qHist.Name = "qHist";
-            this.qHist.Priority = 0;
-            this.qHist.Size = new System.Drawing.Size(1413, 942);
-            this.qHist.TabIndex = 34;
+            this.dbtypeDisplay.Name = "dbtypeDisplay";
+            this.dbtypeDisplay.Size = new System.Drawing.Size(132, 29);
+            this.dbtypeDisplay.Text = "Database Type:";
             // 
             // frmMain2
             // 
@@ -433,5 +441,6 @@
         private System.Windows.Forms.Label label1;
         private System.Windows.Forms.Button btn_Connect;
         private System.Windows.Forms.ToolStripStatusLabel mqttStatus;
+        private System.Windows.Forms.ToolStripStatusLabel dbtypeDisplay;
     }
 }
