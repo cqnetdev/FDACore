@@ -5,11 +5,13 @@ using System.Net.Sockets;
 using System.ComponentModel;
 using System.Threading;
 using System.Diagnostics;
+using Microsoft.Extensions.Logging;
 
-namespace FDAController
+namespace ControllerService
 {
     class FDAClient : IDisposable
     {
+        private ILogger<Worker> _logger;
         private TcpClient _FDA;
         NetworkStream FDAstream;
 
@@ -19,8 +21,9 @@ namespace FDAController
 
         private BackgroundWorker _bgWorker;
 
-        public FDAClient(int port)
+        public FDAClient(int port,ILogger<Worker> logger)
         {
+            _logger = logger;
             _FDA = new TcpClient();
             _port = port;
             _sendQueue = new Queue<string>();
@@ -53,6 +56,7 @@ namespace FDAController
             string message;
             string responseStr;
             int qCount;
+            string logmessage = "";
 
 
             stopwatch.Start();
@@ -66,9 +70,8 @@ namespace FDAController
                 while (_sendQueue.Count > 0)
                 {
                     message = _sendQueue.Dequeue();
-                    Console.Write("Sending '" + message + "' to the FDA...");
                     responseStr = DoTransaction(message);
-                    Console.WriteLine("response = '" + responseStr + "'");
+                    _logger.LogInformation("Sending '" + message + "' to the FDA...response = '" + responseStr + "'");
                 }
 
                 if (stopwatch.ElapsedMilliseconds >= 3000)
@@ -123,23 +126,25 @@ namespace FDAController
         {
             _FDA?.Dispose();
             _FDA = new TcpClient();
-
+            string logmessage = "";
             while (!_FDA.Connected)
             {
                 try
                 {
-                    Console.Write("Attempting to connect to FDA...");
+                    logmessage = "Attempting to connect to FDA...";
                     _FDA.Connect("127.0.0.1", _port);
                 }
                 catch
                 {
-                    Console.WriteLine("Failed to connect");
+                    logmessage += "Failed to connect";
+                    _logger.LogInformation(logmessage);
                 }
                 Thread.Sleep(3000);
             }
 
             FDAstream = _FDA.GetStream();
-            Console.WriteLine("Success");
+            logmessage += "success";
+            _logger.LogInformation(logmessage);
 
         }
 

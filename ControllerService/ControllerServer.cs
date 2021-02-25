@@ -1,19 +1,22 @@
-﻿using System;
+﻿using Microsoft.Extensions.Logging;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
 
 
-namespace FDAController
+namespace ControllerService
 {
   
 
     class ControllerServer : IDisposable
     {
         private static FDA.TCPServer _tcpServer;
+        private static ILogger<Worker> _logger;
 
-        public ControllerServer(int port)
+        public ControllerServer(int port,ILogger<Worker> logger)
         {
+            _logger = logger;
             _tcpServer = FDA.TCPServer.NewTCPServer(port);
             _tcpServer.DataAvailable += _tcpServer_DataAvailable;
         }
@@ -38,29 +41,29 @@ namespace FDAController
                 command = Encoding.UTF8.GetString(e.Data, 0, e.Data.Length - 1);
             }
 
-            Console.WriteLine("Received command '" + command + "'");
+            _logger.LogInformation("Received command '" + command + "'", new object[] { });
 
             command = command.ToUpper();
 
             switch (command)
             {
                 case "START":
-                    Console.WriteLine("Start command received, starting FDA");
+                    _logger.LogInformation("Start command received, starting FDA", new object[] { });
                     StartFDA();
-                    Console.WriteLine("Replying 'OK' to requestor");
+                    _logger.LogInformation("Replying 'OK' to requestor", new object[] { });
                     _tcpServer.Send(e.ClientID, "OK");
                     break;
                 case "PING":
-                    Console.WriteLine("replying with 'UP'");
+                    _logger.LogInformation("replying with 'UP'", new object[] { });
                     _tcpServer.Send(e.ClientID, "UP"); // yes, I'm here
                     break;
                 case "TOTALQUEUECOUNT":
                     string count = Globals.FDAClient.FDAQueueCount.ToString();
-                    Console.WriteLine("Returning the total queue count (" + count + ") to the requestor");
+                    _logger.LogInformation("Returning the total queue count (" + count + ") to the requestor", new object[] { });
                     _tcpServer.Send(e.ClientID, count);  // return the last known queue count to the requestor
                     break;
                 default:
-                    Console.WriteLine("Forwarding command '" + command + "' to the FDA");
+                    _logger.LogInformation("Forwarding command '" + command + "' to the FDA", new object[] { });
                     Globals.FDAClient.Send(command); // forward all other messages to the FDA
                     _tcpServer.Send(e.ClientID, "FORWARDED"); // reply  back to the requestor that the command was forwarded to the FDA
                     break;
@@ -70,12 +73,11 @@ namespace FDAController
 
         private static void StartFDA()
         {
-            //_FDAPath = _config["FDAPath"];
-            //Console.WriteLine("Starting FDA (" + _FDAPath + ")");
+
 
             if (Environment.OSVersion.Platform == PlatformID.Win32NT)
             {
-                // TO DO
+                RunConsoleCommand("FDACore.exe", "", "c:\\FDA\\");
             }
 
             if (Environment.OSVersion.Platform == PlatformID.Unix)
