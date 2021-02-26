@@ -34,6 +34,7 @@ namespace FDAController
             this.lblLastupdate = new System.Windows.Forms.Label();
             this.lblControllerService = new System.Windows.Forms.Label();
             this.lblFDA = new System.Windows.Forms.Label();
+            this.lblMQTT = new System.Windows.Forms.Label();
             this.SuspendLayout();
             // 
             // btnStart
@@ -77,17 +78,27 @@ namespace FDAController
             // lblFDA
             // 
             this.lblFDA.AutoSize = true;
-            this.lblFDA.Location = new System.Drawing.Point(30, 254);
+            this.lblFDA.Location = new System.Drawing.Point(30, 289);
             this.lblFDA.Name = "lblFDA";
             this.lblFDA.Size = new System.Drawing.Size(42, 20);
             this.lblFDA.TabIndex = 4;
             this.lblFDA.Text = "FDA";
             // 
+            // lblMQTT
+            // 
+            this.lblMQTT.AutoSize = true;
+            this.lblMQTT.Location = new System.Drawing.Point(34, 253);
+            this.lblMQTT.Name = "lblMQTT";
+            this.lblMQTT.Size = new System.Drawing.Size(52, 20);
+            this.lblMQTT.TabIndex = 5;
+            this.lblMQTT.Text = "MQTT";
+            // 
             // frmMain
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(9F, 20F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(742, 307);
+            this.ClientSize = new System.Drawing.Size(742, 400);
+            this.Controls.Add(this.lblMQTT);
             this.Controls.Add(this.lblFDA);
             this.Controls.Add(this.lblControllerService);
             this.Controls.Add(this.lblLastupdate);
@@ -107,6 +118,7 @@ namespace FDAController
         private System.Windows.Forms.Label lblLastupdate;
         private System.Windows.Forms.Label lblControllerService;
         private System.Windows.Forms.Label lblFDA;
+        private System.Windows.Forms.Label lblMQTT;
     }
 }
 

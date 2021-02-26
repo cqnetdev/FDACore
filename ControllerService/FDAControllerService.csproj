@@ -3,6 +3,7 @@
   <PropertyGroup>
     <TargetFramework>netcoreapp3.1</TargetFramework>
     <UserSecretsId>dotnet-ControllerService-C405C806-E22B-4964-8DC9-69A7E6C707DA</UserSecretsId>
+    <AssemblyName>FDAController</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>

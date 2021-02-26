@@ -14,7 +14,9 @@ namespace FDAController
 {
     public partial class frmMain : Form
     {
-
+        private Color GoodColor = Color.Green;
+        private Color WarningColor = Color.Gold;
+        private Color BadColor = Color.Red;
         private int _controllerPort = 9571;
         private string _controllerIP = "127.0.0.1";
         private bool _isStopping = false;
@@ -34,12 +36,13 @@ namespace FDAController
         {
             string result;
             string status;
+            Color textcolor = Color.Green;
 
             // is the controller service running?
             if (ProcessRunning("ControllerService"))
             {
                 status = "FDA Controller service is running";
-              
+                textcolor = GoodColor;
 
                 // is the controller responsive to requests?
                 result = SendRequest(_controllerIP, _controllerPort, "PING");
@@ -50,6 +53,7 @@ namespace FDAController
                 else
                 {
                     status += " but is not responsive";
+                    textcolor = WarningColor;
                 }
 
             }
@@ -58,14 +62,30 @@ namespace FDAController
                 status = "FDA Controller service is not running";
                 btnStop.Enabled = false;
                 btnStart.Enabled = false;
+                textcolor = Color.Red;
             }
             lblControllerService.Text = status;
+            lblControllerService.ForeColor = textcolor;
+
+            // is MQTT running?
+            if (ProcessRunning("mosquitto"))
+            {
+                lblMQTT.Text = "MQTT service is running";
+                textcolor = GoodColor;
+            }
+            else
+            {
+                lblMQTT.Text = "MQTT service not not running";
+                textcolor = BadColor;
+            }
+            lblMQTT.ForeColor = textcolor;
 
             // is the FDA running?
             if (ProcessRunning("FDACore"))
             {
                 _isStarting = false;
                 status = "FDA service is running";
+                textcolor = GoodColor;
                 if (!_isStopping)
                 {
                     btnStop.Enabled = true;
@@ -83,11 +103,13 @@ namespace FDAController
                 else
                 {
                     status += ", unknown number of items in the communications queues";
+                    textcolor = WarningColor;
                 }
             }
             else
             {
                 status = "The FDA is not running";
+                textcolor = BadColor;
                 if (_isStopping)
                 {
                     btnStop.Text = "Stop";
@@ -102,6 +124,7 @@ namespace FDAController
                 
             }
             lblFDA.Text = status;
+            lblFDA.ForeColor = textcolor;
 
 
             // update the 'last status update' timestamp
