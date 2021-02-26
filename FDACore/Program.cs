@@ -718,7 +718,19 @@ namespace FDAApp
             }
 
 
-            // unpublish FDA topics and set run status to "stopped"
+
+            // stop the TCP Server
+            _TCPServer.Dispose();
+            _TCPServer = null;
+
+            Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "FDA Application", "", "Shutting down the Data Acquisition Manager");
+            _dataAquisitionManager?.Dispose();
+
+            Globals.SystemManager?.LogApplicationEvent(Globals.FDANow(), "FDA Application", "", "Shutting down System Manager");
+            Globals.SystemManager?.Dispose();
+
+
+            // unpublish FDA topics,set run status to "stopped", and shut down the MQTT connection
             if (Globals.MQTTEnabled && Globals.MQTT != null)
             {
                 if (Globals.MQTT.IsConnected)
@@ -728,22 +740,6 @@ namespace FDAApp
                     Globals.MQTT.Publish("FDA/dbconnstring", new byte[0], 0, true);
                     Globals.MQTT.Publish("FDA/uptime", new byte[0], 0, true);
                     Globals.MQTT.Publish("FDA/connectionlist", new byte[0], 0, true);
-                }
-            }
-
-            // stop the TCP Server
-            _TCPServer.Dispose();
-
-            Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "FDA Application", "", "Shutting down the Data Acquisition Manager");
-            _dataAquisitionManager?.Dispose();
-
-            Globals.SystemManager?.LogApplicationEvent(Globals.FDANow(), "FDA Application", "", "Shutting down System Manager");
-            Globals.SystemManager?.Dispose();
-
-            if (Globals.MQTTEnabled && Globals.MQTT != null)
-            {
-                if (Globals.MQTT.IsConnected)
-                {
                     Globals.MQTT.Publish("FDA/runstatus", Encoding.UTF8.GetBytes("Stopped"), 0, true);
                     Thread.Sleep(3000);
                     Globals.MQTT.Disconnect();
@@ -751,7 +747,6 @@ namespace FDAApp
                 }
             }
 
-            _TCPServer.Dispose();
 
             ShutdownComplete = true;
 

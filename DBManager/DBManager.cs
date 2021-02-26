@@ -2035,82 +2035,135 @@ namespace FDA
             return PreReqCheck();
         }
 
-        protected virtual void Dispose(bool disposing)
+        public virtual void Dispose()
         {
-            if (!disposedValue)
+            // log any data that's sitting in the caches before shutting down
+            Globals.SystemManager.LogApplicationEvent(this, "", "Flushing all cached data");
+
+            if (_cacheManager != null)
             {
-                if (disposing)
+                List<string> batches = _cacheManager.FlushAll();
+                foreach (string batch in batches)
                 {
-
-                    // log any data that's sitting in the caches before shutting down
-                    Globals.SystemManager.LogApplicationEvent(this, "", "Flushing all cached data");
-
-                    if (_cacheManager != null)
-                    {
-                        List<string> batches = _cacheManager.FlushAll();
-                        foreach (string batch in batches)
-                        {
-                            ExecuteNonQuery(batch);
-                        }
-                    }
-                    _cacheManager.Dispose();
-
-                    Stopwatch stopwatch = new Stopwatch();
-                    // wait for datawriter thread to finish (up to 10 seconds)
-                    if (_dataWriter != null)
-                    {
-                        if (_dataWriter.IsBusy)
-                            Globals.SystemManager.LogApplicationEvent(this, "", "Waiting for data writer thread to finish and exit");
-
-                        stopwatch.Start();
-                        while (_dataWriter.IsBusy && stopwatch.Elapsed.Seconds < 10)
-                            Thread.Sleep(50);
-                        stopwatch.Stop();
-                        _dataWriter.Dispose();
-                    }
-
-                    // wait for alarms and events writing thread to finish (up to 10 seconds)
-                    if (_alarmsEventsWriter != null)
-                    {
-                        if (_alarmsEventsWriter.IsBusy)
-                            Globals.SystemManager.LogApplicationEvent(this, "", "Waiting for Alarms and Events writer thread to finish and exit");
-
-                        stopwatch.Reset();
-                        stopwatch.Start();
-                        while (_alarmsEventsWriter.IsBusy && stopwatch.Elapsed.Seconds < 10)
-                            Thread.Sleep(50);
-                        stopwatch.Stop();
-                        _alarmsEventsWriter.Dispose();
-                    }
-
-                    stopwatch = null;
-
-
-                    lock (_schedConfig) { _schedConfig.Clear(); }
-                    lock (_requestgroupConfig) { _requestgroupConfig.Clear(); }
-                    lock (_dataPointConfig) { _dataPointConfig.Clear(); }
-                    lock (_connectionsConfig) { _connectionsConfig.Clear(); }
+                    ExecuteNonQuery(batch);
                 }
-
-                // TODO: free unmanaged resources (unmanaged objects) and override finalizer
-                // TODO: set large fields to null
-                disposedValue = true;
             }
-        }
+            _cacheManager.Dispose();
 
-        // // TODO: override finalizer only if 'Dispose(bool disposing)' has code to free unmanaged resources
-        // ~DBManagerBase()
-        // {
-        //     // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
-        //     Dispose(disposing: false);
-        // }
+            Stopwatch stopwatch = new Stopwatch();
+            // wait for datawriter thread to finish (up to 10 seconds)
+            if (_dataWriter != null)
+            {
+                if (_dataWriter.IsBusy)
+                    Globals.SystemManager.LogApplicationEvent(this, "", "Waiting for data writer thread to finish and exit");
 
-        public void Dispose()
-        {
-            // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
-            Dispose(disposing: true);
-            GC.SuppressFinalize(this);
+                stopwatch.Start();
+                while (_dataWriter.IsBusy && stopwatch.Elapsed.Seconds < 10)
+                    Thread.Sleep(50);
+                stopwatch.Stop();
+                _dataWriter.Dispose();
+            }
+
+            // wait for alarms and events writing thread to finish (up to 10 seconds)
+            if (_alarmsEventsWriter != null)
+            {
+                if (_alarmsEventsWriter.IsBusy)
+                    Globals.SystemManager.LogApplicationEvent(this, "", "Waiting for Alarms and Events writer thread to finish and exit");
+
+                stopwatch.Reset();
+                stopwatch.Start();
+                while (_alarmsEventsWriter.IsBusy && stopwatch.Elapsed.Seconds < 10)
+                    Thread.Sleep(50);
+                stopwatch.Stop();
+                _alarmsEventsWriter.Dispose();
+            }
+
+            stopwatch = null;
+
+
+            lock (_schedConfig) { _schedConfig.Clear(); }
+            lock (_requestgroupConfig) { _requestgroupConfig.Clear(); }
+            lock (_dataPointConfig) { _dataPointConfig.Clear(); }
+            lock (_connectionsConfig) { _connectionsConfig.Clear(); }
         }
+    
+
+        //protected virtual void Dispose(bool disposing)
+        //{
+        //    if (!disposedValue)
+        //    {
+        //        if (disposing)
+        //        {
+
+        //            // log any data that's sitting in the caches before shutting down
+        //            Globals.SystemManager.LogApplicationEvent(this, "", "Flushing all cached data");
+
+        //            if (_cacheManager != null)
+        //            {
+        //                List<string> batches = _cacheManager.FlushAll();
+        //                foreach (string batch in batches)
+        //                {
+        //                    ExecuteNonQuery(batch);
+        //                }
+        //            }
+        //            _cacheManager.Dispose();
+
+        //            Stopwatch stopwatch = new Stopwatch();
+        //            // wait for datawriter thread to finish (up to 10 seconds)
+        //            if (_dataWriter != null)
+        //            {
+        //                if (_dataWriter.IsBusy)
+        //                    Globals.SystemManager.LogApplicationEvent(this, "", "Waiting for data writer thread to finish and exit");
+
+        //                stopwatch.Start();
+        //                while (_dataWriter.IsBusy && stopwatch.Elapsed.Seconds < 10)
+        //                    Thread.Sleep(50);
+        //                stopwatch.Stop();
+        //                _dataWriter.Dispose();
+        //            }
+
+        //            // wait for alarms and events writing thread to finish (up to 10 seconds)
+        //            if (_alarmsEventsWriter != null)
+        //            {
+        //                if (_alarmsEventsWriter.IsBusy)
+        //                    Globals.SystemManager.LogApplicationEvent(this, "", "Waiting for Alarms and Events writer thread to finish and exit");
+
+        //                stopwatch.Reset();
+        //                stopwatch.Start();
+        //                while (_alarmsEventsWriter.IsBusy && stopwatch.Elapsed.Seconds < 10)
+        //                    Thread.Sleep(50);
+        //                stopwatch.Stop();
+        //                _alarmsEventsWriter.Dispose();
+        //            }
+
+        //            stopwatch = null;
+
+
+        //            lock (_schedConfig) { _schedConfig.Clear(); }
+        //            lock (_requestgroupConfig) { _requestgroupConfig.Clear(); }
+        //            lock (_dataPointConfig) { _dataPointConfig.Clear(); }
+        //            lock (_connectionsConfig) { _connectionsConfig.Clear(); }
+        //        }
+
+        //        // TODO: free unmanaged resources (unmanaged objects) and override finalizer
+        //        // TODO: set large fields to null
+        //        disposedValue = true;
+        //    }
+        //}
+
+        //// // TODO: override finalizer only if 'Dispose(bool disposing)' has code to free unmanaged resources
+        //// ~DBManagerBase()
+        //// {
+        ////     // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+        ////     Dispose(disposing: false);
+        //// }
+
+        //public void Dispose()
+        //{
+        //    // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+        //    Dispose(disposing: true);
+        //    GC.SuppressFinalize(this);
+        //}
 
     }
 }

@@ -723,7 +723,7 @@ namespace FDAInterface
                 tree.Nodes[0].Nodes.Clear();
                 Version.Text = "FDA Version: unknown";
                 Uptime.Text = "FDA Runtime: unknown";
-                FDAStatus.Text = "FDA Status: unknown";
+                //FDAStatus.Text = "FDA Status: unknown";
                 dbtypeDisplay.Text = "Database Type: unknown";
 
 
