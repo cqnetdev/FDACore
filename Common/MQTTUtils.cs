@@ -241,6 +241,36 @@ namespace Common
         }
 
 
+        public static string StopMosquittoService()
+        {
+            if (Environment.OSVersion.Platform == PlatformID.Win32NT)
+            {
+                ServiceController sc = new ServiceController();
+                sc.ServiceName = serviceName;
+                try
+                {
+                    sc.Stop();
+                }
+                catch (Exception ex)
+                {
+                    return ex.Message;
+                }
+
+                sc.WaitForStatus(ServiceControllerStatus.Stopped, new TimeSpan(0, 0, 5)); // 5 second timeout for service to stop
+                if (sc.Status != ServiceControllerStatus.Stopped)
+                    return "service failed to stop";
+                return string.Empty;
+            }
+
+            if (Environment.OSVersion.Platform == PlatformID.Unix)
+            {
+                string result = RunCommand("systemctl", "stop " + serviceName);
+                return result;
+            }
+
+            return "unsupported platform"; // should never see this;
+        }
+
 
         public static string StartMosquittoService()
         {

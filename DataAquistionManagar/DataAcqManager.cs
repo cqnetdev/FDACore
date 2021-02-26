@@ -24,6 +24,8 @@ namespace FDA
         public readonly Guid ExecutionID;
 
 
+        public delegate void MQTTEnabledChangeHandler(object sender, BoolEventArgs e);
+        public event MQTTEnabledChangeHandler MQTTEnableStatusChanged;
 
         // temporary test variable
         //private bool firstGoAround = true;
@@ -225,14 +227,18 @@ namespace FDA
                 Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "DataAcqManager: General error in Start()");
             }
 
+
+            if (Globals.MQTTEnabled)
+            {
+                PublishUpdatedConnectionsList();
+
+                // publish the default CommsStats table name
+                string tableString = Globals.SystemManager.GetTableName("CommsStats");
+                byte[] tableBytes = Encoding.UTF8.GetBytes(tableString);
+                Globals.MQTT.Publish("FDA/DefaultCommsStatsTable", tableBytes, 0, true);
+            }
+
          
-
-            PublishUpdatedConnectionsList();
-
-            // publish the default CommsStats table name
-            string tableString = Globals.SystemManager.GetTableName("CommsStats");
-            byte[] tableBytes = Encoding.UTF8.GetBytes(tableString);
-            Globals.MQTT.Publish("FDA/DefaultCommsStatsTable",tableBytes,0,true);
         }
 
         public void PublishUpdatedConnectionsList()
@@ -686,7 +692,10 @@ namespace FDA
                         RevalidateRequestGroups(2);
                     }
 
-                    PublishUpdatedConnectionsList();
+                    if (Globals.MQTTEnabled)
+                    {
+                        PublishUpdatedConnectionsList();
+                    }
                 }
 
                 // handle request group config changes 
@@ -918,6 +927,21 @@ namespace FDA
             {
                 Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Error while parsing the value of the UTCOffset option in the FDAConfig table. Using default value of 0");
                 Globals.UTCOffset = 0;
+            }
+
+            if (configs.ContainsKey("MQTTEnabled"))
+            {
+                bool mqttEnb = false;
+                try
+                {
+                  mqttEnb = (int.Parse(configs["MQTTEnabled"].OptionValue) == 1);
+                }  catch (Exception ex)
+                {
+                    Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Error while parsing the value of the MQTTEnabled option in the FDAConfig table. Using default value of 0");
+                }
+
+                // handle this at the program level
+                MQTTEnableStatusChanged?.Invoke(this, new BoolEventArgs(mqttEnb));
             }
 
         }

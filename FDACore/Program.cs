@@ -27,6 +27,7 @@ namespace FDAApp
         static public bool InitSuccess { get; }
 
         static private Guid ExecutionID;
+        static private string DBType;
         static private System.Threading.Timer upTimeReporterTmr;
         static private System.Threading.Timer MqttRetryTimer;
         static private bool FDAIsElevated = false;
@@ -148,7 +149,7 @@ namespace FDAApp
 
                 // use intricate values here
                 string DBInstance = appConfig["DatabaseInstance"]; 
-                string DBType = appConfig["DatabaseType"];
+                DBType = appConfig["DatabaseType"];
                 string DBName = appConfig["SystemDBName"]; 
                 string userName = appConfig["SystemLogin"]; 
                 string userPass = appConfig["SystemDBPass"]; 
@@ -229,7 +230,17 @@ namespace FDAApp
                     Globals.DetailedMessaging = (systemManager.GetAppConfig()["DetailedMessaging"].OptionValue == "on");
 
                 // connect to the MQTT broker
-                MQTTConnect("localhost");
+                Globals.MQTTEnabled = false;
+                if (options.ContainsKey("MQTTEnabled"))
+                {
+                    Globals.MQTTEnabled = (options["MQTTEnabled"].OptionValue == "1");
+                }
+                
+                if (Globals.MQTTEnabled)
+                { 
+                    MQTTConnect("localhost");
+                    Globals.MQTT?.Publish("FDA/DBType", Encoding.UTF8.GetBytes(DBType.ToUpper()), 0, true);
+                }
 
                 Globals.FDAStatus = Globals.AppState.Starting;
 
@@ -245,11 +256,13 @@ namespace FDAApp
                         return;
                 }
 
-                Globals.MQTT.Publish("FDA/DBType", Encoding.UTF8.GetBytes(DBType.ToUpper()),0,true);
+                
 
                 // start the DataAcqManager             
                 _dataAquisitionManager = new DataAcqManager(FDAID, dbManager, ExecutionID);
 
+                // watch for changes to the MQTTEnabled option
+                _dataAquisitionManager.MQTTEnableStatusChanged += _dataAquisitionManager_MQTTEnableStatusChanged;
 
                 if (_dataAquisitionManager.TestDBConnection())
                 {
@@ -281,14 +294,46 @@ namespace FDAApp
             }
         }
 
+        private static void _dataAquisitionManager_MQTTEnableStatusChanged(object sender, BoolEventArgs e)
+        {
+            bool mqttEnabled = e.Value;
+
+            if (mqttEnabled == Globals.MQTTEnabled) return;
+
+
+
+            Globals.MQTTEnabled = mqttEnabled;
+
+            if (mqttEnabled)
+            {
+                Globals.SystemManager.LogApplicationEvent(null,"","Enabling MQTT");
+                MQTTConnect("localhost");
+                Globals.SystemManager.LogApplicationEvent(null, "", "Starting Remote Query Manager");
+
+                ((DBManager)Globals.DBManager).StartRemoteQueryManager();
+                
+            }
+            else
+            {
+                Globals.SystemManager.LogApplicationEvent(null, "", "Disabling Remote Query Manager");
+                ((DBManager)Globals.DBManager).StopRemoteQueryManager();
+
+ 
+                if (Globals.MQTT != null)
+                    if (Globals.MQTT.IsConnected)
+                        Globals.MQTT.Disconnect(); 
+                Globals.MQTT = null;
+            }
+        }
+
         private static void _TCPServer_ClientDisconnected(object sender, TCPServer.ClientEventArgs e)
         {
             LogEvent("Client disconnected");
         }
 
         private static void _TCPServer_ClientConnected(object sender, TCPServer.ClientEventArgs e)
-        {
-            LogEvent("Client connected");
+        {        
+            LogEvent("TCP client connected on port " + _TCPServer.Port);
         }
 
         static private void MQTTConnect(object o)
@@ -344,6 +389,10 @@ namespace FDAApp
 
                 // publish the FDA identifier
                 //Globals.MQTT.Publish("FDA/identifier", Encoding.UTF8.GetBytes(FDAidentifier), 0, true);
+
+                // publish the DB type;
+                Globals.MQTT?.Publish("FDA/DBType", Encoding.UTF8.GetBytes(DBType.ToUpper()), 0, true);
+
 
                 // subscribe to FDAManager commands
                 Globals.MQTT.Subscribe(new string[] { "FDAManager/command" }, new byte[] { 0 });
@@ -473,7 +522,6 @@ namespace FDAApp
                 command = Encoding.UTF8.GetString(e.Data, 0, e.Data.Length - 1);
             }
 
-            LogEvent("Command received: " + command);
             switch (command.ToUpper())
             {
                 case "PING":
@@ -668,7 +716,7 @@ namespace FDAApp
 
 
             // unpublish FDA topics and set run status to "stopped"
-            if (Globals.MQTT != null)
+            if (Globals.MQTTEnabled && Globals.MQTT != null)
             {
                 if (Globals.MQTT.IsConnected)
                 {
@@ -689,7 +737,7 @@ namespace FDAApp
             Globals.SystemManager?.LogApplicationEvent(Globals.FDANow(), "FDA Application", "", "Shutting down System Manager");
             Globals.SystemManager?.Dispose();
 
-            if (Globals.MQTT != null)
+            if (Globals.MQTTEnabled && Globals.MQTT != null)
             {
                 if (Globals.MQTT.IsConnected)
                 {
@@ -709,13 +757,28 @@ namespace FDAApp
 
         static private void MQTT_ConnectionClosed(object sender, EventArgs e)
         {
-            Globals.SystemManager.LogApplicationEvent(null, "", "Disconnected from MQTT broker. Will attempt to reconnect every 5 seconds until connection is re-established");
+            if (Globals.MQTTEnabled)
+            {
+                Globals.SystemManager.LogApplicationEvent(null, "", "Disconnected from MQTT broker. Will attempt to reconnect every 5 seconds until connection is re-established");
 
 
-            if (MqttRetryTimer == null)
-                MqttRetryTimer = new System.Threading.Timer(MQTTConnect, null, 5000, 5000);
+                if (MqttRetryTimer == null)
+                    MqttRetryTimer = new System.Threading.Timer(MQTTConnect, null, 5000, 5000);
+                else
+                    MqttRetryTimer.Change(5000, 5000);
+            }
             else
-                MqttRetryTimer.Change(5000, 5000);
+            {
+                Globals.SystemManager.LogApplicationEvent(null, "", "Disconnected from MQTT broker");
+                if (FDAIsElevated)
+                {
+                    MQTTUtils.StopMosquittoService();
+                }
+                else
+                {
+                    Globals.SystemManager.LogApplicationEvent(null, "", "Unable to stop MQTT broker service, FDA not run as Administrator");
+                }
+            }
         }
 
 
@@ -757,8 +820,11 @@ namespace FDAApp
 
         static private void ReportUptime(object o)
         {
-            TimeSpan uptime = Globals.FDANow().Subtract(Globals.ExecutionTime);
-            Globals.MQTT.Publish("FDA/uptime", BitConverter.GetBytes(uptime.Ticks), 0, true);
+            if (Globals.MQTTEnabled)
+            {
+                TimeSpan uptime = Globals.FDANow().Subtract(Globals.ExecutionTime);
+                Globals.MQTT?.Publish("FDA/uptime", BitConverter.GetBytes(uptime.Ticks), 0, true);
+            }
         }
 
 

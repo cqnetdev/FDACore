@@ -115,8 +115,7 @@ namespace FDA
             Globals.SystemManager.LogApplicationEvent(this, "", "Initializing database manager");
 
             // start the remote query manager (handles queries from FDAManagers)
-            Globals.SystemManager.LogApplicationEvent(this, "", "Starting Remote Query Manager");
-            RemoteQueryManager = new RemoteQueryManager(this.GetType().Name,ConnectionString);
+            StartRemoteQueryManager();
 
 
             // get the last DB start time
@@ -124,6 +123,29 @@ namespace FDA
 
             _keepAliveTimer.Change(_DBKeepAliveRate, _DBKeepAliveRate);
         }
+
+        public void StartRemoteQueryManager()
+        {
+            if (Globals.MQTTEnabled)
+            {
+                if (RemoteQueryManager != null)
+                {
+                    StartRemoteQueryManager();
+                }
+
+                RemoteQueryManager = new RemoteQueryManager(this.GetType().Name, ConnectionString);
+            }
+        }
+
+        public void StopRemoteQueryManager()
+        {
+            if (RemoteQueryManager != null)
+            {
+                RemoteQueryManager.Dispose();
+            }
+            RemoteQueryManager = null;
+        }
+
 
         #region abstract functions
 

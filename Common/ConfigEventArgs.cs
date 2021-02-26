@@ -20,4 +20,14 @@ namespace Common
             ID = item;
         }
     }
+
+    public class BoolEventArgs : EventArgs
+    {
+        public bool Value;
+
+        public BoolEventArgs(bool value)
+        {
+            Value = value;
+        }
+    }
 }

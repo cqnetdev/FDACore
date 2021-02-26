@@ -64,6 +64,8 @@ namespace Common
 
         public static MqttClient MQTT { get; set; }
 
+        public static bool MQTTEnabled = false;
+
         public static int UTCOffset = 0;
 
         public enum RequesterType { Schedule, Demand, System };

@@ -170,7 +170,7 @@ namespace Common
 
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 
-                if (!(MQTTEnabled || MQTTalwaysPublishProperties.Contains(propertyName)))
+                if (!Globals.MQTTEnabled || !(MQTTEnabled || MQTTalwaysPublishProperties.Contains(propertyName)))
                     return;
 
                 if (Globals.MQTT != null)

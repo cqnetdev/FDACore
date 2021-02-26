@@ -10,9 +10,12 @@ using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using Npgsql;
+using System.Diagnostics;
+using System.Threading;
+
 namespace FDA
 {
-    public class RemoteQueryManager
+    public class RemoteQueryManager :IDisposable
     {
     
         private string _connString;
@@ -21,6 +24,8 @@ namespace FDA
         private static string _createStoredProc = "";
 
         private readonly string _DBManagerType;
+
+        private List<BackgroundWorker> currentWorkers;
  
         public RemoteQueryManager(string dbType, string connString)
         {
@@ -28,9 +33,9 @@ namespace FDA
             _connString = connString;
             Globals.MQTT.Subscribe(new string[] { "DBQUERY/#" }, new byte[] { 0 });
             Globals.MQTT.MqttMsgPublishReceived += MQTT_MqttMsgPublishReceived;
-
-           
+            currentWorkers = new List<BackgroundWorker>();
         }
+
 
 
         public void DoCommsStats(List<object> commsStatsParams) // DateTime fromTime,DateTime ToTime,string outputtable="",string connectionfilter="", string devicefilter="",string description,string altoutput)
@@ -68,6 +73,7 @@ namespace FDA
             query += ",@saveOutput=1";
 
             BackgroundWorker worker = new BackgroundWorker();
+            lock (currentWorkers) { currentWorkers.Add(worker); }
 
             switch (_DBManagerType)
             {
@@ -98,6 +104,7 @@ namespace FDA
                 case "DBManagerSQL": worker.DoWork += Worker_DoWorkSQL; break;
             }
             worker.RunWorkerCompleted += Worker_RunWorkerCompleted;
+            lock (currentWorkers) { currentWorkers.Add(worker); }
             worker.RunWorkerAsync(new QueryParameters(topic[1],query));
         }
 
@@ -284,8 +291,32 @@ namespace FDA
 
             }
             worker.RunWorkerCompleted -= Worker_RunWorkerCompleted;
+            lock (currentWorkers) { currentWorkers.Remove(worker); }
             worker.Dispose();
             worker = null;
+        }
+
+        public void Dispose()
+        {
+            if (currentWorkers.Count > 0)
+            {
+                // let any active workers finish up (give them 5 seconds)
+                Stopwatch timer = new Stopwatch();
+                TimeSpan timeout = new TimeSpan(0, 0, 5);
+                timer.Start();
+                while (timer.Elapsed < timeout && currentWorkers.Count > 0)
+                {
+                    Thread.Sleep(100);
+                }
+                timer.Stop();
+                timer = null;
+            }
+
+            if (Globals.MQTT != null)
+            {
+                Globals.MQTT.Disconnect();
+                Globals.MQTT.MqttMsgPublishReceived -= MQTT_MqttMsgPublishReceived;
+            }
         }
 
         private class QueryParameters
