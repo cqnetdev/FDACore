@@ -30,6 +30,7 @@ namespace FDA
         System.Threading.Timer _timer;
         public static Exception LastError = null;
 
+        public int Port { get { return _listeningPort; } }
 
         public delegate void TCPCommandHandler(object sender, TCPCommandEventArgs e);
         public event TCPCommandHandler DataAvailable;
