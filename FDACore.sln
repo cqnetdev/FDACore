@@ -27,9 +27,9 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FDAManager", "FDAInterface\
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tests", "Tests\Tests.csproj", "{02CEA272-3757-42BC-B54A-81AB9B83D2AD}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ControllerService", "ControllerService\ControllerService.csproj", "{1A4714C9-A1D4-4400-9D9F-A8DCDCDA21E3}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FDAControllerService", "ControllerService\FDAControllerService.csproj", "{1A4714C9-A1D4-4400-9D9F-A8DCDCDA21E3}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FDAController", "FDAController\FDAController.csproj", "{9BEBA322-9F71-469C-B0A1-3B13AFF792E5}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FDAControllerGUI", "FDAController\FDAControllerGUI.csproj", "{9BEBA322-9F71-469C-B0A1-3B13AFF792E5}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

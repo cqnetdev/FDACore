@@ -103,8 +103,11 @@ namespace FDAInterface
         private TimeSpan UpTimespan;
         private enum DetailsType { Queue, Connection, None };
         internal MqttClient MQTT { get => _mqtt; set { _mqtt = value; 
-                if (_mqtt != null) { _mqtt.MqttMsgPublishReceived += MQTT_MqttMsgPublishReceived; SubscribeToFDATopics(null); 
+                if (_mqtt != null) { _mqtt.MqttMsgPublishReceived += MQTT_MqttMsgPublishReceived; _mqtt.ConnectionClosed += _mqtt_ConnectionClosed; SubscribeToFDATopics(null); 
                 } } }
+
+      
+
         private List<FDAConnection> _recent;
 
         /******************************************** CONSTRUCTOR / initialization ***************************************/
@@ -252,9 +255,9 @@ namespace FDAInterface
             else
             {
                 mqttStatus.Text = "MQTT Status: Connected";
-                btn_Connect.Enabled = false;
+                //btn_Connect.Enabled = false;
                 tb_activeFDA.Text = FDAName + " (" + host + ")";
-                FDAStatus.Text = "FDA Status: Stopped";
+                FDAStatus.Text = "FDA Status: Unknown";
                 startToolStripMenuItem.Enabled = true;
                 startwithConsoleToolStripMenuItem.Enabled = true;
 
@@ -279,6 +282,12 @@ namespace FDAInterface
             }
         }
 
+
+        private void _mqtt_ConnectionClosed(object sender, EventArgs e)
+        {
+            MQTTDisconnected();
+        }
+
         public void MQTTDisconnected()
         {
             if (Disposing || IsDisposed || closing)
@@ -291,7 +300,7 @@ namespace FDAInterface
             else
             {
                 mqttStatus.Text = "MQTT Status: Disconnected";
-                btn_Connect.Enabled = true;
+                //btn_Connect.Enabled = true;
             }
         }
 
@@ -503,9 +512,7 @@ namespace FDAInterface
 
         private void SubscribeToFDATopics(object o)
         {
-            MQTT?.Subscribe(new string[] { "FDA/version", "FDA/uptime", "FDA/connectionlist", "FDA/DBType" }, new byte[] { 0, 0, 0, 0 });
-
-           
+            MQTT?.Subscribe(new string[] { "FDA/version", "FDA/uptime", "FDA/connectionlist", "FDA/DBType" }, new byte[] { 0, 0, 0, 0 });         
         }
 
         private void UnsubscribeFDATopics()
@@ -714,11 +721,14 @@ namespace FDAInterface
             else
             {
                 tree.Nodes[0].Nodes.Clear();
-                Version.Text = "FDA Version:";
-                Uptime.Text = "FDA Runtime:";
-                //FDAStatus.Text = "FDA Status: Disconnected";
+                Version.Text = "FDA Version: unknown";
+                Uptime.Text = "FDA Runtime: unknown";
+                FDAStatus.Text = "FDA Status: unknown";
+                dbtypeDisplay.Text = "Database Type: unknown";
 
-                foreach(ConnectionNode connection in _connOverviewDict.Values)
+
+
+                foreach (ConnectionNode connection in _connOverviewDict.Values)
                 {
                     UnsubscribeConnectionDetails(connection.ID.ToString());
                     UnsubscribeConnectionStatus(connection.ID.ToString());
@@ -738,27 +748,28 @@ namespace FDAInterface
         /*************************************** user action handling (handle clicks)************************************************************/
         #region UserInteraction
 
-   /*     private void btnEditFDA_Click(object sender, EventArgs e)
-        {
-            frmEditFDAList editFDADlg = new frmEditFDAList(_FDAList);
+        /*     private void btnEditFDA_Click(object sender, EventArgs e)
+             {
+                 frmEditFDAList editFDADlg = new frmEditFDAList(_FDAList);
 
-            editFDADlg.ShowDialog();
+                 editFDADlg.ShowDialog();
 
-        }
-   */
-        // FDA Menu
+             }
+        */
+
+        //FDA Menu
         private void startToolStripMenuItem_Click(object sender, EventArgs e)
         {
             FDAManagerContext.SendStartFDACommand(null, new EventArgs());
-           // startwithConsoleToolStripMenuItem.Enabled = false;
-           // startToolStripMenuItem.Enabled = false;
-           // stopToolStripMenuItem.Enabled = true;
+            // startwithConsoleToolStripMenuItem.Enabled = false;
+            // startToolStripMenuItem.Enabled = false;
+            // stopToolStripMenuItem.Enabled = true;
         }
 
-        
+
         private void startwithConsoleToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            FDAManagerContext.SendStartFDAConsoleCommand(null, new EventArgs());
+            //FDAManagerContext.SendStartFDAConsoleCommand(null, new EventArgs());
             //startwithConsoleToolStripMenuItem.Enabled = false;
             //startToolStripMenuItem.Enabled = false;
             //stopToolStripMenuItem.Enabled = true;
@@ -1160,6 +1171,7 @@ namespace FDAInterface
                 pauseToolStripMenuItem.Text = "Pause FDA";
             }
         }
+
     }
   
  

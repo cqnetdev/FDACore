@@ -350,6 +350,9 @@ namespace FDAApp
                 var appConfig = configuration.GetSection(nameof(AppSettings));
                 string pass = Common.Encrypt.DecryptString(appConfig["MQTT"], "KrdXI6HhS3B8C0CulLtB");
 
+                if (Globals.MQTT.IsConnected)
+                    Globals.MQTT.Disconnect();
+
                 Globals.MQTT.Connect("FDA" + ExecutionID.ToString(), "FDA", pass);
                 if (Globals.MQTT.IsConnected)
                 {

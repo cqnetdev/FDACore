@@ -19,7 +19,7 @@ namespace FDAInterface
             InitializeComponent();
         }
 
-        private void btnSave_Click(object sender, EventArgs e)
+        private void btnConnect_Click(object sender, EventArgs e)
         {
             FDAConnection = tb_FDAName.Text + "|" + tb_host.Text;
             DialogResult = DialogResult.OK;

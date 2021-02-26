@@ -37,6 +37,7 @@
             this.FDAStatus = new System.Windows.Forms.ToolStripStatusLabel();
             this.Uptime = new System.Windows.Forms.ToolStripStatusLabel();
             this.mqttStatus = new System.Windows.Forms.ToolStripStatusLabel();
+            this.dbtypeDisplay = new System.Windows.Forms.ToolStripStatusLabel();
             this.menuStrip1 = new System.Windows.Forms.MenuStrip();
             this.fDAToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.connectToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -56,11 +57,9 @@
             this.tabQueues = new System.Windows.Forms.TabPage();
             this.qHist = new FDAInterface.QueueHistory();
             this.panel2 = new System.Windows.Forms.Panel();
-            this.btn_Connect = new System.Windows.Forms.Button();
             this.tb_activeFDA = new System.Windows.Forms.TextBox();
             this.label1 = new System.Windows.Forms.Label();
             this.tree = new System.Windows.Forms.TreeView();
-            this.dbtypeDisplay = new System.Windows.Forms.ToolStripStatusLabel();
             this.statusStrip1.SuspendLayout();
             this.menuStrip1.SuspendLayout();
             this.tabControl1.SuspendLayout();
@@ -93,9 +92,8 @@
             this.Version,
             this.FDAStatus,
             this.Uptime,
-            this.mqttStatus,
             this.dbtypeDisplay});
-            this.statusStrip1.Location = new System.Drawing.Point(0, 1014);
+            this.statusStrip1.Location = new System.Drawing.Point(0, 667);
             this.statusStrip1.Name = "statusStrip1";
             this.statusStrip1.Padding = new System.Windows.Forms.Padding(2, 0, 21, 0);
             this.statusStrip1.RightToLeft = System.Windows.Forms.RightToLeft.No;
@@ -108,30 +106,31 @@
             this.Version.BorderSides = System.Windows.Forms.ToolStripStatusLabelBorderSides.Right;
             this.Version.BorderStyle = System.Windows.Forms.Border3DStyle.Bump;
             this.Version.Name = "Version";
-            this.Version.Size = new System.Drawing.Size(117, 29);
-            this.Version.Text = "FDA Version:";
+            this.Version.Size = new System.Drawing.Size(195, 29);
+            this.Version.Text = "FDA Version: unknown";
             // 
             // FDAStatus
             // 
             this.FDAStatus.BorderSides = System.Windows.Forms.ToolStripStatusLabelBorderSides.Right;
             this.FDAStatus.BorderStyle = System.Windows.Forms.Border3DStyle.Bump;
             this.FDAStatus.Name = "FDAStatus";
-            this.FDAStatus.Size = new System.Drawing.Size(219, 29);
-            this.FDAStatus.Text = "FDA Status: Disconnected";
+            this.FDAStatus.Size = new System.Drawing.Size(185, 29);
+            this.FDAStatus.Text = "FDA Status: unknown";
             // 
             // Uptime
             // 
             this.Uptime.BorderSides = System.Windows.Forms.ToolStripStatusLabelBorderSides.Right;
             this.Uptime.BorderStyle = System.Windows.Forms.Border3DStyle.Bump;
             this.Uptime.Name = "Uptime";
-            this.Uptime.Size = new System.Drawing.Size(125, 29);
-            this.Uptime.Text = "FDA Runtime:";
+            this.Uptime.Size = new System.Drawing.Size(203, 29);
+            this.Uptime.Text = "FDA Runtime: unknown";
+           
             // 
-            // mqttStatus
+            // dbtypeDisplay
             // 
-            this.mqttStatus.Name = "mqttStatus";
-            this.mqttStatus.Size = new System.Drawing.Size(116, 29);
-            this.mqttStatus.Text = "MQTT Status:";
+            this.dbtypeDisplay.Name = "dbtypeDisplay";
+            this.dbtypeDisplay.Size = new System.Drawing.Size(132, 29);
+            this.dbtypeDisplay.Text = "Database Type:";
             // 
             // menuStrip1
             // 
@@ -143,7 +142,7 @@
             this.toolsToolStripMenuItem});
             this.menuStrip1.Location = new System.Drawing.Point(0, 0);
             this.menuStrip1.Name = "menuStrip1";
-            this.menuStrip1.Size = new System.Drawing.Size(1836, 38);
+            this.menuStrip1.Size = new System.Drawing.Size(1836, 36);
             this.menuStrip1.TabIndex = 22;
             this.menuStrip1.Text = "menuStrip1";
             // 
@@ -164,7 +163,6 @@
             this.connectToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.newConnectionToolStripMenuItem,
             this.recentToolStripMenuItem});
-            this.connectToolStripMenuItem.Enabled = false;
             this.connectToolStripMenuItem.Name = "connectToolStripMenuItem";
             this.connectToolStripMenuItem.Size = new System.Drawing.Size(281, 36);
             this.connectToolStripMenuItem.Text = "Connect";
@@ -246,10 +244,10 @@
             this.tabControl1.Controls.Add(this.tabQueues);
             this.tabControl1.Dock = System.Windows.Forms.DockStyle.Fill;
             this.tabControl1.ItemSize = new System.Drawing.Size(61, 20);
-            this.tabControl1.Location = new System.Drawing.Point(409, 38);
+            this.tabControl1.Location = new System.Drawing.Point(409, 36);
             this.tabControl1.Name = "tabControl1";
             this.tabControl1.SelectedIndex = 0;
-            this.tabControl1.Size = new System.Drawing.Size(1427, 976);
+            this.tabControl1.Size = new System.Drawing.Size(1427, 631);
             this.tabControl1.TabIndex = 37;
             // 
             // tabDetails
@@ -258,9 +256,9 @@
             this.tabDetails.Location = new System.Drawing.Point(4, 24);
             this.tabDetails.Name = "tabDetails";
             this.tabDetails.Padding = new System.Windows.Forms.Padding(3);
-            this.tabDetails.Size = new System.Drawing.Size(1419, 948);
+            this.tabDetails.Size = new System.Drawing.Size(1419, 603);
             this.tabDetails.TabIndex = 0;
-            this.tabDetails.Text = "Details";
+            this.tabDetails.Text = "Connection Details";
             this.tabDetails.UseVisualStyleBackColor = true;
             // 
             // panel1
@@ -273,7 +271,7 @@
             this.panel1.Dock = System.Windows.Forms.DockStyle.Fill;
             this.panel1.Location = new System.Drawing.Point(3, 3);
             this.panel1.Name = "panel1";
-            this.panel1.Size = new System.Drawing.Size(1413, 942);
+            this.panel1.Size = new System.Drawing.Size(1413, 597);
             this.panel1.TabIndex = 38;
             // 
             // connDetails
@@ -294,7 +292,7 @@
             this.tabQueues.Location = new System.Drawing.Point(4, 24);
             this.tabQueues.Name = "tabQueues";
             this.tabQueues.Padding = new System.Windows.Forms.Padding(3);
-            this.tabQueues.Size = new System.Drawing.Size(1419, 948);
+            this.tabQueues.Size = new System.Drawing.Size(1419, 601);
             this.tabQueues.TabIndex = 1;
             this.tabQueues.Text = "Queues";
             this.tabQueues.UseVisualStyleBackColor = true;
@@ -307,30 +305,19 @@
             this.qHist.Margin = new System.Windows.Forms.Padding(6, 8, 6, 8);
             this.qHist.Name = "qHist";
             this.qHist.Priority = 0;
-            this.qHist.Size = new System.Drawing.Size(1413, 942);
+            this.qHist.Size = new System.Drawing.Size(1413, 595);
             this.qHist.TabIndex = 34;
             // 
             // panel2
             // 
-            this.panel2.Controls.Add(this.btn_Connect);
             this.panel2.Controls.Add(this.tb_activeFDA);
             this.panel2.Controls.Add(this.label1);
             this.panel2.Controls.Add(this.tree);
             this.panel2.Dock = System.Windows.Forms.DockStyle.Left;
-            this.panel2.Location = new System.Drawing.Point(0, 38);
+            this.panel2.Location = new System.Drawing.Point(0, 36);
             this.panel2.Name = "panel2";
-            this.panel2.Size = new System.Drawing.Size(409, 976);
+            this.panel2.Size = new System.Drawing.Size(409, 631);
             this.panel2.TabIndex = 38;
-            // 
-            // btn_Connect
-            // 
-            this.btn_Connect.Location = new System.Drawing.Point(10, 16);
-            this.btn_Connect.Name = "btn_Connect";
-            this.btn_Connect.Size = new System.Drawing.Size(102, 38);
-            this.btn_Connect.TabIndex = 34;
-            this.btn_Connect.Text = "Connect";
-            this.btn_Connect.UseVisualStyleBackColor = true;
-            this.btn_Connect.Click += new System.EventHandler(this.btn_Connect_Click);
             // 
             // tb_activeFDA
             // 
@@ -340,7 +327,6 @@
             this.tb_activeFDA.Size = new System.Drawing.Size(380, 26);
             this.tb_activeFDA.TabIndex = 33;
             this.tb_activeFDA.Text = "Not connected";
-            this.tb_activeFDA.Visible = false;
             // 
             // label1
             // 
@@ -350,7 +336,6 @@
             this.label1.Size = new System.Drawing.Size(124, 20);
             this.label1.TabIndex = 32;
             this.label1.Text = "Connected FDA";
-            this.label1.Visible = false;
             // 
             // tree
             // 
@@ -369,22 +354,16 @@
             this.tree.Nodes.AddRange(new System.Windows.Forms.TreeNode[] {
             treeNode1});
             this.tree.SelectedImageIndex = 0;
-            this.tree.Size = new System.Drawing.Size(384, 888);
+            this.tree.Size = new System.Drawing.Size(384, 545);
             this.tree.StateImageList = this.imageList1;
             this.tree.TabIndex = 31;
             this.tree.AfterSelect += new System.Windows.Forms.TreeViewEventHandler(this.tree_AfterSelect);
-            // 
-            // dbtypeDisplay
-            // 
-            this.dbtypeDisplay.Name = "dbtypeDisplay";
-            this.dbtypeDisplay.Size = new System.Drawing.Size(132, 29);
-            this.dbtypeDisplay.Text = "Database Type:";
             // 
             // frmMain2
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(9F, 20F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(1836, 1050);
+            this.ClientSize = new System.Drawing.Size(1836, 703);
             this.Controls.Add(this.tabControl1);
             this.Controls.Add(this.panel2);
             this.Controls.Add(this.statusStrip1);
@@ -439,7 +418,6 @@
         private System.Windows.Forms.ToolStripMenuItem recentToolStripMenuItem;
         private System.Windows.Forms.TextBox tb_activeFDA;
         private System.Windows.Forms.Label label1;
-        private System.Windows.Forms.Button btn_Connect;
         private System.Windows.Forms.ToolStripStatusLabel mqttStatus;
         private System.Windows.Forms.ToolStripStatusLabel dbtypeDisplay;
     }
