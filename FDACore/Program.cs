@@ -95,15 +95,6 @@ namespace FDAApp
 
             Thread.Sleep(5000);
 
-            /*
-            for (int i = 0; i < 500;i++)
-            {
-                Thread.Sleep(10);
-            }
-            */
-
-            OperationalMessageServer.WriteLine("First operational message (test)");
-
             if (Environment.OSVersion.Platform == PlatformID.Unix)
             {
                 Globals.ConsoleMode = args.Contains("-console");
