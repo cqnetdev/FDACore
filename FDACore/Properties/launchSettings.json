@@ -2,7 +2,7 @@
   "profiles": {
     "FDACore": {
       "commandName": "Project",
-      "commandLineArgs": "-show"
+      "commandLineArgs": "-console"
     }
   }
 }

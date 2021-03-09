@@ -20,7 +20,6 @@
     <ProjectReference Include="..\Common\Common.csproj" />
     <ProjectReference Include="..\DataAquistionManagar\DataAquisitionManagar.csproj" />
     <ProjectReference Include="..\DBManager\DBManager.csproj" />
-    <ProjectReference Include="..\TCPServer\TCPServer.csproj" />
   </ItemGroup>
 
   <ItemGroup>

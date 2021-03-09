@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using System.ComponentModel;
 using System.Net;
 using System.Net.Sockets;
+using Common;
 using System.Threading;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.IO;
@@ -29,6 +30,8 @@ namespace FDA
         System.Threading.Timer _timer;
         public static Exception LastError = null;
 
+        public int Port { get { return _listeningPort; } }
+        public int ClientCount { get { return _clients.Count; } }
 
         public delegate void TCPCommandHandler(object sender, TCPCommandEventArgs e);
         public event TCPCommandHandler DataAvailable;
@@ -71,63 +74,36 @@ namespace FDA
         public void Start()
         {
             _server.Start();
-            Console.WriteLine("Listening for TCP connections on port " + _listeningPort);
+
+            //Globals.SystemManager.LogApplicationEvent(this, "", "Listening for TCP connections on port " + _listeningPort);
             _timer = new System.Threading.Timer(CheckRecieved);
             _timer.Change(_tickRate, Timeout.Infinite);
         }
 
         public bool Send(Guid clientID, string message)
         {
-            if (!_clients.ContainsKey(clientID))
-                return false; // client doesn't exist, can't send anything to it
-            /*
-            byte dataType;
-            byte[] dataBlock = new byte[0];
+            bool broadcast = (clientID == Guid.Empty);   // Guid.Empty = broadcast to all clients 
 
-            Type objectType = message.GetType();
+            //if (!_clients.ContainsKey(clientID) && !broadcast)
+            //    return false; // client doesn't exist, can't send anything to it
 
-            if (objectType == typeof(string))
+            if (broadcast)
             {
-                dataBlock = Encoding.UTF8.GetBytes((string)message);
-                dataType = 0; // ASCII = 0;
+                foreach (Client client in _clients.Values)
+                {
+                    lock (client.SendQueue)
+                    {
+                        client.SendQueue.Enqueue(Encoding.UTF8.GetBytes(message));
+                    }
+                }
             }
             else
-            {
-                if (objectType == typeof(long))
-                {
-                    dataBlock = BitConverter.GetBytes((long)message);
-                    dataType = 1;  // Long = 1
-                }
-                else
-                {
-                    BinaryFormatter bf = new BinaryFormatter();
-                    using (var ms = new MemoryStream())
-                    {
-                        bf.Serialize(ms, message);
-                        dataBlock = ms.ToArray();
-                    }
-                    dataType = 2; // Binary = 2
-                }
-            }
-
-            byte[] header = new byte[3];
-            Array.Copy(BitConverter.GetBytes((ushort)dataBlock.Length), 0, header, 0, 2);
-            header[2] = dataType;
-
-            byte[] toSend = new byte[header.Length + dataBlock.Length];
-
-            Array.Copy(header, toSend, header.Length);
-            Array.Copy(dataBlock, 0, toSend, header.Length, dataBlock.Length);
-            */
-
-            byte[] toSend = Encoding.UTF8.GetBytes(message);
-
             if (_clients.ContainsKey(clientID))
             {
                 Client client = _clients[clientID];
                 lock (client.SendQueue)
                 {
-                    client.SendQueue.Enqueue(toSend);
+                    client.SendQueue.Enqueue(Encoding.UTF8.GetBytes(message));
                 }
             }
             else
@@ -139,6 +115,11 @@ namespace FDA
         protected virtual void CheckRecieved(Object o)
         {
             _timer.Change(Timeout.Infinite, Timeout.Infinite);
+            /*
+            if (Globals.FDAStatus != Globals.AppState.Normal)
+            {
+                goto ResetTimer;
+            }*/
 
             // check for pending connections
             if (_server.Pending())
@@ -171,6 +152,7 @@ namespace FDA
                 }
             }
 
+            //ResetTimer:
             _timer.Change(_tickRate, Timeout.Infinite);
         }
 
@@ -250,6 +232,7 @@ namespace FDA
                         */
 
                         byte[] readBuffer = new byte[65535];
+                        byte[] messageArray;
                         byte[] header = new byte[3];
                         int readSize;
                         int dataSize;
@@ -265,11 +248,13 @@ namespace FDA
                                 // read the data portion of the message
                                 //readBuffer = new byte[dataSize];
                                 readSize = stream.Read(readBuffer, 0, readBuffer.Length);
-                                Array.Resize(ref readBuffer, readSize);
+                                messageArray = new byte[readSize];
+                                Array.Copy(readBuffer, messageArray,readSize);
+                                //Array.Resize(ref readBuffer, readSize);
 
                                 lock (ReceivedQueue)
                                 {
-                                    ReceivedQueue.Enqueue(readBuffer);
+                                    ReceivedQueue.Enqueue(messageArray);
                                 }
                             }
 

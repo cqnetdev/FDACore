@@ -1,23 +1,26 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-
 namespace Common
 {
-  
-
-
-
-    public static class Console2
+    public static class OperationalMessageServer
     {
         private static readonly StringBuilder _sb = new StringBuilder();
         private static volatile CancellationTokenSource _cts;
         private static int _count;
         private static int _flushRate = 500;
+
+        private static FDA.TCPServer _TCPServer;
+       
+
+        public static void Start()
+        {
+            _TCPServer = FDA.TCPServer.NewTCPServer(9573);
+            _TCPServer.Start();
+        }
 
         public static void Write(string value)
         {
@@ -30,13 +33,17 @@ namespace Common
             ScheduleFlush();
         }
         public static void WriteLine(string value)
-            => Write(value + Environment.NewLine);
-
+        {
+            Write(value + Environment.NewLine);
+        }
         public static void WriteLine(string format, params object[] args)
-            => Write(format + Environment.NewLine, args);
-
+        {
+            Write(format + Environment.NewLine, args);
+        }
         public static void WriteLine()
-            => WriteLine("");
+        {
+            WriteLine("");
+        }
 
         private static void ScheduleFlush()
         {
@@ -68,7 +75,9 @@ namespace Common
                 text = _sb.ToString();
                 _sb.Clear();
             }
-            Console.Write(text);
+
+            //Console.Write(text);
+            _TCPServer.Send(Guid.Empty, text);
         }
     }
 }

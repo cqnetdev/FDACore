@@ -35,6 +35,7 @@ namespace FDAController
             this.lblControllerService = new System.Windows.Forms.Label();
             this.lblFDA = new System.Windows.Forms.Label();
             this.lblMQTT = new System.Windows.Forms.Label();
+            this.btnStartConsole = new System.Windows.Forms.Button();
             this.SuspendLayout();
             // 
             // btnStart
@@ -43,17 +44,17 @@ namespace FDAController
             this.btnStart.Name = "btnStart";
             this.btnStart.Size = new System.Drawing.Size(174, 100);
             this.btnStart.TabIndex = 0;
-            this.btnStart.Text = "Start";
+            this.btnStart.Text = "Start FDA";
             this.btnStart.UseVisualStyleBackColor = true;
             this.btnStart.Click += new System.EventHandler(this.btnStart_Click);
             // 
             // btnStop
             // 
-            this.btnStop.Location = new System.Drawing.Point(222, 49);
+            this.btnStop.Location = new System.Drawing.Point(210, 49);
             this.btnStop.Name = "btnStop";
             this.btnStop.Size = new System.Drawing.Size(174, 100);
             this.btnStop.TabIndex = 1;
-            this.btnStop.Text = "Stop";
+            this.btnStop.Text = "Stop FDA";
             this.btnStop.UseVisualStyleBackColor = true;
             this.btnStop.Click += new System.EventHandler(this.btnStop_Click);
             // 
@@ -87,23 +88,35 @@ namespace FDAController
             // lblMQTT
             // 
             this.lblMQTT.AutoSize = true;
-            this.lblMQTT.Location = new System.Drawing.Point(34, 253);
+            this.lblMQTT.Location = new System.Drawing.Point(30, 253);
             this.lblMQTT.Name = "lblMQTT";
             this.lblMQTT.Size = new System.Drawing.Size(52, 20);
             this.lblMQTT.TabIndex = 5;
             this.lblMQTT.Text = "MQTT";
+            // 
+            // btnStartConsole
+            // 
+            this.btnStartConsole.Location = new System.Drawing.Point(535, 49);
+            this.btnStartConsole.Name = "btnStartConsole";
+            this.btnStartConsole.Size = new System.Drawing.Size(174, 100);
+            this.btnStartConsole.TabIndex = 6;
+            this.btnStartConsole.Text = "Start FDA in console (debug) mode";
+            this.btnStartConsole.UseVisualStyleBackColor = true;
+            this.btnStartConsole.Click += new System.EventHandler(this.btnStartConsole_Click);
             // 
             // frmMain
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(9F, 20F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(742, 400);
+            this.Controls.Add(this.btnStartConsole);
             this.Controls.Add(this.lblMQTT);
             this.Controls.Add(this.lblFDA);
             this.Controls.Add(this.lblControllerService);
             this.Controls.Add(this.lblLastupdate);
             this.Controls.Add(this.btnStop);
             this.Controls.Add(this.btnStart);
+            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.Fixed3D;
             this.Name = "frmMain";
             this.Text = "FDA Controller";
             this.ResumeLayout(false);
@@ -119,6 +132,7 @@ namespace FDAController
         private System.Windows.Forms.Label lblControllerService;
         private System.Windows.Forms.Label lblFDA;
         private System.Windows.Forms.Label lblMQTT;
+        private System.Windows.Forms.Button btnStartConsole;
     }
 }
 

@@ -459,7 +459,6 @@ namespace Common
         }
 
 
-        // SQL Server Version
 
     
          
@@ -475,11 +474,17 @@ namespace Common
 
         public void LogApplicationError(DateTime timestamp, Exception ex, string description = "")
         {
-            // temporary: display it in the console too
-            if (Globals.ConsoleMode)
+            string eventText = Helpers.FormatDateTime(timestamp) + ": " + ex.Message + ", " + description;
+            
+            // display it in the console if we're in interactive mode
+            if (Environment.UserInteractive)
             {
-                Console.WriteLine(Helpers.FormatDateTime(timestamp) + ": " + ex.Message + ", " + description);
+                Console.WriteLine(eventText);
             }
+
+            // send it to any terminal clients
+            OperationalMessageServer.WriteLine(eventText);
+
             //    description = description.Replace("'", "''");
 
             // log application error events
@@ -510,13 +515,22 @@ namespace Common
             if (detailed && !Globals.DetailedMessaging)
                 return;
 
+            string eventText = Helpers.FormatDateTime(timestamp) + ": " + objectType + "(" + objectName + "), " + description;
             if (Globals.ConsoleMode)
             {
-                Console.WriteLine(Helpers.FormatDateTime(timestamp) + ": " + objectType + "(" + objectName + "), " + description);
+                // write it to the console
+                if (Environment.UserInteractive)
+                {
+                    Console.WriteLine(eventText);
+                }
+
+                // send it to any terminal clients
+                OperationalMessageServer.WriteLine(eventText);
             }
 
             //description = description.Replace("'", "''");
 
+            // write it to the database
             EventLogItem ELI = new EventLogItem(timestamp, objectType, objectName, description, configError);
 
             lock (_eventLogInputBuffer)

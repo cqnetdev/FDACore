@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Data;
 using System.Diagnostics;
 using System.Drawing;
+using System.IO;
 using System.Linq;
 using System.Net.Sockets;
 using System.Text;
@@ -15,7 +16,7 @@ namespace FDAController
     public partial class frmMain : Form
     {
         private Color GoodColor = Color.Green;
-        private Color WarningColor = Color.Gold;
+        private Color WarningColor = Color.Blue;
         private Color BadColor = Color.Red;
         private int _controllerPort = 9571;
         private string _controllerIP = "127.0.0.1";
@@ -36,12 +37,12 @@ namespace FDAController
         {
             string result;
             string status;
-            Color textcolor = Color.Green;
+            Color textcolor = GoodColor;
 
             // is the controller service running?
-            if (ProcessRunning("ControllerService"))
+            if (ProcessRunning("FDAController"))
             {
-                status = "FDA Controller service is running";
+                status = "FDAController service is running";
                 textcolor = GoodColor;
 
                 // is the controller responsive to requests?
@@ -55,14 +56,15 @@ namespace FDAController
                     status += " but is not responsive";
                     textcolor = WarningColor;
                 }
-
             }
             else
             {
                 status = "FDA Controller service is not running";
+                textcolor = BadColor;
                 btnStop.Enabled = false;
                 btnStart.Enabled = false;
-                textcolor = Color.Red;
+                btnStartConsole.Enabled = false;
+                
             }
             lblControllerService.Text = status;
             lblControllerService.ForeColor = textcolor;
@@ -84,21 +86,32 @@ namespace FDAController
             if (ProcessRunning("FDACore"))
             {
                 _isStarting = false;
-                status = "FDA service is running";
+                status = "FDACore is running";
                 textcolor = GoodColor;
                 if (!_isStopping)
                 {
                     btnStop.Enabled = true;
                 }
                 btnStart.Enabled = false;
+                btnStartConsole.Enabled = false;
                 btnStart.Text = "Start";
+
+                // ask the FDA controller for the FDA's run mode (background or console)
+                result = SendRequest(_controllerIP, _controllerPort, "RUNMODE");
+                if (result != "")
+                {
+                    status += " in " + result + " mode";
+                }
 
                 // ask the FDA controller for the FDA's current queue count (serves as an 'FDA is responsive' test)
                 result = SendRequest(_controllerIP, _controllerPort, "TOTALQUEUECOUNT");
                 int count;
                 if (int.TryParse(result, out count))
                 {
-                    status += ", " + count + " items in the communications queues";
+                    if (count > -1)
+                    {
+                        status += ", " + count + " items in the communications queues";
+                    }
                 }
                 else
                 {
@@ -108,7 +121,7 @@ namespace FDAController
             }
             else
             {
-                status = "The FDA is not running";
+                status = "FDACore is not running";
                 textcolor = BadColor;
                 if (_isStopping)
                 {
@@ -120,6 +133,7 @@ namespace FDAController
                 {
                     btnStart.Enabled = true;
                     btnStart.Text = "Start";
+                    btnStartConsole.Enabled = true;
                 }
                 
             }
@@ -142,9 +156,11 @@ namespace FDAController
                 try
                 {
                     client.Connect(address, port);
+                    client.GetStream().WriteTimeout = 1000;
+                    client.GetStream().ReadTimeout = 1000;
                 } catch (Exception ex)
                 {
-                    return "failed to connect to FDA";
+                    return "";
                 }
 
                 // send the request
@@ -154,10 +170,19 @@ namespace FDAController
                     client.GetStream().Write(requestBytes, 0, requestBytes.Length);
                 } catch (Exception ex)
                 {
-                    return "failed to send the request to the FDA";
+                    client.Close();
+                    return "";
                 }
 
-                bytesRead = client.GetStream().Read(buffer, 0, buffer.Length);
+                try
+                {
+                    bytesRead = client.GetStream().Read(buffer, 0, buffer.Length);
+                } catch (Exception ex)
+                {
+                    client.Close();
+                    return "";
+                }
+
                 client.Close();
 
             }
@@ -168,28 +193,38 @@ namespace FDAController
             return Encoding.UTF8.GetString(response);
         }
 
+        private void btnStartConsole_Click(object sender, EventArgs e)
+        {
+            StartFDA("-console");
+        }
+
         private void btnStart_Click(object sender, EventArgs e)
         {
+            StartFDA("");
+        }
 
+        private void StartFDA(string args)
+        {
             // instead of sending the start command to the FDAController like we do in linux (because the FDA is a service)
             // we can just run the FDA directly from here
             _isStarting = true;
             btnStart.Enabled = false;
-            RunConsoleCommand("FDACore.exe","","C:\\FDA\\");
+            btnStartConsole.Enabled = false;
+            string applicationDir = System.IO.Path.GetDirectoryName(System.Windows.Forms.Application.ExecutablePath);
 
-
-            /*
-            string response = SendRequest(_controllerIP, _controllerPort, "start");
-            if (response != "OK")
+            if (File.Exists("FDACore.exe"))
+                RunConsoleCommand("cmd.exe","/c FDACore.exe " + args, applicationDir);
+            else
             {
-                MessageBox.Show("Failed to start the FDA: " + response);
+                MessageBox.Show("FDA executable not found in the current folder \"" + applicationDir + "\\FDACore.exe");
             }
-            */
+
         }
 
         private void btnStop_Click(object sender, EventArgs e)
         {
             btnStart.Enabled = false;
+            btnStartConsole.Enabled = false;
             btnStop.Enabled = false;
 
 
@@ -208,29 +243,34 @@ namespace FDAController
 
         private static void RunConsoleCommand(string command, string args, string workingDir = "")
         {
-            var processStartInfo = new ProcessStartInfo()
+            try
             {
-                FileName = command,
-                Arguments = args,
-                RedirectStandardOutput = false,
-                RedirectStandardError = false,
-                UseShellExecute = true,
-                CreateNoWindow = false,
-            };
+                var processStartInfo = new ProcessStartInfo()
+                {
+                    FileName = command,
+                    Arguments = args,
+                    RedirectStandardOutput = false,
+                    RedirectStandardError = false,
+                    UseShellExecute = true,
+                    CreateNoWindow = false,
+                };
 
-            if (workingDir != "")
-                processStartInfo.WorkingDirectory = workingDir;
+                if (workingDir != "")
+                    processStartInfo.WorkingDirectory = workingDir;
 
-            var process = new Process();
-            process.StartInfo = processStartInfo;
+                var process = new Process();
+                process.StartInfo = processStartInfo;
 
 
-            process.Start();
-            //string output = process.StandardOutput.ReadToEnd();
-            //string error = process.StandardError.ReadToEnd();
+                process.Start();
+                //string output = process.StandardOutput.ReadToEnd();
+                //string error = process.StandardError.ReadToEnd();
 
-            //process.WaitForExit();
-
+                //process.WaitForExit();
+            } catch (Exception ex)
+            {
+                MessageBox.Show("Failed execute command '" + command + "', " + ex.Message);
+            }
             return;
 
             //if (string.IsNullOrEmpty(error)) { return output; }
@@ -243,6 +283,7 @@ namespace FDAController
             return (self && proc.Length > 1) || (!self && proc.Length > 0);
         }
 
+     
     }
 }
 

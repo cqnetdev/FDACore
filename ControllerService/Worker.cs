@@ -33,17 +33,22 @@ namespace ControllerService
             {
                 if (!(new System.Security.Principal.WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator)))
                 {
-                    _logger.Log(LogLevel.Warning, "FDAController service not running in administrator mode.The service must run as administrator to be able to start the FDA service", new object[] { });
+                    _logger.Log(LogLevel.Warning, "Warning: FDAController service not running in administrator mode.The service must run as administrator to be able to start the FDA as an administrator", new object[] { });
                 }
             }
+            
 
+            // listens for basic services requests (start/stop FDA, etc)
+            Globals.BasicServicesServer = new BasicServicesServer(9571,_logger);
+            Globals.BasicServicesServer.Start();
 
-            Globals.Server = new ControllerServer(9571,_logger);
-            Globals.Server.Start();
+            // connects to the FDA on the control port
+            Globals.BasicServicesClient = new BasicServicesClient(9572,_logger);
+            Globals.BasicServicesClient.Start();
 
-
-            Globals.FDAClient = new FDAClient(9572,_logger);
-            Globals.FDAClient.Start();
+            // connects to the FDA on the operational messages port, receives any messages that the FDA posts, and forwards them to clients on operational messages passthrough port
+            Globals.OMPassthrough = new OMPassthough(9573, 9570, _logger);
+            Globals.OMPassthrough.Start();
 
             while (!stoppingToken.IsCancellationRequested)
             {               

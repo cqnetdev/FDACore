@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging;
 
 namespace ControllerService
 {
-    class FDAClient : IDisposable
+    class BasicServicesClient : IDisposable
     {
         private ILogger<Worker> _logger;
         private TcpClient _FDA;
@@ -18,10 +18,11 @@ namespace ControllerService
         private int _port;
         private Queue<string> _sendQueue;
         public int FDAQueueCount;
+        public string FDAMode = "";
 
         private BackgroundWorker _bgWorker;
 
-        public FDAClient(int port,ILogger<Worker> logger)
+        public BasicServicesClient(int port,ILogger<Worker> logger)
         {
             _logger = logger;
             _FDA = new TcpClient();
@@ -64,8 +65,10 @@ namespace ControllerService
             {
                 if (!_FDA.Connected)
                 {
-                    Connect();
+                    FDAMode = "";
+                    Connect(e);
                 }
+              
 
                 while (_sendQueue.Count > 0)
                 {
@@ -75,18 +78,26 @@ namespace ControllerService
                 }
 
                 if (stopwatch.ElapsedMilliseconds >= 3000)
-                {
+                {              
                     // Get the current queue count from the FDA
                     responseStr = DoTransaction("TOTALQUEUECOUNT\0");
-
+                    _logger.LogInformation("Total Queue count received: " + responseStr);
                     if (int.TryParse(responseStr, out qCount))
                     {
                         FDAQueueCount = qCount;
-                        stopwatch.Reset();
-                        stopwatch.Start();
                     }
-                }
 
+                    // get the FDA run mode if we don't already know it (only need to get this once)
+                    if (FDAMode == "")
+                    {
+                        FDAMode = DoTransaction("RUNMODE\0");
+                        _logger.LogInformation("Run mode received: " + FDAMode);
+                    }
+
+                    stopwatch.Reset();
+                    stopwatch.Start();
+                }
+                
                 Thread.Sleep(250);
             }
         }
@@ -100,7 +111,7 @@ namespace ControllerService
             string responseStr;
 
             if (!_FDA.Connected)
-                return "no response";
+                return "not connected";
 
             try
             {
@@ -122,16 +133,16 @@ namespace ControllerService
             return responseStr;
         }
 
-        private void Connect()
+        private void Connect(DoWorkEventArgs e)
         {
             _FDA?.Dispose();
             _FDA = new TcpClient();
             string logmessage = "";
-            while (!_FDA.Connected)
+            while (!_FDA.Connected && !e.Cancel)
             {
                 try
                 {
-                    logmessage = "Attempting to connect to FDA...";
+                    logmessage = "Attempting to connect to FDA on port " + _port + "...";
                     _FDA.Connect("127.0.0.1", _port);
                 }
                 catch
@@ -142,10 +153,12 @@ namespace ControllerService
                 Thread.Sleep(3000);
             }
 
-            FDAstream = _FDA.GetStream();
-            logmessage += "success";
-            _logger.LogInformation(logmessage);
-
+            if (_FDA.Connected)
+            {
+                FDAstream = _FDA.GetStream();
+                logmessage += "success";
+                _logger.LogInformation(logmessage);
+            }
         }
 
         public void Start()

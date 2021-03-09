@@ -3,13 +3,13 @@ using System.Collections.Generic;
 using System.Text;
 using System.Net.Sockets;
 
+
 namespace ControllerService
 {
     class Globals
     {
-        public static ControllerServer Server;
-        public static FDAClient FDAClient;
-
-
+        public static BasicServicesServer BasicServicesServer;
+        public static BasicServicesClient BasicServicesClient;
+        public static OMPassthough OMPassthrough;
     }
 }

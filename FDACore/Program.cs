@@ -20,9 +20,8 @@ namespace FDAApp
     static class Program
     {
         static DataAcqManager _dataAquisitionManager;
-        static TCPServer _TCPServer;
-        //SubscriptionManager _subscriptionManager;
-        //List<Guid> elevatedClients;
+        static TCPServer _FDAControlServer;
+
 
         static public bool InitSuccess { get; }
 
@@ -42,7 +41,7 @@ namespace FDAApp
             static string SQLServerInstance { get; set; }
         }
         
-        /* not .NET Core compatible
+        /* not .NET Core compatible */
         static private class NativeMethods
         {
             public const int SW_HIDE = 0;
@@ -56,12 +55,12 @@ namespace FDAApp
             [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
             [DllImport("user32.dll")] public static extern int DeleteMenu(IntPtr hMenu, int nPosition, int wFlags);
             [DllImport("user32.dll")] public static extern IntPtr GetSystemMenu(IntPtr hWnd, bool bRevert);
-            [DllImport("kernel32.dll", SetLastError = true)] public static extern bool SetConsoleCtrlHandler(ConsoleEventDelegate callback, bool add);
+            //[DllImport("kernel32.dll", SetLastError = true)] public static extern bool SetConsoleCtrlHandler(ConsoleEventDelegate callback, bool add);
             [DllImport("kernel32.dll", SetLastError = true)] public static extern bool GetConsoleMode(IntPtr hConsoleHandle, out int lpMode);
             [DllImport("kernel32.dll", SetLastError = true)] public static extern bool SetConsoleMode(IntPtr hConsoleHandle, int ioMode);
             [DllImport("Kernel32.dll", SetLastError = true)] public static extern IntPtr GetStdHandle(int nStdHandle);
         }
-        */
+        
 
               
 
@@ -75,71 +74,130 @@ namespace FDAApp
         [STAThread]
         static void Main(string[] args)
         {
-            /* not .NET Core compatible
-            // hide the console window if the -show command line option is not specified
-            if (!args.Contains("-show"))
+            Console.WriteLine("Starting the basic services control port server");
+            _FDAControlServer = TCPServer.NewTCPServer(9572);
+            if (_FDAControlServer != null)
             {
-                var handle = NativeMethods.GetConsoleWindow();
-                NativeMethods.ShowWindow(handle, NativeMethods.SW_HIDE);
-                Globals.ConsoleMode = false;
+                _FDAControlServer.DataAvailable += TCPServer_DataAvailable;
+                _FDAControlServer.ClientDisconnected += _TCPServer_ClientDisconnected;
+                _FDAControlServer.ClientConnected += _TCPServer_ClientConnected;
+                _FDAControlServer.Start();
             }
             else
             {
-                
-                Globals.ConsoleMode = true;
+                Globals.SystemManager.LogApplicationError(Globals.FDANow(), TCPServer.LastError, "Error occurred while initializing the Basic Services Control Port Server");
+            }
 
-                // the console window is shown, we need to change some settings
+            Console.WriteLine("Starting the operational messages streaming server");
+            OperationalMessageServer.Start();
 
-                IntPtr conHandle = NativeMethods.GetConsoleWindow();
+            Console.WriteLine("Waiting five seconds to allow clients to connect to the BSCP or OMSP ports");
 
-                //disable the window close button(X)
-                NativeMethods.DeleteMenu(NativeMethods.GetSystemMenu(conHandle, false), NativeMethods.SC_CLOSE, NativeMethods.MF_BYCOMMAND);
+            Thread.Sleep(5000);
 
-                // disable quick edit mode (this causes the app to pause when the user clicks in the console window)             
-                int mode;
-                IntPtr stdHandle = NativeMethods.GetStdHandle(NativeMethods.STD_INPUT_HANDLE);
-                if (!NativeMethods.GetConsoleMode(stdHandle, out mode))
-                {
-                    // error getting the console mode
-                    Console.WriteLine("Error retrieving console mode");
-                }
-                mode = mode & ~(NativeMethods.QuickEditMode | NativeMethods.ExtendedFlags);
-                if (!NativeMethods.SetConsoleMode(stdHandle, mode))
-                {
-                    // error setting console mode.
-                    Console.WriteLine("Error setting console mode");
-                }
+            /*
+            for (int i = 0; i < 500;i++)
+            {
+                Thread.Sleep(10);
             }
             */
 
-            Globals.ConsoleMode = true;
+            OperationalMessageServer.WriteLine("First operational message (test)");
 
+            if (Environment.OSVersion.Platform == PlatformID.Unix)
+            {
+                Globals.ConsoleMode = args.Contains("-console");
+            }
+
+
+            // hiding the console, disabling the x button, disabling quick edit mode are windows only functions
+            if (Environment.OSVersion.Platform == PlatformID.Win32NT)
+            {
+                // hide the console window if the -show command line option is not specified
+                if (!args.Contains("-console"))
+                {
+                    var handle = NativeMethods.GetConsoleWindow();
+                    NativeMethods.ShowWindow(handle, NativeMethods.SW_HIDE);
+                    Globals.ConsoleMode = false;
+                }
+                else
+                {
+
+                    Globals.ConsoleMode = true;
+
+                    // the console window is shown, we need to change some settings
+
+                    IntPtr conHandle = NativeMethods.GetConsoleWindow();
+
+                    //disable the window close button(X)
+                    NativeMethods.DeleteMenu(NativeMethods.GetSystemMenu(conHandle, false), NativeMethods.SC_CLOSE, NativeMethods.MF_BYCOMMAND);
+
+                    // disable quick edit mode (this causes the app to pause when the user clicks in the console window)             
+                    int mode;
+                    IntPtr stdHandle = NativeMethods.GetStdHandle(NativeMethods.STD_INPUT_HANDLE);
+                    if (!NativeMethods.GetConsoleMode(stdHandle, out mode))
+                    {
+                        // error getting the console mode
+                        Console.WriteLine("Error retrieving console mode");
+                        OperationalMessageServer.WriteLine("Error retrieving the console mode");
+                    }
+                    mode = mode & ~(NativeMethods.QuickEditMode | NativeMethods.ExtendedFlags);
+                    if (!NativeMethods.SetConsoleMode(stdHandle, mode))
+                    {
+                        // error setting console mode.
+                        Console.WriteLine("Error setting console mode");
+                        OperationalMessageServer.WriteLine("Error while settting the console mode");
+                    }
+                }
+            }
+
+      
             // check if an instance is already running
             Process[] proc = Process.GetProcessesByName("FDACore");
             if (proc.Length > 1)
             {
                 Console.WriteLine("An existing FDA instance was detected, closing");
+                OperationalMessageServer.WriteLine("An existing FDA instance was detected, closing");
                 return;
             }
-           
-         
-            /* not .NET Core compatible
-            Application.EnableVisualStyles();
-            Application.SetCompatibleTextRenderingDefault(false);
+
+
+            /* not .NET Code compatible
+            if (Environment.OSVersion.Platform == PlatformID.Win32NT)
+            {
+                Application.EnableVisualStyles();
+                Application.SetCompatibleTextRenderingDefault(false);
+            }
             */
 
+
+
+
+  
 
             // initialize and start data acquisition
             try // general error catching
             {
-                configuration = new ConfigurationBuilder().AddJsonFile("appsettings.json", false, true).Build();
-                var appConfig = configuration.GetSection(nameof(AppSettings));
+                IConfigurationSection appConfig = null;
+                try
+                {
+                    configuration = new ConfigurationBuilder().AddJsonFile("appsettings.json", false, true).Build();
+                    appConfig = configuration.GetSection(nameof(AppSettings));
+                } catch (Exception ex)
+                {
+                    OperationalMessageServer.WriteLine("Error while reading appsettings.json \"" + ex.Message + "\"");
+                    Console.WriteLine("Error while reading appsettings.json \"" + ex.Message + "\"");
+                    Console.WriteLine("Closing the FDA, press Enter");
+                    Console.Read();
+                    return;
+
+                }
 
                 FDAIsElevated = false;
                 FDAIsElevated = MQTTUtils.ThisProcessIsAdmin();
 
                 ExecutionID = Guid.NewGuid();
-                string FDAID = appConfig["FDAID"];
+ 
                 string exePath = System.Reflection.Assembly.GetEntryAssembly().Location;
                 FileVersionInfo versionInfo = FileVersionInfo.GetVersionInfo(exePath);
                 Console.Title = "FDA version " + versionInfo.FileVersion;
@@ -147,7 +205,8 @@ namespace FDAApp
 
                 // start the FDASystemManager
 
-                // use intricate values here
+                
+                string FDAID = appConfig["FDAID"];
                 string DBInstance = appConfig["DatabaseInstance"]; 
                 DBType = appConfig["DatabaseType"];
                 string DBName = appConfig["SystemDBName"]; 
@@ -212,18 +271,6 @@ namespace FDAApp
 
                 //elevatedClients = new List<Guid>();
 
-                _TCPServer = TCPServer.NewTCPServer(9572);
-                if (_TCPServer != null)
-                {
-                    _TCPServer.DataAvailable += TCPServer_DataAvailable;
-                    _TCPServer.ClientDisconnected += _TCPServer_ClientDisconnected;
-                    _TCPServer.ClientConnected += _TCPServer_ClientConnected; 
-                    _TCPServer.Start();
-                }
-                else
-                {
-                    Globals.SystemManager.LogApplicationError(Globals.FDANow(), TCPServer.LastError, "Error occurred while initializing the TCP Server");
-                }
 
                 // set the "detailed messaging" flag
                 if (options.ContainsKey("DetailedMessaging"))
@@ -333,7 +380,7 @@ namespace FDAApp
 
         private static void _TCPServer_ClientConnected(object sender, TCPServer.ClientEventArgs e)
         {        
-            LogEvent("TCP client connected on port " + _TCPServer.Port);
+            LogEvent("TCP client connected on port " + _FDAControlServer.Port);
         }
 
         static private void MQTTConnect(object o)
@@ -528,7 +575,7 @@ namespace FDAApp
             switch (command.ToUpper())
             {
                 case "PING":
-                    _TCPServer.Send(e.ClientID, "OK");
+                    _FDAControlServer.Send(e.ClientID, "OK");
                     break;
                 case "SHUTDOWN":
                     Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "FDA Application", "", "Shutdown command received");
@@ -536,7 +583,7 @@ namespace FDAApp
                     //            {
                     //                return;
                     //            }
-                    _TCPServer.Send(e.ClientID, "OK");
+                    _FDAControlServer.Send(e.ClientID, "OK");
 
                     // give the TCP server a second to send the response before starting the shutdown
                     Thread.Sleep(1000);
@@ -546,9 +593,17 @@ namespace FDAApp
                     break;
                 case "TOTALQUEUECOUNT":
                     //LogEvent("Getting queue counts");
-                    int count = _dataAquisitionManager.GetTotalQueueCounts();
+                    int count = -1;
+                    if (_dataAquisitionManager != null)
+                        count = _dataAquisitionManager.GetTotalQueueCounts();
                     //LogEvent("Replying with the count (" + count.ToString() + ")");
-                    _TCPServer.Send(e.ClientID, count.ToString());
+                    _FDAControlServer.Send(e.ClientID, count.ToString());
+                    break;
+                case "RUNMODE":
+                    if (Globals.ConsoleMode)
+                        _FDAControlServer.Send(e.ClientID, "debug (console)");
+                    else
+                        _FDAControlServer.Send(e.ClientID, "background");
                     break;
                 case "PAUSE":
                     Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "FDA Application", "", "Pause command received", false, true);
@@ -688,7 +743,7 @@ namespace FDAApp
 
                 default:
                     Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "FDA Application", "", "Unrecognized command received over TCP '" + receivedStr + "'");
-                    _TCPServer.Send(e.ClientID, "Unrecognized command '" + receivedStr);
+                    _FDAControlServer.Send(e.ClientID, "Unrecognized command '" + receivedStr + "'");
                     break;
 
             }
@@ -720,8 +775,8 @@ namespace FDAApp
 
 
             // stop the TCP Server
-            _TCPServer.Dispose();
-            _TCPServer = null;
+            _FDAControlServer.Dispose();
+            _FDAControlServer = null;
 
             Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "FDA Application", "", "Shutting down the Data Acquisition Manager");
             _dataAquisitionManager?.Dispose();
