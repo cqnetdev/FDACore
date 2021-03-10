@@ -516,21 +516,18 @@ namespace Common
                 return;
 
             string eventText = Helpers.FormatDateTime(timestamp) + ": " + objectType + "(" + objectName + "), " + description;
-            if (Globals.ConsoleMode)
-            {
-                // write it to the console
-                if (Environment.UserInteractive)
-                {
-                    Console.WriteLine(eventText);
-                }
 
-                // send it to any terminal clients
-                OperationalMessageServer.WriteLine(eventText);
+            // write it to the console
+            if (Globals.ConsoleMode && Environment.UserInteractive)
+            {
+                Console2.WriteLine(eventText);
             }
 
-            //description = description.Replace("'", "''");
+            // send it to any tcp clients (typically the ControllerService, which will forward it to remote clients, if any are connected)
+            OperationalMessageServer.WriteLine(eventText);
 
             // write it to the database
+            description = description.Replace("'", "''");
             EventLogItem ELI = new EventLogItem(timestamp, objectType, objectName, description, configError);
 
             lock (_eventLogInputBuffer)
