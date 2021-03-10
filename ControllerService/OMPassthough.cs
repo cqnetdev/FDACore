@@ -53,13 +53,14 @@ namespace ControllerService
             int readsize;
             byte[] data;
             byte[] buffer = new byte[1048576]; // 1 MB input buffer for operational messages
-            string dataStr;
+            string messages;
 
             OMClient = new TcpClient();                      // FDA operational messages port    
             
             OMServer = TCPServer.NewTCPServer(_clientPort);  // server for external clients who wish to receive operational messages
             OMServer.ClientConnected += OMServer_ClientConnected;
             OMServer.ClientDisconnected += OMServer_ClientDisconnected;
+            OMServer.WelcomeMessage = "Connected to FDAController operational messages passthrough port\r\n";
             OMServer.Start();
             _logger.LogInformation("Listening for client connections on port " + _clientPort);
 
@@ -104,15 +105,19 @@ namespace ControllerService
                     if (OMClient.GetStream().DataAvailable)
                     {
                         // read the data from the FDA stream
-                        readsize = OMClient.GetStream().Read(buffer, 0, buffer.Length);
-                        data = new byte[readsize];
+                        readsize = OMClient.GetStream().Read(buffer, 0, buffer.Length);                       
+                        data = new byte[readsize];                        
                         Array.Copy(buffer, data, readsize);
-                        dataStr = Encoding.UTF8.GetString(data);
+                        messages = Encoding.UTF8.GetString(data);
 
                         // if any clients are connected to the OM server port, forward the message to them
                         if (OMServer.ClientCount > 0)
                         {
-                            OMServer.Send(Guid.Empty, dataStr);
+                            if (Environment.OSVersion.Platform == PlatformID.Unix)
+                            {
+                                messages = messages.Replace("\n", "\r\n");
+                            }
+                            OMServer.Send(Guid.Empty, messages);
                         }
                     }
                 }
