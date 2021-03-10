@@ -29,6 +29,7 @@ namespace FDA
         Dictionary<Guid, Client> _clients;
         System.Threading.Timer _timer;
         public static Exception LastError = null;
+        public string WelcomeMessage = "";
 
         public int Port { get { return _listeningPort; } }
         public int ClientCount { get { return _clients.Count; } }
@@ -131,6 +132,10 @@ namespace FDA
                     client.Disconnected += ClientDisconnectedHandler;
 
                     _clients.Add(client.ID, client);
+                    if (WelcomeMessage != "")
+                    {
+                        client.SendQueue.Enqueue(Encoding.UTF8.GetBytes(WelcomeMessage+"\n"));
+                    }
 
                     //Globals.SystemManager.LogApplicationEvent(this, "", "Accepted TCP connection from " + client.Address);
                     ClientConnected?.Invoke(this, new ClientEventArgs(client.ID, client.Address));
