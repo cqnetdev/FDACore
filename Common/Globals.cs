@@ -10,6 +10,7 @@ using System.ComponentModel;
 using uPLibrary.Networking.M2Mqtt;
 using System.Runtime.CompilerServices;
 using Newtonsoft.Json;
+using System.Diagnostics;
 
 namespace Common
 {
@@ -31,7 +32,42 @@ namespace Common
         }
        
         public static List<string> SupportedProtocols = new List<string>(new string[] { "ROC", "MODBUS","MODBUSTCP","ENRONMODBUS","BSAP","BSAPUDP"});
+        public static bool RunConsoleCommand(string command, string args, string workingDir = "")
+        {
+            try
+            {
+                var processStartInfo = new ProcessStartInfo()
+                {
+                    FileName = command,
+                    Arguments = args,
+                    RedirectStandardOutput = false,
+                    RedirectStandardError = false,
+                    UseShellExecute = true,
+                    CreateNoWindow = false,
+                };
 
+                if (workingDir != "")
+                    processStartInfo.WorkingDirectory = workingDir;
+
+                var process = new Process();
+                process.StartInfo = processStartInfo;
+
+
+                process.Start();
+                //string output = process.StandardOutput.ReadToEnd();
+                //string error = process.StandardError.ReadToEnd();
+
+                //process.WaitForExit();
+            }
+            catch (Exception ex)
+            {
+                return false;
+            }
+            return true;
+
+            //if (string.IsNullOrEmpty(error)) { return output; }
+            //else { return error; }
+        }
         public static DateTime FDANow()
         {
             /* not .NET Core Compatible
