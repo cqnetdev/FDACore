@@ -221,8 +221,6 @@ namespace Common
 
             _RocEventsFormatsMonitor?.StopListening();
             _RocEventsFormatsMonitor?.Dispose();
-
-            base.Dispose();
         }
     }
 }

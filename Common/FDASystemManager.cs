@@ -773,6 +773,7 @@ namespace Common
                         _bgEventLogger.Dispose();
                     }
 
+                    Globals.SystemManager.LogApplicationEvent(this, "", "Event logger thread closed");
                     Console2.Flush();
                 }
 
