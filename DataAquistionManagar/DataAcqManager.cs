@@ -89,6 +89,7 @@ namespace FDA
                 // subscribe to configuration change events from the DBManager
                 _dbManager.ConfigChange += ConfigChangeHandler;
                 _dbManager.DemandRequest += DemandRequestHandler;
+                _dbManager.ForceScheduleExecution += ForceScheduleExecutionHandler;
 
                 // create connection objects for each DSSourceConnection            
                 List<FDASourceConnection> ConnectionList = _dbManager.GetAllConnectionconfigs();
@@ -204,7 +205,8 @@ namespace FDA
                             case "DAILY": _schedulersDictionary.Add(sched.FRGSUID, new FDASchedulerDaily(sched.FRGSUID, sched.Description, sched.RequestGroups, sched.Tasks, new DateTime(sched.Year, sched.Month, sched.Day, sched.Hour, sched.Minute, sched.Second))); break;
                             case "HOURLY": _schedulersDictionary.Add(sched.FRGSUID, new FDASchedulerHourly(sched.FRGSUID, sched.Description, sched.RequestGroups, sched.Tasks, new DateTime(sched.Year, sched.Month, sched.Day, sched.Hour, sched.Minute, sched.Second))); break;
                             case "MONTHLY": _schedulersDictionary.Add(sched.FRGSUID, new FDASchedulerMonthly(sched.FRGSUID, sched.Description, sched.RequestGroups, sched.Tasks,new DateTime(sched.Year, sched.Month, sched.Day, sched.Hour, sched.Minute, sched.Second))); break;
-                            default: Globals.SystemManager.LogApplicationEvent(this, "", "Schedule " + sched.FRGSUID + " has unrecognized FRGDType '" + sched.FRGSType + "' - this schedule will not be loaded"); break;
+                            case "ONSTARTUP":  _schedulersDictionary.Add(sched.FRGSUID, new FDASchedulerOnshot(sched.FRGSUID, sched.Description, sched.RequestGroups, sched.Tasks)); break;
+                            default: Globals.SystemManager.LogApplicationEvent(this, "", "Schedule " + sched.FRGSUID + " has unrecognized schedule type '" + sched.FRGSType + "' - this schedule will not be loaded"); break;
                         }
 
                         if (_schedulersDictionary.ContainsKey(sched.FRGSUID))
@@ -239,6 +241,14 @@ namespace FDA
             }
 
          
+        }
+
+        private void ForceScheduleExecutionHandler(object sender, DBManager.ForceScheduleEventArgs e)
+        {
+            if (_schedulersDictionary.ContainsKey(e.ScheduleID))
+            {
+                _schedulersDictionary[e.ScheduleID].ForceExecute();
+            }
         }
 
         public void PublishUpdatedConnectionsList()
@@ -450,9 +460,10 @@ namespace FDA
                                     }
                                     newScheduler = new FDASchedulerRealtime(SchedulerConfig.FRGSUID, SchedulerConfig.Description, SchedulerConfig.RequestGroups,SchedulerConfig.Tasks, SchedulerConfig.RealTimeRate,delayTime);
                                     break;
-                                case "DAILY":  newScheduler = new FDASchedulerDaily(SchedulerConfig.FRGSUID, SchedulerConfig.Description, SchedulerConfig.RequestGroups, SchedulerConfig.Tasks, new DateTime(SchedulerConfig.Year, SchedulerConfig.Month, SchedulerConfig.Day, SchedulerConfig.Hour, SchedulerConfig.Minute, SchedulerConfig.Second)); break;
-                                case "HOURLY": newScheduler = new FDASchedulerHourly(SchedulerConfig.FRGSUID, SchedulerConfig.Description, SchedulerConfig.RequestGroups, SchedulerConfig.Tasks, new DateTime(SchedulerConfig.Year, SchedulerConfig.Month, SchedulerConfig.Day, SchedulerConfig.Hour, SchedulerConfig.Minute, SchedulerConfig.Second)); break;
-                                case "MONTHLY":newScheduler = new FDASchedulerMonthly(SchedulerConfig.FRGSUID, SchedulerConfig.Description, SchedulerConfig.RequestGroups, SchedulerConfig.Tasks, new DateTime(SchedulerConfig.Year, SchedulerConfig.Month, SchedulerConfig.Day, SchedulerConfig.Hour, SchedulerConfig.Minute, SchedulerConfig.Second)); break;
+                                case "DAILY":   newScheduler = new FDASchedulerDaily(SchedulerConfig.FRGSUID, SchedulerConfig.Description, SchedulerConfig.RequestGroups, SchedulerConfig.Tasks, new DateTime(SchedulerConfig.Year, SchedulerConfig.Month, SchedulerConfig.Day, SchedulerConfig.Hour, SchedulerConfig.Minute, SchedulerConfig.Second)); break;
+                                case "HOURLY":  newScheduler = new FDASchedulerHourly(SchedulerConfig.FRGSUID, SchedulerConfig.Description, SchedulerConfig.RequestGroups, SchedulerConfig.Tasks, new DateTime(SchedulerConfig.Year, SchedulerConfig.Month, SchedulerConfig.Day, SchedulerConfig.Hour, SchedulerConfig.Minute, SchedulerConfig.Second)); break;
+                                case "MONTHLY": newScheduler = new FDASchedulerMonthly(SchedulerConfig.FRGSUID, SchedulerConfig.Description, SchedulerConfig.RequestGroups, SchedulerConfig.Tasks, new DateTime(SchedulerConfig.Year, SchedulerConfig.Month, SchedulerConfig.Day, SchedulerConfig.Hour, SchedulerConfig.Minute, SchedulerConfig.Second)); break;
+                                case "ONSTARTUP": newScheduler = new FDASchedulerOnshot(SchedulerConfig.FRGSUID, SchedulerConfig.Description, SchedulerConfig.RequestGroups, SchedulerConfig.Tasks, true); break; 
                                 default:
                                     Globals.SystemManager.LogApplicationEvent(this, "", "Schedule ID " + e.ID + " has unrecognized schedule type '" + SchedulerConfig.FRGSType.ToString() + "'");
                                     break;
@@ -504,6 +515,7 @@ namespace FDA
                                     case "DAILY": _schedulersDictionary.Add(SchedulerConfig.FRGSUID, new FDASchedulerDaily(SchedulerConfig.FRGSUID, SchedulerConfig.Description, SchedulerConfig.RequestGroups, SchedulerConfig.Tasks, new DateTime(SchedulerConfig.Year, SchedulerConfig.Month, SchedulerConfig.Day, SchedulerConfig.Hour, SchedulerConfig.Minute, SchedulerConfig.Second))); break;
                                     case "HOURLY": _schedulersDictionary.Add(SchedulerConfig.FRGSUID, new FDASchedulerHourly(SchedulerConfig.FRGSUID, SchedulerConfig.Description, SchedulerConfig.RequestGroups, SchedulerConfig.Tasks, new DateTime(SchedulerConfig.Year, SchedulerConfig.Month, SchedulerConfig.Day, SchedulerConfig.Hour, SchedulerConfig.Minute, SchedulerConfig.Second))); break;
                                     case "MONTHLY": _schedulersDictionary.Add(SchedulerConfig.FRGSUID, new FDASchedulerMonthly(SchedulerConfig.FRGSUID, SchedulerConfig.Description, SchedulerConfig.RequestGroups, SchedulerConfig.Tasks, new DateTime(SchedulerConfig.Year, SchedulerConfig.Month, SchedulerConfig.Day, SchedulerConfig.Hour, SchedulerConfig.Minute, SchedulerConfig.Second))); break;
+                                    case "ONSTARTUP": _schedulersDictionary.Add(SchedulerConfig.FRGSUID, new FDASchedulerOnshot(SchedulerConfig.FRGSUID, SchedulerConfig.Description, SchedulerConfig.RequestGroups, SchedulerConfig.Tasks, true)); break;
                                     default:
                                         Globals.SystemManager.LogApplicationEvent(this, "", "Schedule ID " + e.ID + " has unrecognized schedule type '" + SchedulerConfig.FRGSType.ToString() + "'");
                                         break;
@@ -521,7 +533,6 @@ namespace FDA
                     string changeType = e.ChangeType;
                     if (changeType == "UPDATE")
                     {
-
                         // get the connection object from the dictionary
                         if (_connectionsDictionary == null)
                             return;
@@ -970,23 +981,23 @@ namespace FDA
             if (Globals.FDAStatus == Globals.AppState.ShuttingDown || Globals.FDAStatus == Globals.AppState.Pausing || Globals.FDAStatus == Globals.AppState.Paused)
                 return;
 
-            FDAScheduler timer = (FDAScheduler)sender;
+            FDAScheduler scheduler = (FDAScheduler)sender;
 
-            Globals.SystemManager.LogApplicationEvent(this, "", "Schedule '" + timer.Description + "' triggered");
+            Globals.SystemManager.LogApplicationEvent(this, "", "Schedule '" + scheduler.Description + "' triggered");
 
             //validate requested group(s)
-            List<RequestGroup> validGroups = ValidateRequestedGroups(timer.RequestGroupList, "Schedule " + timer.ID);
+            List<RequestGroup> validGroups = ValidateRequestedGroups(scheduler.RequestGroupList, "Schedule " + scheduler.ID);
 
             // if there are still any groups in the list after validation, continue
             if (validGroups.Count > 0)
             {
-                PrepareAndSendRequestGroups(validGroups, Globals.RequesterType.Schedule, timer.ID);
+                PrepareAndSendRequestGroups(validGroups, Globals.RequesterType.Schedule, scheduler.ID);
             }
 
             // if there are any tasks in the taskList, do those too
-            if (timer.TasksList.Count > 0)
+            if (scheduler.TasksList.Count > 0)
             {
-                foreach (FDATask task in timer.TasksList)
+                foreach (FDATask task in scheduler.TasksList)
                 {
                     switch (task.task_type.ToUpper())
                     {
@@ -1017,7 +1028,7 @@ namespace FDA
                             List<Object> commsStatsParams = _dbManager.ParseStatsCalcParams(task.task_details,out error);
                             if (error == "" && commsStatsParams != null)
                             {
-                                Globals.SystemManager.LogApplicationEvent(this, "", "Calculating communications statistics (requested by schedule " + timer.ID);
+                                Globals.SystemManager.LogApplicationEvent(this, "", "Calculating communications statistics (requested by schedule " + scheduler.ID);
                                 _dbManager.RemoteQueryManager.DoCommsStats(commsStatsParams);
                             }
                             else
@@ -1029,6 +1040,22 @@ namespace FDA
                     }
                 }
             }
+
+
+            // if the schedule is of the OneShot type, dispose of it
+            // change of plans, don't dispose of it because we might get a demand for a 'force execute' to run it again later
+            /*
+            if (scheduler.ScheduleType == ScheduleType.OneShot)
+            {
+                Globals.SystemManager.LogApplicationEvent(this, "", "Disposing of Schedule '" + scheduler.Description +"'");
+                if (_schedulersDictionary.ContainsKey(scheduler.ID))
+                {
+                    _schedulersDictionary.Remove(scheduler.ID);
+                    scheduler.Dispose();
+                    scheduler = null;
+                }
+            }
+            */
         }
 
                                        

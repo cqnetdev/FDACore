@@ -39,6 +39,9 @@ namespace FDA
         public delegate void DemandRequestHandler(object sender, DemandEventArgs e);
         public event DemandRequestHandler DemandRequest;
 
+        public delegate void ForceScheduleHandler(object sender, ForceScheduleEventArgs e);
+        public event ForceScheduleHandler ForceScheduleExecution;
+
         protected bool _DBStatus = false;
 
         protected bool _devicesTableExists = false;
@@ -812,6 +815,16 @@ namespace FDA
             {
                 DemandRequestObject = demand;
                 RequestGroups = requestGroups;
+            }
+        }
+
+        public class ForceScheduleEventArgs : EventArgs
+        {
+            public Guid ScheduleID { get; }
+
+            public ForceScheduleEventArgs(Guid scheduleID)
+            {
+                ScheduleID = scheduleID;
             }
         }
 
@@ -1981,6 +1994,13 @@ namespace FDA
                                 }
                                 else
                                 {
+                                    // task with this ID not found, check the schedulers table
+                                    FDARequestGroupScheduler scheduler = GetSched(taskID);
+                                    if (scheduler != null)
+                                    {
+                                        ForceScheduleExecution?.Invoke(this, new ForceScheduleEventArgs(scheduler.FRGSUID));
+                                        return; 
+                                    }
                                     Globals.SystemManager.LogApplicationEvent(this, "", "Task " + taskID + " was not found. Task was requested by demand " + demand.FRGDUID, true);
                                 }
                             }
@@ -2000,6 +2020,7 @@ namespace FDA
                         if (demandedGroupList.Count > 0)
                         {
                             RaiseDemandRequestEvent(demand, demandedGroupList);
+                            
                             if (demand.DestroyDRG)
                                 DeleteRequestGroup(demandedGroupList);
 

@@ -9,14 +9,14 @@ using System.Threading.Tasks;
 
 namespace FDA
 {
-    public enum ScheduleType {Realtime,Hourly,Daily,Monthly,Specific};
+    public enum ScheduleType {Realtime,Hourly,Daily,Monthly,Specific,OneShot};
 
     //********************************************************************************** FDAScheduler (base class) ************************************************************
     public abstract class FDAScheduler: IDisposable
     {
         public Guid ID { get; set; }
         public string Description { get; set; }
-        public ScheduleType Type;
+        public ScheduleType ScheduleType;
         protected Timer Timer;
         public bool Enabled { get; set; }
         public List<RequestGroup> RequestGroupList { get; set; }
@@ -57,10 +57,17 @@ namespace FDA
                 RaiseTimerElapsedEvent();
         }
 
+
+        public void ForceExecute()
+        {
+            RaiseTimerElapsedEvent();
+        }
+
         protected void RaiseTimerElapsedEvent()
         {
-            TimerElapsed?.Invoke(this, new TimerEventArgs(ID, Type, RequestGroupList));
+            TimerElapsed?.Invoke(this, new TimerEventArgs(ID, ScheduleType, RequestGroupList));
         }
+
 
         public void Dispose()
         {
@@ -72,6 +79,17 @@ namespace FDA
         }
     }
 
+    //******************************************************************** Oneshot scheduler *******************************************
+    public class FDASchedulerOnshot : FDAScheduler
+    {
+        private int delayms = 500;
+        public FDASchedulerOnshot(Guid TimerID, string description, List<RequestGroup> RequestGroupList, List<FDATask> tasksList,bool suppressExecution=false) : base(TimerID, description, RequestGroupList, tasksList)
+        {
+            ScheduleType = ScheduleType.OneShot;
+            if (!suppressExecution)
+                Timer = new Timer(TimerTick, ID, new TimeSpan(0, 0, 0, 0, delayms), new TimeSpan(0, 0, 0, 0,-1));
+        }
+    }
 
     //*******************************************************************************  Realtime Scheduler ****************************************************************
 
@@ -86,7 +104,7 @@ namespace FDA
 
         public FDASchedulerRealtime(Guid TimerID,string description,List<RequestGroup> RequestGroupList,List<FDATask> tasksList,int timerSeconds,TimeSpan delay) : base(TimerID, description, RequestGroupList,tasksList)
         {
-            Type = ScheduleType.Realtime;
+            ScheduleType = ScheduleType.Realtime;
             base.TimerElapsed += Tick;
             InitialDelay = delay;
             if (InitialDelay < TimeSpan.Zero)
@@ -127,7 +145,7 @@ namespace FDA
     {
         public FDASchedulerHourly(Guid TimerID,string description,List<RequestGroup> requestGroupList,List<FDATask> tasksList,DateTime scheduleTime): base(TimerID,description,requestGroupList,tasksList)
         {
-            Type = ScheduleType.Hourly;
+            ScheduleType = ScheduleType.Hourly;
             TimeSpan timeToFirstRun = TimeSpan.MinValue;
             TimeSpan delayTime = TimeSpan.FromHours(1);
 
@@ -170,7 +188,7 @@ namespace FDA
        
         public FDASchedulerDaily(Guid TimerID,string description,List<RequestGroup> requestGroupList,List<FDATask> tasksList,DateTime scheduleTime) : base(TimerID,description,requestGroupList, tasksList)
         {
-            Type = ScheduleType.Daily;
+            ScheduleType = ScheduleType.Daily;
             TimeSpan timeToFirstRun = TimeSpan.MinValue;
             TimeSpan delayTime = TimeSpan.MaxValue;
 
@@ -220,7 +238,7 @@ namespace FDA
 
         public FDASchedulerMonthly(Guid TimerID, string description, List<RequestGroup> requestGroupList,List<FDATask> tasksList, DateTime scheduleTime) : base(TimerID, description, requestGroupList,tasksList)
         {
-            Type = ScheduleType.Monthly;
+            ScheduleType = ScheduleType.Monthly;
             ScheduleTime = scheduleTime;
 
             Timer = new Timer(TimerTick, ID, TimeSpan.Zero, TimeSpan.FromSeconds(15));          
