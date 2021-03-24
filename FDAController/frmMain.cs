@@ -38,6 +38,7 @@ namespace FDAController
             string result;
             string status;
             Color textcolor = GoodColor;
+            bool controllerGood = false;
 
             // is the controller service running?
             if (ProcessRunning("FDAController"))
@@ -50,6 +51,7 @@ namespace FDAController
                 if (result == "UP")
                 {
                     status += " and responsive";
+                    controllerGood = true;
                 }
                 else
                 {
@@ -63,11 +65,11 @@ namespace FDAController
                 textcolor = BadColor;
                 btnStop.Enabled = false;
                 btnStart.Enabled = false;
-                btnStartConsole.Enabled = false;
-                
+                btnStartConsole.Enabled = false;               
             }
             lblControllerService.Text = status;
             lblControllerService.ForeColor = textcolor;
+            btnFDAMonitor.Enabled = controllerGood;
 
             // is MQTT running?
             if (ProcessRunning("mosquitto"))
@@ -77,7 +79,7 @@ namespace FDAController
             }
             else
             {
-                lblMQTT.Text = "MQTT service not not running";
+                lblMQTT.Text = "MQTT service is not running";
                 textcolor = BadColor;
             }
             lblMQTT.ForeColor = textcolor;
@@ -203,6 +205,17 @@ namespace FDAController
             StartFDA("");
         }
 
+
+        private void btnFDAMonitor_Click(object sender, EventArgs e)
+        {
+            RunConsoleCommand("openFDAMonitor.bat","");
+            //RunConsoleCommand("notepad.exe", "");
+            //RunConsoleCommand("cmd.exe","");
+            //RunConsoleCommand("%SystemRoot%\\System32\\telnet.exe", "127.0.0.1 9570"); //<--- this is not working grrr
+            //RunConsoleCommand("cmd.exe", "/c cd c:\\");
+            //RunConsoleCommand("telnet.exe","");       
+        }
+
         private void StartFDA(string args)
         {
             // instead of sending the start command to the FDAController like we do in linux (because the FDA is a service)
@@ -261,10 +274,10 @@ namespace FDAController
                 var process = new Process();
                 process.StartInfo = processStartInfo;
 
-
                 process.Start();
                 //string output = process.StandardOutput.ReadToEnd();
                 //string error = process.StandardError.ReadToEnd();
+                              
 
                 //process.WaitForExit();
             } catch (Exception ex)
@@ -283,7 +296,6 @@ namespace FDAController
             return (self && proc.Length > 1) || (!self && proc.Length > 0);
         }
 
-     
     }
 }
 

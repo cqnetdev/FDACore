@@ -394,9 +394,7 @@ namespace FDA
         private bool disposedValue = false; // To detect redundant calls
 
         public override void Dispose()
-        {
-
-
+        { 
                     // postgreSQL specific disposal
                     _demandMonitor?.StopListening();
                     _schedMonitor?.StopListening();

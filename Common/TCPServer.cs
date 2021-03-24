@@ -31,6 +31,8 @@ namespace FDA
         public static Exception LastError = null;
         public string WelcomeMessage = "";
 
+        private bool isDisposing = false;
+
         public int Port { get { return _listeningPort; } }
         public int ClientCount { get { return _clients.Count; } }
 
@@ -74,11 +76,22 @@ namespace FDA
 
         public void Start()
         {
-            _server.Start();
+            bool success = true;
+            try
+            {
+                _server.Start();
+            } catch (Exception ex)
+            {
+                Console2.WriteLine("Error starting TCP server on port " + Port + ": " + ex.Message);
+                success = false;
+            }
 
-            //Globals.SystemManager.LogApplicationEvent(this, "", "Listening for TCP connections on port " + _listeningPort);
-            _timer = new System.Threading.Timer(CheckRecieved);
-            _timer.Change(_tickRate, Timeout.Infinite);
+            if (success)
+            {
+                //Globals.SystemManager.LogApplicationEvent(this, "", "Listening for TCP connections on port " + _listeningPort);
+                _timer = new System.Threading.Timer(OnTick);
+                _timer.Change(_tickRate, Timeout.Infinite);
+            }
         }
 
         public bool Send(Guid clientID, string message)
@@ -113,14 +126,14 @@ namespace FDA
             return true;
         }
 
-        protected virtual void CheckRecieved(Object o)
+        protected virtual void OnTick(Object o)
         {
             _timer.Change(Timeout.Infinite, Timeout.Infinite);
-            /*
-            if (Globals.FDAStatus != Globals.AppState.Normal)
+            
+            if (isDisposing)
             {
                 goto ResetTimer;
-            }*/
+            }
 
             // check for pending connections
             if (_server.Pending())
@@ -157,7 +170,7 @@ namespace FDA
                 }
             }
 
-            //ResetTimer:
+            ResetTimer:
             _timer.Change(_tickRate, Timeout.Infinite);
         }
 
@@ -392,6 +405,7 @@ namespace FDA
             {
                 if (disposing)
                 {
+                    isDisposing = true;
                     _timer.Change(Timeout.Infinite, Timeout.Infinite);
                     Client[] clients = _clients.Values.ToArray();
                     foreach (Client client in clients)

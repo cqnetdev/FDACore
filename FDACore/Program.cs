@@ -142,6 +142,9 @@ namespace FDAApp
                 }
             }
 
+
+          
+
       
             // check if an instance is already running
             Process[] proc = Process.GetProcessesByName("FDACore");
@@ -176,9 +179,9 @@ namespace FDAApp
                     appConfig = configuration.GetSection(nameof(AppSettings));
                 } catch (Exception ex)
                 {
-                    OperationalMessageServer.WriteLine("Error while reading appsettings.json \"" + ex.Message + "\"");
+                    OperationalMessageServer.WriteLine("Error while reading appsettings.json \"" + ex.Message + "\"\nFDA Exiting");
                     Console.WriteLine("Error while reading appsettings.json \"" + ex.Message + "\"");
-                    Console.WriteLine("Closing the FDA, press Enter");
+                    Console.WriteLine("FDA Exiting");
                     Console.Read();
                     return;
 
@@ -776,6 +779,7 @@ namespace FDAApp
             Globals.SystemManager?.Dispose();
 
 
+
             // unpublish FDA topics,set run status to "stopped", and shut down the MQTT connection
             if (Globals.MQTTEnabled && Globals.MQTT != null)
             {
@@ -795,7 +799,9 @@ namespace FDAApp
 
 
             ShutdownComplete = true;
+            OperationalMessageServer.WriteLine("Goodbye");
 
+           
             //Application.Exit();
         }
 

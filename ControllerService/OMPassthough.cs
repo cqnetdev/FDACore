@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
@@ -54,9 +55,14 @@ namespace ControllerService
             byte[] data;
             byte[] buffer = new byte[1048576]; // 1 MB input buffer for operational messages
             string messages;
+            string logmessage = "";
+            Stopwatch quietTimer = new Stopwatch();
+            TimeSpan quietLimit = new TimeSpan(0, 0, 5); // 5 seconds
+            bool FDAConnectionHalfOpen = false;
 
             OMClient = new TcpClient();                      // FDA operational messages port    
-            
+            OMClient.ReceiveTimeout = 1; 
+
             OMServer = TCPServer.NewTCPServer(_clientPort);  // server for external clients who wish to receive operational messages
             OMServer.ClientConnected += OMServer_ClientConnected;
             OMServer.ClientDisconnected += OMServer_ClientDisconnected;
@@ -64,16 +70,50 @@ namespace ControllerService
             OMServer.Start();
             _logger.LogInformation("Listening for client connections on port " + _clientPort);
 
+            quietTimer.Start();
             while (!e.Cancel)
             {
+                // if the FDA has been quiet for too long, check if its still there
+                if (OMClient.Connected && quietTimer.Elapsed > quietLimit)
+                {
+                    try
+                    {
+                        _logger.LogInformation("FDA has been quiet for a while, checking to see if it's still alive");
+                        OMClient.GetStream().Write(Encoding.UTF8.GetBytes("hey you there?"));
+                        int respSize = OMClient.GetStream().Read(buffer, 0, 10);
+                        /*
+                        byte[] response = new byte[respSize];
+                        Array.Copy(buffer, response, respSize);
+                        if (Encoding.UTF8.GetString(response) != "yes")
+                        {
+                            FDAConnectionHalfOpen = true;
+                        }
+                        */
+                    } catch
+                    {
+                        FDAConnectionHalfOpen = true;
+                    }
+
+                    if (!FDAConnectionHalfOpen)
+                    {
+                        _logger.LogInformation("FDA is still alive");
+                        quietTimer.Restart();
+                    }
+                    else
+                    {
+                        _logger.LogInformation("FDA seems to be dead, going into re-connection mode");
+                    }
+
+                }
+
                 // is the client connected to the FDA? go into a connection loop if not
-                if (!OMClient.Connected)
+                if (!OMClient.Connected || FDAConnectionHalfOpen)
                 {
                     while (!e.Cancel && !OMClient.Connected)
                     {
                         OMClient?.Dispose();
                         OMClient = new TcpClient();
-                        string logmessage = "";
+                        logmessage = "";
                         while (!OMClient.Connected && !e.Cancel)
                         {
                             try
@@ -94,6 +134,8 @@ namespace ControllerService
 
                         if (OMClient.Connected)
                         {
+                            FDAConnectionHalfOpen = false;
+                            quietTimer.Restart();
                             logmessage += "success";
                             _logger.LogInformation(logmessage);
                         }
@@ -101,9 +143,12 @@ namespace ControllerService
                 }
                 else
                 {
+                    logmessage = "";
                     // we're connected to the FDA, check for available data
                     if (OMClient.GetStream().DataAvailable)
                     {
+                        quietTimer.Restart();
+                        logmessage = "OpMsg Data received from FDA";
                         // read the data from the FDA stream
                         readsize = OMClient.GetStream().Read(buffer, 0, buffer.Length);                       
                         data = new byte[readsize];                        
@@ -113,14 +158,23 @@ namespace ControllerService
                         // if any clients are connected to the OM server port, forward the message to them
                         if (OMServer.ClientCount > 0)
                         {
+                            logmessage += ", " + OMServer.ClientCount + " client(s) connected, forwarding the data";
                             if (Environment.OSVersion.Platform == PlatformID.Unix)
                             {
                                 messages = messages.Replace("\n", "\r\n");
                             }
+                           
                             OMServer.Send(Guid.Empty, messages);
                         }
+                        else
+                        {
+                            logmessage += ", no clients connected so I'm dropping this data";
+                        }
+
                     }
                 }
+                if (logmessage != "")
+                    _logger.LogInformation(logmessage);
                 Thread.Sleep(50);
             }
             

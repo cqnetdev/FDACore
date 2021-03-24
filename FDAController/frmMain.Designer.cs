@@ -36,6 +36,7 @@ namespace FDAController
             this.lblFDA = new System.Windows.Forms.Label();
             this.lblMQTT = new System.Windows.Forms.Label();
             this.btnStartConsole = new System.Windows.Forms.Button();
+            this.btnFDAMonitor = new System.Windows.Forms.Button();
             this.SuspendLayout();
             // 
             // btnStart
@@ -104,11 +105,23 @@ namespace FDAController
             this.btnStartConsole.UseVisualStyleBackColor = true;
             this.btnStartConsole.Click += new System.EventHandler(this.btnStartConsole_Click);
             // 
+            // btnFDAMonitor
+            // 
+            this.btnFDAMonitor.Location = new System.Drawing.Point(727, 49);
+            this.btnFDAMonitor.Name = "btnFDAMonitor";
+            this.btnFDAMonitor.Size = new System.Drawing.Size(174, 100);
+            this.btnFDAMonitor.TabIndex = 7;
+            this.btnFDAMonitor.Text = "Open FDA Monitor (doesn\'t work)";
+            this.btnFDAMonitor.UseVisualStyleBackColor = true;
+            this.btnFDAMonitor.Visible = false;
+            this.btnFDAMonitor.Click += new System.EventHandler(this.btnFDAMonitor_Click);
+            // 
             // frmMain
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(9F, 20F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(742, 400);
+            this.ClientSize = new System.Drawing.Size(924, 400);
+            this.Controls.Add(this.btnFDAMonitor);
             this.Controls.Add(this.btnStartConsole);
             this.Controls.Add(this.lblMQTT);
             this.Controls.Add(this.lblFDA);
@@ -133,6 +146,7 @@ namespace FDAController
         private System.Windows.Forms.Label lblFDA;
         private System.Windows.Forms.Label lblMQTT;
         private System.Windows.Forms.Button btnStartConsole;
+        private System.Windows.Forms.Button btnFDAMonitor;
     }
 }
 
