@@ -14,6 +14,7 @@ using System.Security.Authentication;
 using System.Security.Cryptography.X509Certificates;
 using uPLibrary.Networking.M2Mqtt;
 using FDAInterface.Properties;
+using System.ComponentModel;
 
 namespace FDAInterface
 {
@@ -38,10 +39,27 @@ namespace FDAInterface
         }
     }    
 
+
+
     internal class  FDAManagerContext : ApplicationContext
     {
-        private static NotifyIcon notifyIcon;
+        internal enum ConnectionStatus {Disconnected,Connecting,Connected};
+
+        // statuses 
         internal static bool _MQTTConnectionStatus;
+        internal static ConnectionStatus _ControllerConnectionStatus;
+        internal static string _CurrentConnectionStatus = "Not connected";
+        internal static string _FDAName;
+        internal static string _FDAStatus;
+
+        internal static bool MQTTConnectionStatus { get { return _MQTTConnectionStatus; } set { _MQTTConnectionStatus = value; } }
+        internal static ConnectionStatus ControllerConnectionStatus { get { return _ControllerConnectionStatus; } set { _ControllerConnectionStatus = value; } }
+        internal static string CurrentConnectionStatus { get { return _CurrentConnectionStatus; } set { _CurrentConnectionStatus = value; } }
+        internal static string FDAName { get { return _FDAName; } set { _FDAName = value; } }
+        internal static string FDAStatus { get { return _FDAStatus; } set { _FDAStatus = value; } }
+
+
+        private static NotifyIcon notifyIcon;     
         private static bool _paused = false;
         private static MenuItem stopMenuItem;
         private static MenuItem startMenuItem;
@@ -55,30 +73,23 @@ namespace FDAInterface
         //static NetworkStream _stream;
         //static SslStream _sslStream;
         private static frmMain2 _mainForm;
-       // private System.Threading.Timer dataReceivedCheckTimer;
+        // private System.Threading.Timer dataReceivedCheckTimer;
         //private int dataReceivedCheckRate = 100;
         internal static bool elevatedPermissions = false;
         internal static string Host;
         
-        internal static string ConnectedFDAName;
-        private static string ConnectingFDAName;
-
+     
         //private static int _FDAport = 9572;
         private static System.Threading.Timer MqttRetryTimer;
-
         internal static MqttClient MQTT;
 
-        private static string _FDAStatus;
+        
 
-        private static bool MQTTConnectionStatus { get { return _MQTTConnectionStatus; } set { _MQTTConnectionStatus = value; } }
+ 
+        internal static BackgroundWorker bg_MQTTConnect;
 
-        //private static System.Threading.Timer FDACheckTimer;
-
-        internal static bool ProcessRunning(string processname,bool self = false)
-        {
-            Process[] proc = Process.GetProcessesByName(processname);
-            return (self && proc.Length > 1) || (!self && proc.Length > 0);          
-        }
+ 
+  
 
 
         public FDAManagerContext(string[] args)
@@ -89,19 +100,6 @@ namespace FDAInterface
 
 
 
-            //if (args.Contains("-MASTER"))
-            //    _isMaster = true;
-
-            /*
-            if (args.Length > 0)
-            {
-                if (args[0].ToUpper() == "-STARTFDA")
-                    SendStartFDACommand(this, new EventArgs());
-
-                if (args[0].ToUpper() == "-STARTFDACONSOLE")
-                    SendStartFDAConsoleCommand(this, new EventArgs());
-            }
-            */
 
             string exePath = System.Reflection.Assembly.GetEntryAssembly().Location;
             FileVersionInfo versionInfo = FileVersionInfo.GetVersionInfo(exePath);
@@ -139,8 +137,7 @@ namespace FDAInterface
 
             OpenGui(this, new EventArgs());
             
-            // get the details of the previous connection and try to reconnect to it
-            
+            // get the details of the previous connection and try to reconnect to it            
             string connDetails = Properties.Settings.Default.LastConnectedFDA;
             string[] details = connDetails.Split('|');
             if (details.Length >= 2 && details[0] != "")
@@ -148,21 +145,6 @@ namespace FDAInterface
                 ChangeHost(details[0], details[1]);
             }
            
-
-            /*
-            if (MQTT != null)
-            {
-                if (MQTT.IsConnected)
-                {
-                    if (args.Contains("-STARTFDA"))
-                        SendStartFDACommand(this, new EventArgs());
-
-                    if (args.Contains("-STARTFDACONSOLE"))
-                        SendStartFDAConsoleCommand(this, new EventArgs());
-                }
-            }
-            */
-            //FDACheckTimer = new System.Threading.Timer(CheckConnection, null,TimeSpan.Zero,Timeout.InfiniteTimeSpan);
         }
 
        
@@ -240,166 +222,50 @@ namespace FDAInterface
         {
             if (newHost != Host)
             {
-                /*
-                FDACheckTimer.Change(Timeout.Infinite, Timeout.Infinite);
-                if (_TcpClient != null)
+                     
+                if (bg_MQTTConnect == null)
                 {
-                    if (_TcpClient.Connected)
-                    {
-                        _TcpClient.Close();
-                        _TcpClient.Dispose();
-                        _TcpClient = new TcpClient();
-                    }
+                    bg_MQTTConnect = new BackgroundWorker();
+                    bg_MQTTConnect.DoWork += Bg_MQTTConnect_DoWork;
+                    bg_MQTTConnect.RunWorkerCompleted += Bg_MQTTConnect_RunWorkerCompleted;
                 }
-                */
 
-                ConnectingFDAName = newFDAName;
-        
+                CurrentConnectionStatus = "Connecting to MQTT broker at " + newHost + " (" + newFDAName + ")...";
+                if (MainFormActive())
+                {
+                    _mainForm.SetConnectionState(CurrentConnectionStatus);
+                    _mainForm.SetConnectionMenuItems(false);
+                    _mainForm.SetFDAStatus("Unknown");
+                }
+                string[] args = new string[] { newHost, newFDAName };
+                bg_MQTTConnect.RunWorkerAsync(args);
 
-                MQTTConnect(newHost);
-               // FDACheckTimer.Change(TimeSpan.Zero, Timeout.InfiniteTimeSpan);
             }
         }
 
-        /*
-        protected virtual void CheckConnection(object o)
+        private static void Bg_MQTTConnect_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
         {
-           // FDACheckTimer.Change(Timeout.Infinite, Timeout.Infinite);
+            // results is a four element string array {IP,name,connection result,message}
+            string[] results = (string[])e.Result;
 
+            if (results[2]=="success")
+            {          
+                _FDAName = results[1];
+                Host = results[0];
 
-            // send a ping to the FDA (so we can check if we have a connection)
-            //SendToFDA("ping");
-
-            bool lastStatus = MQTTConnectionStatus;
-
-            
-            if (_TcpClient == null)
-            {
-                _TcpClient = new TcpClient();
-            }
-
-            if (_TcpClient.Connected)
-            {
-                if (_TcpClient.Client.Connected)
+                CurrentConnectionStatus = "Connected to MQTT broker at " + Host + " (" + _FDAName + ")";
+                if (MainFormActive())
                 {
-                    if (!MQTTConnectionStatus)
-                    {
-                        MQTTConnectionStatus = true;
-                    }
-                    goto Reset;
-                }
-                else
-                {
-                    if (MQTTConnectionStatus) MQTTConnectionStatus = false;
-                }
-            }
-            else
-            {
-                if (MQTTConnectionStatus) MQTTConnectionStatus = false;
-            }
-                
-            
-            if (!MQTTConnectionStatus)
-            {
-                if (Host == "")
-                {
-                    goto Reset;
-                }
-                try
-                {
-                    _TcpClient.Connect(Host, _FDAport);
-                    _stream = _TcpClient.GetStream();
-                    _sslStream = new SslStream(_stream, false, new RemoteCertificateValidationCallback(ValidateServerCertificate), null);
-                    _sslStream.ReadTimeout = 2000;
-                    _sslStream.WriteTimeout = 2000;
-                    _sslStream.AuthenticateAsClient("AVERYANDMCCLEOD\\Mike");
-                    MQTTConnectionStatus = true;
-                }
-                catch
-                {
-                    MQTTConnectionStatus = false;
-                    _stream?.Dispose();
-                    _TcpClient?.Dispose();
-                    _TcpClient = new TcpClient();
-                    goto Reset;
-                }            
-            }
-
-            if (lastStatus != MQTTConnectionStatus)
-            {
-                if (MQTTConnectionStatus) // this is a new connection, we need to request elevated permissions and connect to MQTT
-                {
-                    Random rnd = new Random();
-
-                    string requeststring = "Elevate:" + Common.Encrypt.EncryptString(DateTime.UtcNow.ToOADate().ToString(), "KVvvc5thpcrsc5Hkpkof");
-                    SendToFDA(requeststring);
-
-                    Properties.Settings.Default.LastConnectedFDA = Host;
-                    Properties.Settings.Default.Save();
-
-                    // connect to MQTT
-                    MQTTConnect(Host);
-                }
-                else
-                {
-                    // this is a new disconnection, we need to notify the GUI (if open), so it can reset the form
-                    if (MainFormActive())
-                        _mainForm.ClearForm();
+                     _mainForm.SetConnectionState(CurrentConnectionStatus);
                 }
 
-            }
-
-        Reset:
-            FDACheckTimer.Change(TimeSpan.FromSeconds(1), Timeout.InfiniteTimeSpan);
-        }
-
-        */
-        private static void MQTTConnect(object o)
-        {
-            //MessageBox.Show("Connecting to MQTT at " + o.ToString());
-            retry:
-            bool success = false;
-            try
-            {
-                if (MQTT == null)
-                {
-                    MQTT = new MqttClient(o.ToString());
-                  
-                }
-                else
-                {
-                    if (MQTT.IsConnected)
-                    {
-                        MQTT.Disconnect();
-                        MQTT = null;
-                    }
-                }
-
-                string pass = Encryption.DecryptString(Properties.Settings.Default.MQTT, "MC9fSLAfwkrHCx0j6LG4");
-
-                MQTT = new MqttClient(o.ToString());
-                MQTT.Connect("FDAManager" + Guid.NewGuid().ToString(), "FDAManager", pass);
-                if (MQTT.IsConnected)
-                {
-                    success = true;
-                }
-            }
-            catch (Exception ex)
-            {
-                success = false;
-            }
-
-            if (success)
-            {
-                ConnectedFDAName = ConnectingFDAName;
-                Host = o.ToString();
-                
-                Properties.Settings.Default.LastConnectedFDA = Host + "|" + ConnectedFDAName;
+                Properties.Settings.Default.LastConnectedFDA = Host + "|" + _FDAName;
                 Properties.Settings.Default.Save();
 
                 //MQTT.ConnectionClosed += MQTT_ConnectionClosed;
                 MQTTConnectionStatus = true;
                 MQTT.MqttMsgPublishReceived += MQTT_MqttMsgPublishReceived;
+                MQTT.ConnectionClosed += MQTT_ConnectionClosed;
                 MQTT.Subscribe(new string[] { "FDAManager/command" }, new byte[] { 0 });
 
                 // default to the 'FDA Stopped' red icon until we get a status update from the FDA
@@ -414,37 +280,122 @@ namespace FDAInterface
                     _mainForm.SetMQTT(MQTT);
 
                     // notify the GUI that the MQTT connection has been established
-                    _mainForm.MQTTConnected(ConnectedFDAName,Host);
-                }
-
-
-                if (MqttRetryTimer != null)
-                {
-                    MqttRetryTimer.Change(0, 0);
-                    MqttRetryTimer.Dispose();
-                    MqttRetryTimer = null;
-                }
+                    _mainForm.MQTTConnected(_FDAName, Host);
+                }              
             }
             else
             {
                 notifyIcon.Icon = Properties.Resources.ManagerGray;
                 notifyIcon.Text = "FDA Status unknown - not connected";
                 Host = "";
-                //MessageBox.Show("Failed to connect to MQTT");
+ 
                 MQTTConnectionStatus = false;
 
+                CurrentConnectionStatus = "Not connected";
                 if (MainFormActive())
-                {
-                    _mainForm.SetFDAStatus("Disconnected");
+                {                  
+                     _mainForm.SetConnectionState(CurrentConnectionStatus);
+                    _mainForm.SetFDAStatus("Unknown");
                 }
-                if (MessageBox.Show("Failed to connect to " + o.ToString(), "Connection failed", MessageBoxButtons.RetryCancel) == DialogResult.Retry)
-                    goto retry;
 
-                // start a 5 second timer for re-attempting the connection
-                // MqttRetryTimer = new System.Threading.Timer(MQTTConnect,o, 5000, 5000);
+                string message = "Failed to connect to MQTT broker on FDA server " + results[0] + " (" + results[1] + ")";
+                if (results[3] != "")
+                {
+                    message += "\nThe error message was \"" + results[3] + "\"";
+                }
+
+
+                if (MessageBox.Show(message, "Failed Connection", MessageBoxButtons.RetryCancel) == DialogResult.Retry)
+                    bg_MQTTConnect.RunWorkerAsync(new string[] { results[0], results[1] });
+            }
+
+            if (MainFormActive())
+                _mainForm.SetConnectionMenuItems(true);
+        }
+
+        private static void MQTT_ConnectionClosed(object sender, EventArgs e)
+        {
+            Host = "";
+            CurrentConnectionStatus = "Not connected";
+            if (MainFormActive() && !bg_MQTTConnect.IsBusy)
+            {
+                CurrentConnectionStatus = "Not connected";
+                _mainForm.SetConnectionState(CurrentConnectionStatus);
             }
         }
 
+        private static void Bg_MQTTConnect_DoWork(object sender, DoWorkEventArgs e)
+        {
+            string[] args = (string[])e.Argument;
+            string errorMsg = "";
+            // arguments array too short, exit with an error
+            if (args.Length < 2)
+            {
+                // results array is 4 elements long (0/1 are the host IP/Name, 2 is the result (can be success or failure), 3 is any messages (like errors)
+                e.Result = new string[] { args.ToString(), "", "failure","invalid argument passed to Bg_MQTTConnect_DoWork()"};
+                return;
+            }
+
+            // arguments array too long, take the first two and dump the rest
+            if (args.Length > 2)
+            {
+                args = new string[] { args[0], args[1] };
+            }
+
+            string MQTTServer_IP = args[0];
+            string MQTTServer_Name = args[1];
+            
+            bool success = false;
+            try
+            {
+                // no previous connection (MQTT is null)
+                if (MQTT == null)
+                {
+                    MQTT = new MqttClient(MQTTServer_IP);
+                }
+                else
+                {
+                    // a previous connection exists, disconnect it (if it's connected) and dispose of it
+                    if (MQTT.IsConnected)
+                    {
+                        MQTT.Disconnect();
+                    }
+                    MQTT = null;
+                }
+
+                // get the MQTT password (this should probably be entered in the form and passed to this procedure, instead of this)
+                string pass = Encryption.DecryptString(Properties.Settings.Default.MQTT, "MC9fSLAfwkrHCx0j6LG4");
+                MQTT = new MqttClient(MQTTServer_IP);
+                MQTT.Connect("FDAManager" + Guid.NewGuid().ToString(), "FDAManager", pass);
+                if (MQTT.IsConnected)
+                {
+                    success = true;
+                }
+            }
+            catch (Exception ex)
+            {
+                success = false;
+                errorMsg = ex.Message;
+            }
+
+            if (success)
+            {
+                // results array is 4 elements long (0/1 are the host IP/Name, 2 is the result (can be success or failure), 3 is any messages (like errors)
+                string[] results = new string[] { args[0], args[1], "success", "" };
+                e.Result = results;
+            }
+            else
+            {
+                string[] results = new string[] { args[0], args[1], "failure", errorMsg};
+                e.Result = results;
+            }
+
+            return;
+      
+
+        }
+
+   
         private static void MQTT_MqttMsgPublishReceived(object sender, uPLibrary.Networking.M2Mqtt.Messages.MqttMsgPublishEventArgs e)
         {
             switch(e.Topic)
@@ -465,26 +416,13 @@ namespace FDAInterface
                         UpdateFDAStatusIcon(Encoding.UTF8.GetString(e.Message));
                     break;
                 case "FDA/identifier":
-                    ConnectedFDAName = Encoding.UTF8.GetString(e.Message);
+                    _FDAName = Encoding.UTF8.GetString(e.Message);
                     break;
              
             }
         }
 
-        //private static void MQTT_ConnectionClosed(object sender, EventArgs e)
-        //{
-        //    if (MQTT != null)
-        //        MQTT.ConnectionClosed -= MQTT_ConnectionClosed;
-
-        //    if (MainFormActive())
-        //    {
-        //        _mainForm.MQTTDisconnected();
-        //    }
-        //    //if (MqttRetryTimer == null)
-        //    //    MqttRetryTimer = new System.Threading.Timer(MQTTConnect,Host, 5000, 5000);
-        //    //else
-        //    //    MqttRetryTimer.Change(5000, 5000);
-        //}
+    
 
         private static bool MainFormActive()
         {
@@ -762,7 +700,15 @@ namespace FDAInterface
 
 
                 _mainForm.Show();
-              
+
+                if (bg_MQTTConnect != null)
+                {
+                    _mainForm.SetConnectionMenuItems(!bg_MQTTConnect.IsBusy);
+                }
+
+                _mainForm.SetConnectionState(CurrentConnectionStatus);
+
+
             }
             else
                 _mainForm.Focus();
@@ -771,13 +717,23 @@ namespace FDAInterface
         private void _mainForm_Shown(object sender, EventArgs e)
         {
 
+            
             if (MQTTConnectionStatus == true)
             {
                 _mainForm.SetMQTT(MQTT);
-                _mainForm.MQTTConnected(ConnectedFDAName, Host);
+                _mainForm.MQTTConnected(_FDAName, Host);
             }
+            
+            
+            //_mainForm.SetFDAStatus(_FDAStatus);
+            
 
-            _mainForm.SetFDAStatus(_FDAStatus);
+        }
+
+        internal static bool ProcessRunning(string processname, bool self = false)
+        {
+            Process[] proc = Process.GetProcessesByName(processname);
+            return (self && proc.Length > 1) || (!self && proc.Length > 0);
         }
 
         private void MainForm_Disposed(object sender, EventArgs e)

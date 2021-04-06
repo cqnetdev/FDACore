@@ -94,6 +94,7 @@ namespace FDAInterface
 
         private delegate void DataReceivedHandler(byte[] data,byte dataType);
         private delegate void SafeCallNoParams();
+        private delegate void SafeCall1StringParam(string param);
         private delegate void SafeCall2StringParams(string param1,string param2);
         private delegate void SafeMQQTEventHandler(object sender, uPLibrary.Networking.M2Mqtt.Messages.MqttMsgPublishEventArgs e);
 
@@ -132,7 +133,9 @@ namespace FDAInterface
             {
                 AddToRecent(new FDAConnection(recent));
             }
-       
+
+            imgBrokerStatus.Image = imageList1.Images[2];
+            imgControllerServiceStatus.Image = imageList1.Images[2];
         }
 
         private void frmMain2_Shown(object sender, EventArgs e)
@@ -154,7 +157,7 @@ namespace FDAInterface
 
         #endregion
 
-        /************************************ handle data received over TCP connection to FDA  **************************************************/
+        /************************************ handle data received over TCP connection with FDA  **************************************************/
         #region TCPConnectionToFDA
         internal void DataReceivedFromFDA(byte[] message,byte dataType)
         {
@@ -195,41 +198,7 @@ namespace FDAInterface
                                 ClearForm();
                             }
                             break;
-                            /*
-                        case "CONNOVERVIEW":
-                            string[] connections = data.Split('|');
-                            ConnectionNode connNode;
-                            ConnectionNode existingNode;
-                            TreeNode root = tree.Nodes[0];
-
-                            foreach (string connection in connections)
-                            {
-                                connNode = new ConnectionNode(connection);
-
-                                if (!_connOverviewDict.ContainsKey(connNode.ID))
-                                {
-                                    // this is a new connection overview, add it
-                                    root.Nodes.Add(connNode.GetNode());
-                                    _connOverviewDict.Add(connNode.ID, connNode);
-
-
-                                    // now with MQTT                            
-                                    string ID = connNode.ID.ToString().ToLower();
-                                    SubscribeToConnectionStatus(ID, 0);
-
-
-                                }
-                                else
-                                {
-                                    // update existing connection overview
-                                    existingNode = _connOverviewDict[connNode.ID];
-                                    existingNode.Update(connNode);
-                                }
-                            }
-                            if (!root.IsExpanded)
-                                root.Expand();
-                            break;
-                            */
+  
                     }
                 }
 
@@ -254,9 +223,10 @@ namespace FDAInterface
             }
             else
             {
+                imgBrokerStatus.Image = imageList1.Images[0];
                 mqttStatus.Text = "MQTT Status: Connected";
                 //btn_Connect.Enabled = false;
-                tb_activeFDA.Text = FDAName + " (" + host + ")";
+                //tb_activeFDA.Text = FDAName + " (" + host + ")";
                 FDAStatus.Text = "FDA Status: Unknown";
                 startToolStripMenuItem.Enabled = true;
                 startwithConsoleToolStripMenuItem.Enabled = true;
@@ -299,6 +269,8 @@ namespace FDAInterface
             }
             else
             {
+
+                imgBrokerStatus.Image = imageList1.Images[2];
                 mqttStatus.Text = "MQTT Status: Disconnected";
                 //btn_Connect.Enabled = true;
             }
@@ -627,6 +599,31 @@ namespace FDAInterface
 
         /*************************************  form appearance (control visibility, enabled/disabled status etc ********************************/
         #region FormControlManagement
+
+        internal void SetConnectionMenuItems(bool enabled)
+        {
+            connectToolStripMenuItem.Enabled = enabled;
+            recentToolStripMenuItem.Enabled = enabled;
+
+            // if the connection menu items are disabled, disable the FDA start/stop buttons too
+            if (!enabled)
+            {
+                startToolStripMenuItem.Enabled = false;
+                stopToolStripMenuItem.Enabled = false;
+            }
+        }
+
+        internal void SetConnectionState(string newState)
+        {
+            if (InvokeRequired)
+            {
+                Invoke(new SafeCall1StringParam(SetConnectionState), new object[] { newState });
+            }
+            else
+            {
+                tb_connectionstate.Text = newState;
+            }
+        }
         private void SetMenuItemEnabledStates()
         {
             if (FDAManagerContext._MQTTConnectionStatus)
@@ -677,39 +674,10 @@ namespace FDAInterface
                 mQTTQueryTestToolStripMenuItem.Enabled = false;
                 communicationsStatsToolStripMenuItem.Enabled = false;
             }
-
-            //_dbValidationForm?.UpdateFDAStatus(FDAManagerContext._MQTTConnectionStatus);
         }
 
 
-        //private void SetDetailsVisibility(DetailsType dType)
-        //{
-        //    switch (dType)
-        //    {
-        //        case DetailsType.Queue:
-        //            qHist.Visible = true;
-        //            connDetails.Visible = false;
-        //            //btnQueues.Enabled = false;
-        //            //btnDetails.Enabled = true;
-        //            //panel_viewselector.Visible = true;
-        //            break;
-        //        case DetailsType.Connection:
-        //            qHist.Visible = false;
-        //            connDetails.Visible = true;
-        //            //btnDetails.Enabled = false;
-        //            //btnQueues.Enabled = true;
-        //            //panel_viewselector.Visible = true;
-        //            //panel_viewselector.BringToFront();
-        //            break;
-        //        case DetailsType.None:
-        //            qHist.Visible = false;
-        //            connDetails.Visible = false;
-        //            //btnQueues.Enabled = false;
-        //            //btnDetails.Enabled = false;
-        //            //panel_viewselector.Visible = false;
-        //            break;
-        //    }
-        //}
+  
 
 
         internal void ClearForm()
@@ -748,14 +716,7 @@ namespace FDAInterface
         /*************************************** user action handling (handle clicks)************************************************************/
         #region UserInteraction
 
-        /*     private void btnEditFDA_Click(object sender, EventArgs e)
-             {
-                 frmEditFDAList editFDADlg = new frmEditFDAList(_FDAList);
-
-                 editFDADlg.ShowDialog();
-
-             }
-        */
+  
 
         //FDA Menu
         private void startToolStripMenuItem_Click(object sender, EventArgs e)
@@ -778,28 +739,10 @@ namespace FDAInterface
         private void stopToolStripMenuItem_Click(object sender, EventArgs e)
         {
             FDAManagerContext.StopFDA(null, new EventArgs());
-            //startwithConsoleToolStripMenuItem.Enabled = true;
-            //startToolStripMenuItem.Enabled = true;
-            //stopToolStripMenuItem.Enabled = false;
         }
 
 
-        // tools menu
-        /*
-        private void databaseValidatorToolStripMenuItem_Click(object sender, EventArgs e)
-        {
-            if (_dbValidationForm != null)
-            {
-                _dbValidationForm.Focus();
-                return;
-            }
-
-            _dbValidationForm = new frmDBVal();
-            _dbValidationForm.FDADBConnString = _FDADBConnstring;
-            _dbValidationForm.Disposed += DbValidationForm_Disposed;
-            _dbValidationForm.Show();
-        }
-        */
+      
 
         // item selected in the tree
         private void tree_AfterSelect(object sender, TreeViewEventArgs e)
@@ -865,75 +808,11 @@ namespace FDAInterface
                 }
         }
 
-        //private void cb_viewMode_SelectedIndexChanged(object sender, EventArgs e)
-        //{
-        //    switch (cb_viewMode.SelectedIndex)
-        //    {
-        //        case 0: SetDetailsVisibility(DetailsType.Connection); break;
-        //        case 1: SetDetailsVisibility(DetailsType.Queue); break;
-        //        default: SetDetailsVisibility(DetailsType.None); break;
-        //    }
-        //}
-
-        //private void btnDetails_Click(object sender, EventArgs e)
-        //{
-        //    SetDetailsVisibility(DetailsType.Connection);
-        //}
-
-        //private void btnQueues_Click(object sender, EventArgs e)
-        //{
-        //    SetDetailsVisibility(DetailsType.Queue);
-        //}
-
-        // refresh button
-        //private void btnRefresh_Click(object sender, EventArgs e)
-        //{
-        //    RefreshForm();
-        //}
-
-        /*
-        private void cb_FDA_SelectedIndexChanged(object sender, EventArgs e)
-        {
-            if (cb_FDA.SelectedIndex >= 0)
-            {
-                FDAConnection selectedConnection = (FDAConnection)cb_FDA.SelectedItem;
-
-                if (selectedConnection.Host != FDAManagerContext.Host)
-                {
-                    ClearForm();
-                    //MessageBox.Show("connecting to " + selectedConnection.Host + "(" + selectedConnection.FDAName + ")");
-                    FDAManagerContext.ChangeHost(selectedConnection.Host, selectedConnection.FDAName);
-                }
-                else
-                {
-                   // MessageBox.Show("same host '" + selectedConnection.Host + "', nothing to do");
-                }
-
-            }
-        }
-        */
+ 
 
         #endregion
 
-        /************************************ misc **********************************************/
-        #region misc
-        // function to allow FDAManagerContext to update the form with the FDA connection status
-        /*
-        internal void UpdateFDAConnStatus(string status)
-        {
-            FDAStatus.Text = status;
-        }
-        */
-
-        // cleanup the DBValidation form after its closed
-        /*
-        private void DbValidationForm_Disposed(object sender, EventArgs e)
-        {
-            _dbValidationForm.Disposed -= DbValidationForm_Disposed;
-            _dbValidationForm = null;
-        }
-        */
-        #endregion
+    
 
 
         private void frmMain2_FormClosing(object sender, FormClosingEventArgs e)
@@ -963,7 +842,7 @@ namespace FDAInterface
         /**** contains all the details about a given connection                                  ****/
         /**** automatically updates the tree when connection status changes                      ****/
         /********************************************************************************************/
-        internal class ConnectionNode : IComparable
+        internal class ConnectionNode
         {
            
             private string _status;          
@@ -1046,35 +925,13 @@ namespace FDAInterface
                 _node.Text = Description;
             }
 
-            private void CreateQueueSubNodes(ushort[] qCounts)
-            {
-                TreeNode subNode;
-                if (_node == null)
-                    return;
 
-                for (int i=0;i< qCounts.Length; i++)
-                {
-                    subNode = new TreeNode("Priority Queue " + i + " (" + _qCounts[i] + ")", 8, 8);
-                    subNode.Tag = ID + "." + i;
-                    _node.Nodes.Add(subNode);
-                }
-            }
-
-            public void UpdateQueueNodeText(int priority,int count)
-            {
-                _node.Nodes[priority].Text = "Priority Queue " + priority + " (" + count + ")";
-            }
 
             public TreeNode GetNode()
             {
                 return _node;
             }
 
-            public int CompareTo(object obj)
-            {
-                ConnectionNode node = (ConnectionNode)obj;
-                return Description.CompareTo(node.Description);
-            }
         }
 
         //==========================================
@@ -1113,6 +970,7 @@ namespace FDAInterface
             if (selectedConnection.Host != FDAManagerContext.Host) // if the selected connection is different from the currently connected one
             {
                 ClearForm();
+
                 FDAManagerContext.ChangeHost(selectedConnection.Host, selectedConnection.FDAName);
                 AddToRecent(selectedConnection);
             }
@@ -1145,18 +1003,14 @@ namespace FDAInterface
         internal void SetFDAStatus(string status)
         {
             FDAStatus.Text = "FDA Status: " + status;
-            if (status == "Disconnected")
-                tb_activeFDA.Text = "Not Connected";
+            //if (status == "Disconnected")
+            //    tb_activeFDA.Text = "Not Connected";
 
             SetMenuItemEnabledStates();
 
         }
 
-        private void btn_Connect_Click(object sender, EventArgs e)
-        {
-            string localFDAName = Properties.Settings.Default.LocalFDAIdentifier;
-            FDAManagerContext.ChangeHost("127.0.0.1", localFDAName);
-        }
+    
 
         private void pauseToolStripMenuItem_Click(object sender, EventArgs e)
         {

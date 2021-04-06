@@ -10,6 +10,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using System.ServiceProcess;
 
 namespace FDAController
 {
@@ -23,10 +24,12 @@ namespace FDAController
         private bool _isStopping = false;
         private bool _isStarting = false;
         private Timer timer;
+        private ServiceController FDAControllerService;
 
         public frmMain()
         {
             InitializeComponent();
+            FDAControllerService = new ServiceController("FDAControllerService");
             timer = new Timer();
             timer.Interval = 1000;
             timer.Tick += Timer_Tick;
@@ -41,9 +44,9 @@ namespace FDAController
             bool controllerGood = false;
 
             // is the controller service running?
-            if (ProcessRunning("FDAController"))
+            if (ProcessRunning("FDAControllerService"))
             {
-                status = "FDAController service is running";
+                status = "FDAControllerService is running";
                 textcolor = GoodColor;
 
                 // is the controller responsive to requests?
@@ -295,6 +298,8 @@ namespace FDAController
             Process[] proc = Process.GetProcessesByName(processname);
             return (self && proc.Length > 1) || (!self && proc.Length > 0);
         }
+
+      
 
     }
 }

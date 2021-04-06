@@ -74,6 +74,13 @@ namespace FDAApp
         [STAThread]
         static void Main(string[] args)
         {
+            Globals.ConsoleMode = args.Contains("-console");
+
+            string message = "Starting the FDA in background mode";
+            if (Globals.ConsoleMode)
+                message = "Starting the FDA in console mode";
+            Console.WriteLine(message);
+
             Console.WriteLine("Starting the basic services control port server");
             _FDAControlServer = TCPServer.NewTCPServer(9572);
             if (_FDAControlServer != null)
@@ -95,10 +102,9 @@ namespace FDAApp
 
             Thread.Sleep(5000);
 
-            if (Environment.OSVersion.Platform == PlatformID.Unix)
-            {
-                Globals.ConsoleMode = args.Contains("-console");
-            }
+
+    
+
 
 
             // hiding the console, disabling the x button, disabling quick edit mode are windows only functions
@@ -109,13 +115,9 @@ namespace FDAApp
                 {
                     var handle = NativeMethods.GetConsoleWindow();
                     NativeMethods.ShowWindow(handle, NativeMethods.SW_HIDE);
-                    Globals.ConsoleMode = false;
                 }
                 else
                 {
-
-                    Globals.ConsoleMode = true;
-
                     // the console window is shown, we need to change some settings
 
                     IntPtr conHandle = NativeMethods.GetConsoleWindow();
@@ -281,6 +283,10 @@ namespace FDAApp
                 { 
                     MQTTConnect("localhost");
                     Globals.MQTT?.Publish("FDA/DBType", Encoding.UTF8.GetBytes(DBType.ToUpper()), 0, true);
+                }
+                else
+                {
+                    Console.WriteLine("MQTT is disabled in AppConfig table, skipping MQTT connection");
                 }
 
                 Globals.FDAStatus = Globals.AppState.Starting;
@@ -839,7 +845,6 @@ namespace FDAApp
                 // check if FDA process was run with elevated permissions
                 if (FDAIsElevated)
                 { 
-                    // run the mosquitto utility
                     Globals.SystemManager.LogApplicationEvent(null, "", "Unable to connect to the MQTT broker, attempting to repair the service");
                     string result = MQTTUtils.RepairMQTT();
                     if (result == "")

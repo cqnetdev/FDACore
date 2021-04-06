@@ -81,7 +81,7 @@ namespace ControllerService
 
             if (Environment.OSVersion.Platform == PlatformID.Win32NT)
             {
-                RunConsoleCommand("FDACore.exe", "", "c:\\FDA\\");
+                RunConsoleCommand("FDACore.exe", "", "c:\\IntricateFDA\\");
             }
 
             if (Environment.OSVersion.Platform == PlatformID.Unix)
