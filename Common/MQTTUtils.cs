@@ -325,7 +325,7 @@ namespace Common
             {
                 if (!registrationAttempted)
                 {
-                    // try registering it
+                    // try registering the service (using the mosquitto.exe install option)
                     registrationAttempted = true;
                     Console.WriteLine("Installing mosquitto");
                     error = MQTTUtils.InstallMosquitto();
