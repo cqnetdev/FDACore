@@ -13,7 +13,7 @@ namespace FDAInterface
     public partial class frmAddFDADialog : Form
     {
 
-        public string FDAConnection;
+        public Connection connection;
         public frmAddFDADialog()
         {
             InitializeComponent();
@@ -21,7 +21,7 @@ namespace FDAInterface
 
         private void btnConnect_Click(object sender, EventArgs e)
         {
-            FDAConnection = tb_FDAName.Text + "|" + tb_host.Text;
+            connection = new Connection(tb_host.Text, tb_FDAName.Text);
             DialogResult = DialogResult.OK;
             Close();
         }

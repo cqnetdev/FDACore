@@ -112,12 +112,6 @@
     <Compile Include="frmCommsViewer.Designer.cs">
       <DependentUpon>frmCommsViewer.cs</DependentUpon>
     </Compile>
-    <Compile Include="frmEditFDAList.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Include="frmEditFDAList.Designer.cs">
-      <DependentUpon>frmEditFDAList.cs</DependentUpon>
-    </Compile>
     <Compile Include="frmMain2.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -168,9 +162,6 @@
     </EmbeddedResource>
     <EmbeddedResource Include="frmCommsViewer.resx">
       <DependentUpon>frmCommsViewer.cs</DependentUpon>
-    </EmbeddedResource>
-    <EmbeddedResource Include="frmEditFDAList.resx">
-      <DependentUpon>frmEditFDAList.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="frmMain2.resx">
       <DependentUpon>frmMain2.cs</DependentUpon>

@@ -52,17 +52,17 @@
             this.tabControl1 = new System.Windows.Forms.TabControl();
             this.tabDetails = new System.Windows.Forms.TabPage();
             this.panel1 = new System.Windows.Forms.Panel();
-            this.connDetails = new FDAInterface.ConnDetailsCtrl();
             this.tabQueues = new System.Windows.Forms.TabPage();
-            this.qHist = new FDAInterface.QueueHistory();
             this.panel2 = new System.Windows.Forms.Panel();
-            this.tb_connectionstate = new System.Windows.Forms.TextBox();
             this.panel3 = new System.Windows.Forms.Panel();
             this.imgControllerServiceStatus = new System.Windows.Forms.PictureBox();
             this.imgBrokerStatus = new System.Windows.Forms.PictureBox();
             this.label3 = new System.Windows.Forms.Label();
             this.label2 = new System.Windows.Forms.Label();
             this.tree = new System.Windows.Forms.TreeView();
+            this.tb_connectionstate = new System.Windows.Forms.TextBox();
+            this.connDetails = new FDAInterface.ConnDetailsCtrl();
+            this.qHist = new FDAInterface.QueueHistory();
             this.statusStrip1.SuspendLayout();
             this.menuStrip1.SuspendLayout();
             this.tabControl1.SuspendLayout();
@@ -167,7 +167,7 @@
             this.stopToolStripMenuItem,
             this.recentToolStripMenuItem});
             this.fDAToolStripMenuItem.Name = "fDAToolStripMenuItem";
-            this.fDAToolStripMenuItem.Size = new System.Drawing.Size(136, 32);
+            this.fDAToolStripMenuItem.Size = new System.Drawing.Size(136, 34);
             this.fDAToolStripMenuItem.Text = "FDA Control";
             // 
             // connectToolStripMenuItem
@@ -175,7 +175,7 @@
             this.connectToolStripMenuItem.Name = "connectToolStripMenuItem";
             this.connectToolStripMenuItem.Size = new System.Drawing.Size(285, 36);
             this.connectToolStripMenuItem.Text = "New Connection";
-            this.connectToolStripMenuItem.Click += new System.EventHandler(this.ChangeConnectionToolStripMenuItem_Click);
+            this.connectToolStripMenuItem.Click += new System.EventHandler(this.ConnectionToolStripMenuItem_Click);
             // 
             // startToolStripMenuItem
             // 
@@ -223,7 +223,7 @@
             this.communicationsStatsToolStripMenuItem,
             this.mQTTQueryTestToolStripMenuItem});
             this.toolsToolStripMenuItem.Name = "toolsToolStripMenuItem";
-            this.toolsToolStripMenuItem.Size = new System.Drawing.Size(115, 32);
+            this.toolsToolStripMenuItem.Size = new System.Drawing.Size(115, 34);
             this.toolsToolStripMenuItem.Text = "FDA Tools";
             // 
             // communicationsStatsToolStripMenuItem
@@ -247,6 +247,7 @@
             this.tabControl1.Controls.Add(this.tabDetails);
             this.tabControl1.Controls.Add(this.tabQueues);
             this.tabControl1.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.tabControl1.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.tabControl1.ItemSize = new System.Drawing.Size(61, 20);
             this.tabControl1.Location = new System.Drawing.Point(409, 38);
             this.tabControl1.Name = "tabControl1";
@@ -278,6 +279,112 @@
             this.panel1.Size = new System.Drawing.Size(1413, 595);
             this.panel1.TabIndex = 38;
             // 
+            // tabQueues
+            // 
+            this.tabQueues.Controls.Add(this.qHist);
+            this.tabQueues.Location = new System.Drawing.Point(4, 24);
+            this.tabQueues.Name = "tabQueues";
+            this.tabQueues.Padding = new System.Windows.Forms.Padding(3);
+            this.tabQueues.Size = new System.Drawing.Size(1419, 603);
+            this.tabQueues.TabIndex = 1;
+            this.tabQueues.Text = "Queues";
+            this.tabQueues.UseVisualStyleBackColor = true;
+            // 
+            // panel2
+            // 
+            this.panel2.Controls.Add(this.panel3);
+            this.panel2.Controls.Add(this.tree);
+            this.panel2.Dock = System.Windows.Forms.DockStyle.Left;
+            this.panel2.Location = new System.Drawing.Point(0, 38);
+            this.panel2.Name = "panel2";
+            this.panel2.Size = new System.Drawing.Size(409, 629);
+            this.panel2.TabIndex = 38;
+            // 
+            // panel3
+            // 
+            this.panel3.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+            this.panel3.Controls.Add(this.tb_connectionstate);
+            this.panel3.Controls.Add(this.imgControllerServiceStatus);
+            this.panel3.Controls.Add(this.imgBrokerStatus);
+            this.panel3.Controls.Add(this.label3);
+            this.panel3.Controls.Add(this.label2);
+            this.panel3.Location = new System.Drawing.Point(19, 3);
+            this.panel3.Name = "panel3";
+            this.panel3.Size = new System.Drawing.Size(380, 142);
+            this.panel3.TabIndex = 37;
+            // 
+            // imgControllerServiceStatus
+            // 
+            this.imgControllerServiceStatus.Location = new System.Drawing.Point(11, 109);
+            this.imgControllerServiceStatus.Name = "imgControllerServiceStatus";
+            this.imgControllerServiceStatus.Size = new System.Drawing.Size(25, 21);
+            this.imgControllerServiceStatus.SizeMode = System.Windows.Forms.PictureBoxSizeMode.AutoSize;
+            this.imgControllerServiceStatus.TabIndex = 3;
+            this.imgControllerServiceStatus.TabStop = false;
+            // 
+            // imgBrokerStatus
+            // 
+            this.imgBrokerStatus.Location = new System.Drawing.Point(11, 72);
+            this.imgBrokerStatus.Name = "imgBrokerStatus";
+            this.imgBrokerStatus.Size = new System.Drawing.Size(25, 21);
+            this.imgBrokerStatus.SizeMode = System.Windows.Forms.PictureBoxSizeMode.AutoSize;
+            this.imgBrokerStatus.TabIndex = 2;
+            this.imgBrokerStatus.TabStop = false;
+            // 
+            // label3
+            // 
+            this.label3.AutoSize = true;
+            this.label3.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.label3.Location = new System.Drawing.Point(42, 104);
+            this.label3.Name = "label3";
+            this.label3.Size = new System.Drawing.Size(209, 28);
+            this.label3.TabIndex = 1;
+            this.label3.Text = "FDA Controller Service";
+            // 
+            // label2
+            // 
+            this.label2.AutoSize = true;
+            this.label2.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.label2.Location = new System.Drawing.Point(42, 67);
+            this.label2.Name = "label2";
+            this.label2.Size = new System.Drawing.Size(126, 28);
+            this.label2.TabIndex = 0;
+            this.label2.Text = "MQTT Broker";
+            // 
+            // tree
+            // 
+            this.tree.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Left)));
+            this.tree.Font = new System.Drawing.Font("Segoe UI", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.tree.ImageIndex = 0;
+            this.tree.ImageList = this.imageList1;
+            this.tree.Location = new System.Drawing.Point(19, 153);
+            this.tree.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
+            this.tree.Name = "tree";
+            treeNode1.ImageIndex = 9;
+            treeNode1.Name = "Node0";
+            treeNode1.SelectedImageIndex = 9;
+            treeNode1.Text = "Connections";
+            this.tree.Nodes.AddRange(new System.Windows.Forms.TreeNode[] {
+            treeNode1});
+            this.tree.SelectedImageIndex = 0;
+            this.tree.Size = new System.Drawing.Size(384, 471);
+            this.tree.StateImageList = this.imageList1;
+            this.tree.TabIndex = 31;
+            this.tree.AfterSelect += new System.Windows.Forms.TreeViewEventHandler(this.tree_AfterSelect);
+            // 
+            // tb_connectionstate
+            // 
+            this.tb_connectionstate.BorderStyle = System.Windows.Forms.BorderStyle.None;
+            this.tb_connectionstate.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.tb_connectionstate.Location = new System.Drawing.Point(-1, 3);
+            this.tb_connectionstate.Multiline = true;
+            this.tb_connectionstate.Name = "tb_connectionstate";
+            this.tb_connectionstate.ReadOnly = true;
+            this.tb_connectionstate.Size = new System.Drawing.Size(380, 61);
+            this.tb_connectionstate.TabIndex = 39;
+            this.tb_connectionstate.Text = "FDA Connection Status";
+            // 
             // connDetails
             // 
             this.connDetails.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
@@ -290,17 +397,6 @@
             this.connDetails.Size = new System.Drawing.Size(1377, 934);
             this.connDetails.TabIndex = 37;
             // 
-            // tabQueues
-            // 
-            this.tabQueues.Controls.Add(this.qHist);
-            this.tabQueues.Location = new System.Drawing.Point(4, 24);
-            this.tabQueues.Name = "tabQueues";
-            this.tabQueues.Padding = new System.Windows.Forms.Padding(3);
-            this.tabQueues.Size = new System.Drawing.Size(1419, 603);
-            this.tabQueues.TabIndex = 1;
-            this.tabQueues.Text = "Queues";
-            this.tabQueues.UseVisualStyleBackColor = true;
-            // 
             // qHist
             // 
             this.qHist.ConnectionID = new System.Guid("00000000-0000-0000-0000-000000000000");
@@ -311,95 +407,6 @@
             this.qHist.Priority = 0;
             this.qHist.Size = new System.Drawing.Size(1413, 597);
             this.qHist.TabIndex = 34;
-            // 
-            // panel2
-            // 
-            this.panel2.Controls.Add(this.tb_connectionstate);
-            this.panel2.Controls.Add(this.panel3);
-            this.panel2.Controls.Add(this.tree);
-            this.panel2.Dock = System.Windows.Forms.DockStyle.Left;
-            this.panel2.Location = new System.Drawing.Point(0, 38);
-            this.panel2.Name = "panel2";
-            this.panel2.Size = new System.Drawing.Size(409, 629);
-            this.panel2.TabIndex = 38;
-            // 
-            // tb_connectionstate
-            // 
-            this.tb_connectionstate.BorderStyle = System.Windows.Forms.BorderStyle.None;
-            this.tb_connectionstate.Location = new System.Drawing.Point(19, 32);
-            this.tb_connectionstate.Multiline = true;
-            this.tb_connectionstate.Name = "tb_connectionstate";
-            this.tb_connectionstate.ReadOnly = true;
-            this.tb_connectionstate.Size = new System.Drawing.Size(380, 42);
-            this.tb_connectionstate.TabIndex = 38;
-            this.tb_connectionstate.Text = "Connection Status";
-            // 
-            // panel3
-            // 
-            this.panel3.Controls.Add(this.imgControllerServiceStatus);
-            this.panel3.Controls.Add(this.imgBrokerStatus);
-            this.panel3.Controls.Add(this.label3);
-            this.panel3.Controls.Add(this.label2);
-            this.panel3.Location = new System.Drawing.Point(19, 80);
-            this.panel3.Name = "panel3";
-            this.panel3.Size = new System.Drawing.Size(380, 100);
-            this.panel3.TabIndex = 37;
-            // 
-            // imgControllerServiceStatus
-            // 
-            this.imgControllerServiceStatus.Location = new System.Drawing.Point(14, 54);
-            this.imgControllerServiceStatus.Name = "imgControllerServiceStatus";
-            this.imgControllerServiceStatus.Size = new System.Drawing.Size(25, 21);
-            this.imgControllerServiceStatus.TabIndex = 3;
-            this.imgControllerServiceStatus.TabStop = false;
-            // 
-            // imgBrokerStatus
-            // 
-            this.imgBrokerStatus.Location = new System.Drawing.Point(14, 17);
-            this.imgBrokerStatus.Name = "imgBrokerStatus";
-            this.imgBrokerStatus.Size = new System.Drawing.Size(25, 21);
-            this.imgBrokerStatus.TabIndex = 2;
-            this.imgBrokerStatus.TabStop = false;
-            // 
-            // label3
-            // 
-            this.label3.AutoSize = true;
-            this.label3.Location = new System.Drawing.Point(45, 55);
-            this.label3.Name = "label3";
-            this.label3.Size = new System.Drawing.Size(170, 20);
-            this.label3.TabIndex = 1;
-            this.label3.Text = "FDA Controller Service";
-            // 
-            // label2
-            // 
-            this.label2.AutoSize = true;
-            this.label2.Location = new System.Drawing.Point(45, 18);
-            this.label2.Name = "label2";
-            this.label2.Size = new System.Drawing.Size(103, 20);
-            this.label2.TabIndex = 0;
-            this.label2.Text = "MQTT Broker";
-            // 
-            // tree
-            // 
-            this.tree.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
-            | System.Windows.Forms.AnchorStyles.Left)));
-            this.tree.Font = new System.Drawing.Font("Segoe UI", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.tree.ImageIndex = 0;
-            this.tree.ImageList = this.imageList1;
-            this.tree.Location = new System.Drawing.Point(19, 235);
-            this.tree.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
-            this.tree.Name = "tree";
-            treeNode1.ImageIndex = 9;
-            treeNode1.Name = "Node0";
-            treeNode1.SelectedImageIndex = 9;
-            treeNode1.Text = "Connections";
-            this.tree.Nodes.AddRange(new System.Windows.Forms.TreeNode[] {
-            treeNode1});
-            this.tree.SelectedImageIndex = 0;
-            this.tree.Size = new System.Drawing.Size(384, 389);
-            this.tree.StateImageList = this.imageList1;
-            this.tree.TabIndex = 31;
-            this.tree.AfterSelect += new System.Windows.Forms.TreeViewEventHandler(this.tree_AfterSelect);
             // 
             // frmMain2
             // 
@@ -426,7 +433,6 @@
             this.panel1.ResumeLayout(false);
             this.tabQueues.ResumeLayout(false);
             this.panel2.ResumeLayout(false);
-            this.panel2.PerformLayout();
             this.panel3.ResumeLayout(false);
             this.panel3.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.imgControllerServiceStatus)).EndInit();

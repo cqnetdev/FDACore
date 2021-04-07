@@ -19,7 +19,7 @@ namespace FDAInterface
 {
     public partial class frmMain2 : Form, IDisposable
     {
-
+        
         public class FDAConnection : INotifyPropertyChanged
         {
             private string _FDAName;
@@ -42,7 +42,7 @@ namespace FDAInterface
                     Host = "";
                 }
             }
-
+        
     
            
 
@@ -93,9 +93,12 @@ namespace FDAInterface
         private Dictionary<Guid, ConnectionNode> _connOverviewDict;        
 
         private delegate void DataReceivedHandler(byte[] data,byte dataType);
+        private delegate void SafeCallStatusUpdate(object sender,FDAManagerContext.StatusUpdateArgs e);
+        private delegate void SafeCallFDANameUpdate(object sender, string FDAName);
         private delegate void SafeCallNoParams();
         private delegate void SafeCall1StringParam(string param);
         private delegate void SafeCall2StringParams(string param1,string param2);
+        private delegate void SafeCall1BoolParam(bool param1);
         private delegate void SafeMQQTEventHandler(object sender, uPLibrary.Networking.M2Mqtt.Messages.MqttMsgPublishEventArgs e);
 
         //private frmDBVal _dbValidationForm = null;
@@ -109,7 +112,7 @@ namespace FDAInterface
 
       
 
-        private List<FDAConnection> _recent;
+        //private List<FDAConnection> _recent;
 
         /******************************************** CONSTRUCTOR / initialization ***************************************/
         #region initialization
@@ -125,17 +128,70 @@ namespace FDAInterface
             FDAState = new string[] { "starting", "running", "shutting down", "pausing", "paused", "stopped" };
 
             // load the recent FDA connections
-            _recent = new List<FDAConnection>();
-            StringCollection recentList = Properties.Settings.Default.RecentConnections;
-            string[] recentsArray = new string[recentList.Count];
-            recentList.CopyTo(recentsArray,0);
-            foreach (string recent in recentsArray)
+            //_recent = new List<FDAConnection>();
+            //StringCollection recentList = Properties.Settings.Default.RecentConnections;
+            //string[] recentsArray = new string[recentList.Count];
+            //recentList.CopyTo(recentsArray,0);
+            foreach (Connection recent in FDAManagerContext.ConnHistory.RecentConnections)
             {
-                AddToRecent(new FDAConnection(recent));
+                AddToRecent(recent);
             }
 
-            imgBrokerStatus.Image = imageList1.Images[2];
-            imgControllerServiceStatus.Image = imageList1.Images[2];
+            FDAManagerContext_FDANameUpdate(this, FDAManagerContext.CurrentFDA);
+            FDAManagerContext_StatusUpdate(this, new FDAManagerContext.StatusUpdateArgs("MQTT", FDAManagerContext.MQTTConnectionStatus));
+            FDAManagerContext_StatusUpdate(this, new FDAManagerContext.StatusUpdateArgs("Controller", FDAManagerContext.ControllerConnectionStatus));
+
+
+            FDAManagerContext.StatusUpdate += FDAManagerContext_StatusUpdate;
+            FDAManagerContext.FDANameUpdate += FDAManagerContext_FDANameUpdate;
+        }
+
+        private void FDAManagerContext_FDANameUpdate(object sender, string name)
+        {
+            if (InvokeRequired)
+            {
+                Invoke(new SafeCallFDANameUpdate(FDAManagerContext_FDANameUpdate), new object[] { sender, name });
+            }
+            else
+            {
+                tb_connectionstate.Text = "FDA Connection status: " + name;
+            }
+        }
+
+        private void FDAManagerContext_StatusUpdate(object sender, FDAManagerContext.StatusUpdateArgs e)
+        {
+            if (this.IsDisposed || this.Disposing)
+                return;
+
+            if (InvokeRequired)
+            {
+                Invoke(new SafeCallStatusUpdate(FDAManagerContext_StatusUpdate), new object[] { sender, e });
+            }
+            else
+            {
+                if (imageList1.Images.Count >= 3)
+                {
+                    if (e.StatusName == "MQTT")
+                    {
+                        switch (e.Status)
+                        {
+                            case FDAManagerContext.ConnectionStatus.Connected: imgBrokerStatus.Image = imageList1.Images[0]; break;
+                            case FDAManagerContext.ConnectionStatus.Connecting: imgBrokerStatus.Image = imageList1.Images[1]; break;
+                            case FDAManagerContext.ConnectionStatus.Disconnected: imgBrokerStatus.Image = imageList1.Images[2]; break;
+                        }
+                    }
+
+                    if (e.StatusName == "Controller")
+                    {
+                        switch (e.Status)
+                        {
+                            case FDAManagerContext.ConnectionStatus.Connected: imgControllerServiceStatus.Image = imageList1.Images[0]; break;
+                            case FDAManagerContext.ConnectionStatus.Connecting: imgControllerServiceStatus.Image = imageList1.Images[1]; break;
+                            case FDAManagerContext.ConnectionStatus.Disconnected: imgControllerServiceStatus.Image = imageList1.Images[2]; break;
+                        }
+                    }
+                }
+            }
         }
 
         private void frmMain2_Shown(object sender, EventArgs e)
@@ -223,7 +279,7 @@ namespace FDAInterface
             }
             else
             {
-                imgBrokerStatus.Image = imageList1.Images[0];
+                //imgBrokerStatus.Image = imageList1.Images[0];
                 mqttStatus.Text = "MQTT Status: Connected";
                 //btn_Connect.Enabled = false;
                 //tb_activeFDA.Text = FDAName + " (" + host + ")";
@@ -270,7 +326,7 @@ namespace FDAInterface
             else
             {
 
-                imgBrokerStatus.Image = imageList1.Images[2];
+                //imgBrokerStatus.Image = imageList1.Images[2];
                 mqttStatus.Text = "MQTT Status: Disconnected";
                 //btn_Connect.Enabled = true;
             }
@@ -602,77 +658,93 @@ namespace FDAInterface
 
         internal void SetConnectionMenuItems(bool enabled)
         {
-            connectToolStripMenuItem.Enabled = enabled;
-            recentToolStripMenuItem.Enabled = enabled;
-
-            // if the connection menu items are disabled, disable the FDA start/stop buttons too
-            if (!enabled)
+            /*
+            if (InvokeRequired)
             {
-                startToolStripMenuItem.Enabled = false;
-                stopToolStripMenuItem.Enabled = false;
+                Invoke(new SafeCall1BoolParam(SetConnectionMenuItems), new object[] { enabled });
             }
+            else
+            {
+                connectToolStripMenuItem.Enabled = enabled;
+                recentToolStripMenuItem.Enabled = enabled;
+
+                // if the connection menu items are disabled, disable the FDA start/stop buttons too
+                if (!enabled)
+                {
+                    startToolStripMenuItem.Enabled = false;
+                    stopToolStripMenuItem.Enabled = false;
+                }
+            }
+            */
         }
 
-        internal void SetConnectionState(string newState)
+        //internal void SetConnectionStateText(string newState)
+        //{
+        //    if (InvokeRequired)
+        //    {
+        //        Invoke(new SafeCall1StringParam(SetConnectionStateText), new object[] { newState });
+        //    }
+        //    else
+        //    {
+        //        tb_connectionstate.Text = newState;
+        //    }
+        //}
+        private void SetMenuItemEnabledStates()
         {
             if (InvokeRequired)
             {
-                Invoke(new SafeCall1StringParam(SetConnectionState), new object[] { newState });
+                Invoke(new SafeCallNoParams(SetMenuItemEnabledStates));
             }
             else
-            {
-                tb_connectionstate.Text = newState;
-            }
-        }
-        private void SetMenuItemEnabledStates()
-        {
-            if (FDAManagerContext._MQTTConnectionStatus)
-            {
-
-                switch (FDAStatus.Text)
+            { 
+                if (FDAManagerContext.MQTTConnectionStatus == FDAManagerContext.ConnectionStatus.Connected)
                 {
-                    case "FDA Status: ":
-                        startToolStripMenuItem.Enabled = true;
-                        startwithConsoleToolStripMenuItem.Enabled = true;
-                        stopToolStripMenuItem.Enabled = false;
-                        pauseToolStripMenuItem.Enabled = false;
-                        mQTTQueryTestToolStripMenuItem.Enabled = false;
-                        communicationsStatsToolStripMenuItem.Enabled = false;
-                        break;
-                    case "FDA Status: Normal":
-                        startToolStripMenuItem.Enabled = false;
-                        startwithConsoleToolStripMenuItem.Enabled = false;
-                        stopToolStripMenuItem.Enabled = true;
-                        pauseToolStripMenuItem.Enabled = true;
-                        mQTTQueryTestToolStripMenuItem.Enabled = true;
-                        communicationsStatsToolStripMenuItem.Enabled = true;
-                        break;
-                    case "FDA Status: Stopped":                   
-                        startToolStripMenuItem.Enabled = true;
-                        startwithConsoleToolStripMenuItem.Enabled = true;
-                        stopToolStripMenuItem.Enabled = false;
-                        pauseToolStripMenuItem.Enabled = false;
-                        mQTTQueryTestToolStripMenuItem.Enabled = false;
-                        communicationsStatsToolStripMenuItem.Enabled = false;
-                        break;
-                    default:
-                        startToolStripMenuItem.Enabled = false;
-                        startwithConsoleToolStripMenuItem.Enabled = false;
-                        stopToolStripMenuItem.Enabled = false;
-                        pauseToolStripMenuItem.Enabled = false;
-                        mQTTQueryTestToolStripMenuItem.Enabled = false;
-                        communicationsStatsToolStripMenuItem.Enabled = false;
-                        break;
+
+                    switch (FDAStatus.Text)
+                    {
+                        case "FDA Status: ":
+                            startToolStripMenuItem.Enabled = true;
+                            startwithConsoleToolStripMenuItem.Enabled = true;
+                            stopToolStripMenuItem.Enabled = false;
+                            pauseToolStripMenuItem.Enabled = false;
+                            mQTTQueryTestToolStripMenuItem.Enabled = false;
+                            communicationsStatsToolStripMenuItem.Enabled = false;
+                            break;
+                        case "FDA Status: Normal":
+                            startToolStripMenuItem.Enabled = false;
+                            startwithConsoleToolStripMenuItem.Enabled = false;
+                            stopToolStripMenuItem.Enabled = true;
+                            pauseToolStripMenuItem.Enabled = true;
+                            mQTTQueryTestToolStripMenuItem.Enabled = true;
+                            communicationsStatsToolStripMenuItem.Enabled = true;
+                            break;
+                        case "FDA Status: Stopped":
+                            startToolStripMenuItem.Enabled = true;
+                            startwithConsoleToolStripMenuItem.Enabled = true;
+                            stopToolStripMenuItem.Enabled = false;
+                            pauseToolStripMenuItem.Enabled = false;
+                            mQTTQueryTestToolStripMenuItem.Enabled = false;
+                            communicationsStatsToolStripMenuItem.Enabled = false;
+                            break;
+                        default:
+                            startToolStripMenuItem.Enabled = false;
+                            startwithConsoleToolStripMenuItem.Enabled = false;
+                            stopToolStripMenuItem.Enabled = false;
+                            pauseToolStripMenuItem.Enabled = false;
+                            mQTTQueryTestToolStripMenuItem.Enabled = false;
+                            communicationsStatsToolStripMenuItem.Enabled = false;
+                            break;
+                    }
                 }
-            }
-            else
-            {
-                startToolStripMenuItem.Enabled = false;
-                startwithConsoleToolStripMenuItem.Enabled = false;
-                stopToolStripMenuItem.Enabled = false;
-                pauseToolStripMenuItem.Enabled = false;
-                mQTTQueryTestToolStripMenuItem.Enabled = false;
-                communicationsStatsToolStripMenuItem.Enabled = false;
+                else
+                {
+                    startToolStripMenuItem.Enabled = false;
+                    startwithConsoleToolStripMenuItem.Enabled = false;
+                    stopToolStripMenuItem.Enabled = false;
+                    pauseToolStripMenuItem.Enabled = false;
+                    mQTTQueryTestToolStripMenuItem.Enabled = false;
+                    communicationsStatsToolStripMenuItem.Enabled = false;
+                }
             }
         }
 
@@ -721,10 +793,7 @@ namespace FDAInterface
         //FDA Menu
         private void startToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            FDAManagerContext.SendStartFDACommand(null, new EventArgs());
-            // startwithConsoleToolStripMenuItem.Enabled = false;
-            // startToolStripMenuItem.Enabled = false;
-            // stopToolStripMenuItem.Enabled = true;
+            FDAManagerContext.SendCommandToFDAController("START");
         }
 
 
@@ -738,7 +807,7 @@ namespace FDAInterface
 
         private void stopToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            FDAManagerContext.StopFDA(null, new EventArgs());
+            FDAManagerContext.SendCommandToFDAController("SHUTDOWN");
         }
 
 
@@ -948,38 +1017,38 @@ namespace FDAInterface
             statsForm.Show();
         }
 
-        private void ChangeConnectionToolStripMenuItem_Click(object sender, EventArgs e)
+        private void ConnectionToolStripMenuItem_Click(object sender, EventArgs e)
         {
             ToolStripMenuItem selectedItem = (ToolStripMenuItem)sender;
-            FDAConnection selectedConnection;
+            Connection selectedConnection;
             if (selectedItem.Text == "New Connection")  // creating a new connection
             {
                 frmAddFDADialog dlg = new frmAddFDADialog();
                 if (dlg.ShowDialog() == DialogResult.OK)
                 {
-                    selectedConnection = new FDAConnection(dlg.FDAConnection);
+                    selectedConnection = dlg.connection;
                 }
                 else
                     return;
             }
             else   // selecting a previous connection from the recent connections list
             {
-                selectedConnection = (FDAConnection)selectedItem.Tag;
+                selectedConnection = (Connection)selectedItem.Tag;
             }
 
             if (selectedConnection.Host != FDAManagerContext.Host) // if the selected connection is different from the currently connected one
             {
                 ClearForm();
 
-                FDAManagerContext.ChangeHost(selectedConnection.Host, selectedConnection.FDAName);
+                FDAManagerContext.ChangeHost(selectedConnection.Host, selectedConnection.Description);
                 AddToRecent(selectedConnection);
             }
         }
 
-        private void AddToRecent(FDAConnection connection)
+        private void AddToRecent(Connection connection)
         {
             bool alreadyListed = false;
-            foreach (FDAConnection recentConn in _recent)
+            foreach (Connection recentConn in FDAManagerContext.ConnHistory.RecentConnections)
             {
                 if (connection == recentConn)
                 {
@@ -990,14 +1059,17 @@ namespace FDAInterface
 
             if (!alreadyListed)
             {
-                _recent.Add(connection);
-                ToolStripMenuItem newMenuItem = new ToolStripMenuItem(connection.FDAName + " (" + connection.Host + ")");
-                newMenuItem.Click += ChangeConnectionToolStripMenuItem_Click;
-                newMenuItem.Tag = connection;
-                recentToolStripMenuItem.DropDownItems.Add(newMenuItem);
-                Properties.Settings.Default.RecentConnections.Add(connection.FDAName + "|" + connection.Host);
-                Properties.Settings.Default.Save();
+                FDAManagerContext.ConnHistory.RecentConnections.Add(connection);
             }
+
+            ToolStripMenuItem newMenuItem = new ToolStripMenuItem(connection.Description + " (" + connection.Host + ")");
+            newMenuItem.Click += ConnectionToolStripMenuItem_Click;
+            newMenuItem.Tag = connection;
+            recentToolStripMenuItem.DropDownItems.Add(newMenuItem);
+                
+            //Properties.Settings.Default.RecentConnections.Add(connection.FDAName + "|" + connection.Host);
+            //Properties.Settings.Default.Save();
+            
         }
 
         internal void SetFDAStatus(string status)
