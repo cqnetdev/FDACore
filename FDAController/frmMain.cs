@@ -82,6 +82,7 @@ namespace FDAController
                     {
                         status += " but is not responsive";
                         textcolor = WarningColor;
+                        controllerGood = false;
                     }
                 }
                 else
@@ -91,7 +92,7 @@ namespace FDAController
                     SafePropertySet(btnStop, "Enabled", false);
                     SafePropertySet(btnStart, "Enabled", false);
                     SafePropertySet(btnStartConsole, "Enabled", false);
-
+                    controllerGood = false;
                 }
 
                 SafePropertySet(lblControllerService, "Text", status);
@@ -130,9 +131,12 @@ namespace FDAController
                         SafePropertySet(btnStop, "Enabled", true);
                     }
 
-                    SafePropertySet(btnStart, "Enabled", false);
-                    SafePropertySet(btnStartConsole, "Enabled", false);
-                    SafePropertySet(btnStart, "Text", "Start");
+                    if (controllerGood)
+                    {
+                        SafePropertySet(btnStart, "Enabled", false);
+                        SafePropertySet(btnStartConsole, "Enabled", false);
+                        SafePropertySet(btnStart, "Text", "Start");
+                    }
   
 
                     // ask the FDA controller for the FDA's run mode (background or console)
@@ -171,7 +175,7 @@ namespace FDAController
                     
                     SafePropertySet(btnStop, "Enabled", false);
 
-                    if (!_isStarting)
+                    if (!_isStarting && controllerGood)
                     {
                         SafePropertySet(btnStart, "Enabled",true);
                         SafePropertySet(btnStart, "Text", "Start");
