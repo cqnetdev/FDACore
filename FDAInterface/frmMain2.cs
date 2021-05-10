@@ -19,7 +19,7 @@ namespace FDAInterface
 {
     public partial class frmMain2 : Form, IDisposable
     {
-        
+      
         public class FDAConnection : INotifyPropertyChanged
         {
             private string _FDAName;
@@ -134,13 +134,15 @@ namespace FDAInterface
             //recentList.CopyTo(recentsArray,0);
             foreach (Connection recent in FDAManagerContext.ConnHistory.RecentConnections)
             {
-                AddToRecent(recent);
+                AddToRecent(recent,true);
             }
 
             FDAManagerContext_FDANameUpdate(this, FDAManagerContext.CurrentFDA);
             FDAManagerContext_StatusUpdate(this, new FDAManagerContext.StatusUpdateArgs("MQTT", FDAManagerContext.MQTTConnectionStatus));
             FDAManagerContext_StatusUpdate(this, new FDAManagerContext.StatusUpdateArgs("Controller", FDAManagerContext.ControllerConnectionStatus));
 
+            imgFDARunStatus.Image = imageList1.Images[3];
+            imgFDARunStatus.Tag = "unknown";
 
             FDAManagerContext.StatusUpdate += FDAManagerContext_StatusUpdate;
             FDAManagerContext.FDANameUpdate += FDAManagerContext_FDANameUpdate;
@@ -154,7 +156,7 @@ namespace FDAInterface
             }
             else
             {
-                tb_connectionstate.Text = "FDA Connection status: " + name;
+                tb_connectionstate.Text = "FDA Connection: " + name;
             }
         }
 
@@ -175,9 +177,10 @@ namespace FDAInterface
                     {
                         switch (e.Status)
                         {
-                            case FDAManagerContext.ConnectionStatus.Connected: imgBrokerStatus.Image = imageList1.Images[0]; break;
-                            case FDAManagerContext.ConnectionStatus.Connecting: imgBrokerStatus.Image = imageList1.Images[1]; break;
-                            case FDAManagerContext.ConnectionStatus.Disconnected: imgBrokerStatus.Image = imageList1.Images[2]; break;
+                            case FDAManagerContext.ConnectionStatus.Connected: imgBrokerStatus.Status = SuperSpecialPictureBox.ConnStatus.Connected; break;
+                            case FDAManagerContext.ConnectionStatus.Connecting: imgBrokerStatus.Status = SuperSpecialPictureBox.ConnStatus.Connecting;  break;
+                            case FDAManagerContext.ConnectionStatus.Disconnected: imgBrokerStatus.Status = SuperSpecialPictureBox.ConnStatus.Disconnected;  break;
+                            case FDAManagerContext.ConnectionStatus.Default: imgBrokerStatus.Status = SuperSpecialPictureBox.ConnStatus.Default; break;
                         }
                     }
 
@@ -185,9 +188,10 @@ namespace FDAInterface
                     {
                         switch (e.Status)
                         {
-                            case FDAManagerContext.ConnectionStatus.Connected: imgControllerServiceStatus.Image = imageList1.Images[0]; break;
-                            case FDAManagerContext.ConnectionStatus.Connecting: imgControllerServiceStatus.Image = imageList1.Images[1]; break;
-                            case FDAManagerContext.ConnectionStatus.Disconnected: imgControllerServiceStatus.Image = imageList1.Images[2]; break;
+                            case FDAManagerContext.ConnectionStatus.Connected: imgControllerServiceStatus.Status = SuperSpecialPictureBox.ConnStatus.Connected;  break;
+                            case FDAManagerContext.ConnectionStatus.Connecting: imgControllerServiceStatus.Status = SuperSpecialPictureBox.ConnStatus.Connecting; break;
+                            case FDAManagerContext.ConnectionStatus.Disconnected: imgControllerServiceStatus.Status = SuperSpecialPictureBox.ConnStatus.Disconnected; break;
+                            case FDAManagerContext.ConnectionStatus.Default: imgControllerServiceStatus.Status = SuperSpecialPictureBox.ConnStatus.Default; break;
                         }
                     }
                 }
@@ -197,71 +201,10 @@ namespace FDAInterface
         private void frmMain2_Shown(object sender, EventArgs e)
         {
             tree.Nodes[0].Expand();
-
-
-            //if (FDAManagerContext.elevatedPermissions)
-            //{
-            //    SubscribeToFDATopics(null);
-            //}
-            //else
-            //{
-            //    elevationWaitTimer.Change(500, Timeout.Infinite);
-            //}
         }
+        #endregion
 
    
-
-        #endregion
-
-        /************************************ handle data received over TCP connection with FDA  **************************************************/
-        #region TCPConnectionToFDA
-        internal void DataReceivedFromFDA(byte[] message,byte dataType)
-        {
-            if (InvokeRequired)
-                Invoke(new DataReceivedHandler(DataReceivedFromFDA), new object[] { message,dataType });
-            else
-            {
-                string ASCIIMessage;
-                if (dataType == 0) // ASCII data
-                {
-                    ASCIIMessage = Encoding.ASCII.GetString(message);
-                    string[] parsedMsg = ASCIIMessage.Split(':');
-
-                    // message must have two parts, the operation and the data
-                    // if it doesn't have a :, it's not valid so respond with an error
-                    if (parsedMsg.Length < 2)
-                    {
-                        return;
-                    }
-                    string operation = parsedMsg[0].ToUpper();
-                    string data = parsedMsg[1];
-
-                    switch (operation)
-                    {
-                        case "FDACONNECTIONSTATUS":
-                            FDAStatus.Text = "FDA Status: " + data;
-                            SetMenuItemEnabledStates();
-                            if ((data.ToUpper() == "RUNNING" || data.ToUpper() == "PAUSED") && !FDAConnected)
-                            {
-                                FDAConnected = true;
-                                ClearForm();
-                                elevationWaitTimer.Change(500, Timeout.Infinite);
-                            }
-
-                            if (data.ToUpper() == "STOPPED" && FDAConnected)
-                            {
-                                FDAConnected = false;
-                                ClearForm();
-                            }
-                            break;
-  
-                    }
-                }
-
-               
-            }
-        }
-        #endregion
 
         /************************************* MQTT subscriptions and publication received handling **************************************************/
         #region MQTT
@@ -283,7 +226,7 @@ namespace FDAInterface
                 mqttStatus.Text = "MQTT Status: Connected";
                 //btn_Connect.Enabled = false;
                 //tb_activeFDA.Text = FDAName + " (" + host + ")";
-                FDAStatus.Text = "FDA Status: Unknown";
+                //FDAStatus.Text = "FDA Status: Unknown";
                 startToolStripMenuItem.Enabled = true;
                 startwithConsoleToolStripMenuItem.Enabled = true;
 
@@ -397,6 +340,17 @@ namespace FDAInterface
                                 DBType = Encoding.UTF8.GetString(e.Message);
                                 dbtypeDisplay.Text = "Database type: " + DBType;
                                 break;
+                            case "DBConnStatus":
+                                string status = Encoding.UTF8.GetString(e.Message);
+                                if (status == bool.TrueString)
+                                {
+                                    dbConnStatus.Text = "FDA Database Connection: Connected";
+                                }
+                                else
+                                {
+                                    dbConnStatus.Text = "FDA Database Connection: Not Connected";
+                                }
+                                break;
                             case "version":
                                 Version.Text = "FDA Version: " + Encoding.UTF8.GetString(e.Message);
                                 break;
@@ -470,53 +424,50 @@ namespace FDAInterface
 
                                 break;
                             case "runstatus":
-                                string statusfromFDA = Encoding.UTF8.GetString(e.Message);
-                                string status = statusfromFDA;
-                                if (status == "ShuttingDown")
-                                    status = "Shutting Down";
+                                string FDAStatus = Encoding.UTF8.GetString(e.Message);
+                          
 
-                                FDAStatus.Text = "FDA Status: " + status;
-
-                                // if the FDA status is 'stopped' clear the GUI
-                                if (status == "Stopped")
+                                //FDAStatus.Text = "FDA Status: " + status;
+                                imgFDARunStatus.Tag = FDAStatus;
+                                switch (FDAStatus)
                                 {
-                                    ClearForm();
-                                    startwithConsoleToolStripMenuItem.Enabled = true;
-                                    startToolStripMenuItem.Enabled = true;
-                                    stopToolStripMenuItem.Enabled = false;
-                                    pauseToolStripMenuItem.Enabled = false;
-                                    mQTTQueryTestToolStripMenuItem.Enabled = false;
-                                    communicationsStatsToolStripMenuItem.Enabled = false;
-                                }
-
-                                if (status == "Normal")
-                                {
-                                    startwithConsoleToolStripMenuItem.Enabled = false;
-                                    startToolStripMenuItem.Enabled = false;
-                                    stopToolStripMenuItem.Enabled = true;
-                                    pauseToolStripMenuItem.Enabled = true;
-                                    mQTTQueryTestToolStripMenuItem.Enabled = true;
-                                    communicationsStatsToolStripMenuItem.Enabled = true;
-                                }
-
-                                if (status == "Stopping")
-                                {
-                                    startwithConsoleToolStripMenuItem.Enabled = false;
-                                    startToolStripMenuItem.Enabled = false;
-                                    stopToolStripMenuItem.Enabled = false;
-                                    pauseToolStripMenuItem.Enabled = false;
-                                    mQTTQueryTestToolStripMenuItem.Enabled = false;
-                                    communicationsStatsToolStripMenuItem.Enabled = false;
-                                }
-
-                                if (status == "Starting")
-                                {
-                                    startwithConsoleToolStripMenuItem.Enabled = false;
-                                    startToolStripMenuItem.Enabled = false;
-                                    stopToolStripMenuItem.Enabled = false;
-                                    pauseToolStripMenuItem.Enabled = false;
-                                    mQTTQueryTestToolStripMenuItem.Enabled = false;
-                                    communicationsStatsToolStripMenuItem.Enabled = false;
+                                    case "Stopped":
+                                        ResetForm(true);
+                                        startwithConsoleToolStripMenuItem.Enabled = true;
+                                        startToolStripMenuItem.Enabled = true;
+                                        stopToolStripMenuItem.Enabled = false;
+                                        pauseToolStripMenuItem.Enabled = false;
+                                        mQTTQueryTestToolStripMenuItem.Enabled = false;
+                                        communicationsStatsToolStripMenuItem.Enabled = false;
+                                        imgFDARunStatus.Image = imageList1.Images[2];
+                                        break;
+                                    case "Normal":
+                                        startwithConsoleToolStripMenuItem.Enabled = false;
+                                        startToolStripMenuItem.Enabled = false;
+                                        stopToolStripMenuItem.Enabled = true;
+                                        pauseToolStripMenuItem.Enabled = true;
+                                        mQTTQueryTestToolStripMenuItem.Enabled = true;
+                                        communicationsStatsToolStripMenuItem.Enabled = true;
+                                        imgFDARunStatus.Image = imageList1.Images[0];
+                                        break;
+                                    case "ShuttingDown":
+                                        startwithConsoleToolStripMenuItem.Enabled = false;
+                                        startToolStripMenuItem.Enabled = false;
+                                        stopToolStripMenuItem.Enabled = false;
+                                        pauseToolStripMenuItem.Enabled = false;
+                                        mQTTQueryTestToolStripMenuItem.Enabled = false;
+                                        communicationsStatsToolStripMenuItem.Enabled = false;
+                                        imgFDARunStatus.Image = imageList1.Images[10];
+                                        break;
+                                    case "Starting":
+                                        startwithConsoleToolStripMenuItem.Enabled = false;
+                                        startToolStripMenuItem.Enabled = false;
+                                        stopToolStripMenuItem.Enabled = false;
+                                        pauseToolStripMenuItem.Enabled = false;
+                                        mQTTQueryTestToolStripMenuItem.Enabled = false;
+                                        communicationsStatsToolStripMenuItem.Enabled = false;
+                                        imgFDARunStatus.Image = imageList1.Images[1];
+                                        break;
                                 }
                                 break;
                         }
@@ -540,7 +491,7 @@ namespace FDAInterface
 
         private void SubscribeToFDATopics(object o)
         {
-            MQTT?.Subscribe(new string[] { "FDA/version", "FDA/uptime", "FDA/connectionlist", "FDA/DBType" }, new byte[] { 0, 0, 0, 0 });         
+            MQTT?.Subscribe(new string[] { "FDA/#" }, new byte[] { 0});         
         }
 
         private void UnsubscribeFDATopics()
@@ -699,10 +650,9 @@ namespace FDAInterface
             { 
                 if (FDAManagerContext.MQTTConnectionStatus == FDAManagerContext.ConnectionStatus.Connected)
                 {
-
-                    switch (FDAStatus.Text)
+                    switch (imgFDARunStatus.Tag.ToString())
                     {
-                        case "FDA Status: ":
+                        case "unknown":
                             startToolStripMenuItem.Enabled = true;
                             startwithConsoleToolStripMenuItem.Enabled = true;
                             stopToolStripMenuItem.Enabled = false;
@@ -710,7 +660,7 @@ namespace FDAInterface
                             mQTTQueryTestToolStripMenuItem.Enabled = false;
                             communicationsStatsToolStripMenuItem.Enabled = false;
                             break;
-                        case "FDA Status: Normal":
+                        case "Normal":
                             startToolStripMenuItem.Enabled = false;
                             startwithConsoleToolStripMenuItem.Enabled = false;
                             stopToolStripMenuItem.Enabled = true;
@@ -718,7 +668,15 @@ namespace FDAInterface
                             mQTTQueryTestToolStripMenuItem.Enabled = true;
                             communicationsStatsToolStripMenuItem.Enabled = true;
                             break;
-                        case "FDA Status: Stopped":
+                        case "ShuttingDown":
+                            startToolStripMenuItem.Enabled = false;
+                            startwithConsoleToolStripMenuItem.Enabled = false;
+                            stopToolStripMenuItem.Enabled = false;
+                            pauseToolStripMenuItem.Enabled = false;
+                            mQTTQueryTestToolStripMenuItem.Enabled = false;
+                            communicationsStatsToolStripMenuItem.Enabled = false;
+                            break;
+                        case "Stopped":
                             startToolStripMenuItem.Enabled = true;
                             startwithConsoleToolStripMenuItem.Enabled = true;
                             stopToolStripMenuItem.Enabled = false;
@@ -752,20 +710,22 @@ namespace FDAInterface
   
 
 
-        internal void ClearForm()
+        internal void ResetForm(bool FDAOnly = false)
         {
             if (InvokeRequired)
             {
-                Invoke(new SafeCallNoParams(ClearForm), new object[0]);
+                Invoke(new SafeCall1BoolParam(ResetForm), new object[] { FDAOnly });
             }
             else
             {
                 tree.Nodes[0].Nodes.Clear();
                 Version.Text = "FDA Version: unknown";
                 Uptime.Text = "FDA Runtime: unknown";
-                //FDAStatus.Text = "FDA Status: unknown";
+                imgFDARunStatus.Image = imageList1.Images[3];
                 dbtypeDisplay.Text = "Database Type: unknown";
-
+                dbConnStatus.Text = "FDA Database Connection: unknown";
+                startToolStripMenuItem.Enabled = false;
+                stopToolStripMenuItem.Enabled = false;
 
 
                 foreach (ConnectionNode connection in _connOverviewDict.Values)
@@ -781,6 +741,11 @@ namespace FDAInterface
 
                 tabControl1.Visible = false;
                 //SetDetailsVisibility(DetailsType.None);
+
+                if (!FDAOnly)
+                {
+                    tb_connectionstate.Text = "FDA Connection:";
+                }
             }
         }
         #endregion
@@ -911,7 +876,7 @@ namespace FDAInterface
         /**** contains all the details about a given connection                                  ****/
         /**** automatically updates the tree when connection status changes                      ****/
         /********************************************************************************************/
-        internal class ConnectionNode
+        internal class ConnectionNode : IComparable
         {
            
             private string _status;          
@@ -1001,6 +966,12 @@ namespace FDAInterface
                 return _node;
             }
 
+            public int CompareTo(object obj)
+            {
+                ConnectionNode node = (ConnectionNode)obj;
+                return Description.CompareTo(node.Description);
+            }
+
         }
 
         //==========================================
@@ -1038,35 +1009,39 @@ namespace FDAInterface
 
             if (selectedConnection.Host != FDAManagerContext.Host) // if the selected connection is different from the currently connected one
             {
-                ClearForm();
+                ResetForm();
 
                 FDAManagerContext.ChangeHost(selectedConnection.Host, selectedConnection.Description);
                 AddToRecent(selectedConnection);
             }
         }
 
-        private void AddToRecent(Connection connection)
+        private void AddToRecent(Connection connection,bool initial=false)
         {
             bool alreadyListed = false;
-            foreach (Connection recentConn in FDAManagerContext.ConnHistory.RecentConnections)
+
+            if (!initial)
             {
-                if (connection == recentConn)
+                foreach (Connection recentConn in FDAManagerContext.ConnHistory.RecentConnections)
                 {
-                    alreadyListed = true;
-                    break;
+                    if (connection == recentConn)
+                    {
+                        alreadyListed = true;
+                        break;
+                    }
                 }
             }
 
             if (!alreadyListed)
             {
-                FDAManagerContext.ConnHistory.RecentConnections.Add(connection);
-            }
+                if (!initial)
+                    FDAManagerContext.ConnHistory.RecentConnections.Add(connection);
 
-            ToolStripMenuItem newMenuItem = new ToolStripMenuItem(connection.Description + " (" + connection.Host + ")");
-            newMenuItem.Click += ConnectionToolStripMenuItem_Click;
-            newMenuItem.Tag = connection;
-            recentToolStripMenuItem.DropDownItems.Add(newMenuItem);
-                
+                ToolStripMenuItem newMenuItem = new ToolStripMenuItem(connection.Description + " (" + connection.Host + ")");
+                newMenuItem.Click += ConnectionToolStripMenuItem_Click;
+                newMenuItem.Tag = connection;
+                recentToolStripMenuItem.DropDownItems.Add(newMenuItem);
+            }
             //Properties.Settings.Default.RecentConnections.Add(connection.FDAName + "|" + connection.Host);
             //Properties.Settings.Default.Save();
             
@@ -1074,10 +1049,28 @@ namespace FDAInterface
 
         internal void SetFDAStatus(string status)
         {
-            FDAStatus.Text = "FDA Status: " + status;
-            //if (status == "Disconnected")
-            //    tb_activeFDA.Text = "Not Connected";
+            switch (status)
+            {
+                case "Normal":
+                    imgFDARunStatus.Image = imageList1.Images[0];
+                    break;
+                case "ShuttingDown":
+                    imgFDARunStatus.Image = imageList1.Images[10];
+                    break;
+                case "Starting":
+                    imgFDARunStatus.Image = imageList1.Images[1];
+                    break;
+                case "Stopped":
+                    imgFDARunStatus.Image = imageList1.Images[2];
+                    break;
+                case "unknown":
+                    imgFDARunStatus.Image = imageList1.Images[3];
+                    break;
+                default:
+                    return;
+            }
 
+            imgFDARunStatus.Tag = status;
             SetMenuItemEnabledStates();
 
         }
@@ -1098,6 +1091,27 @@ namespace FDAInterface
             }
         }
 
+        private void HandleRetryRequested(object sender, EventArgs e)
+        {
+            SuperSpecialPictureBox requestor = (SuperSpecialPictureBox)sender;
+            if (requestor.Name == "imgBrokerStatus")
+            {
+                if (!FDAManagerContext.bg_MQTTConnect.IsBusy)
+                    FDAManagerContext.bg_MQTTConnect.RunWorkerAsync(new string[] { FDAManagerContext.Host, FDAManagerContext.FDAName });
+            }
+
+            if (requestor.Name == "imgControllerServiceStatus")
+            {
+                if (!FDAManagerContext.bg_ControllerConnect.IsBusy)
+                    FDAManagerContext.bg_ControllerConnect.RunWorkerAsync(new string[] { FDAManagerContext.Host, FDAManagerContext.FDAName });
+            }
+        }
+
+        private void disconnectToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            FDAManagerContext.Disconnect();
+            ResetForm();
+        }
     }
   
  

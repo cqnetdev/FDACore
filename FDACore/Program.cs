@@ -797,6 +797,7 @@ namespace FDAApp
                     Globals.MQTT.Publish("FDA/uptime", new byte[0], 0, true);
                     Globals.MQTT.Publish("FDA/connectionlist", new byte[0], 0, true);
                     Globals.MQTT.Publish("FDA/runstatus", Encoding.UTF8.GetBytes("Stopped"), 0, true);
+                    Globals.MQTT.Publish("FDA/DBType", new byte[0], 0, true);
                     Thread.Sleep(3000);
                     Globals.MQTT.Disconnect();
                     Globals.MQTT = null;

@@ -121,6 +121,9 @@
   <data name="ManagerGray" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\ManagerGray.ico;System.Drawing.Icon, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
+  <data name="executetriangle" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\executetriangle.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
   <data name="ManagerRed" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\ManagerRed.ico;System.Drawing.Icon, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
@@ -130,7 +133,7 @@
   <data name="ManagerYellow" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\ManagerYellow.ico;System.Drawing.Icon, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
-  <data name="executetriangle" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\executetriangle.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  <data name="green" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\green.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
 </root>

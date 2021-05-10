@@ -145,6 +145,12 @@
     <Compile Include="QueueHistory.Designer.cs">
       <DependentUpon>QueueHistory.cs</DependentUpon>
     </Compile>
+    <Compile Include="SuperSpecialPictureBox.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="SuperSpecialPictureBox.Designer.cs">
+      <DependentUpon>SuperSpecialPictureBox.cs</DependentUpon>
+    </Compile>
     <EmbeddedResource Include="ConnDetails.resx">
       <DependentUpon>ConnDetails.cs</DependentUpon>
     </EmbeddedResource>
@@ -189,6 +195,9 @@
     <EmbeddedResource Include="QueueHistory.resx">
       <DependentUpon>QueueHistory.cs</DependentUpon>
     </EmbeddedResource>
+    <EmbeddedResource Include="SuperSpecialPictureBox.resx">
+      <DependentUpon>SuperSpecialPictureBox.cs</DependentUpon>
+    </EmbeddedResource>
     <None Include="Connected Services\FDAApplication\FDAContext.wsdl" />
     <None Include="Connected Services\FDAApplication\item.wsdl" />
     <None Include="Connected Services\FDAApplication\item.xsd">
@@ -218,6 +227,7 @@
     <None Include="Resources\red.ico" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="Resources\green.png" />
     <None Include="Resources\executetriangle.png" />
     <None Include="Resources\execute.png" />
     <None Include="Resources\execute1.png" />
