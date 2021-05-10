@@ -16,6 +16,7 @@ namespace FDA
         protected Dictionary<Guid, FDARequestGroupScheduler> _schedConfig;
         protected Dictionary<Guid, FDADataBlockRequestGroup> _requestgroupConfig;
         protected Dictionary<Guid, FDADataPointDefinitionStructure> _dataPointConfig;
+        protected Dictionary<Guid, DerivedTag> _derivedTagConfig;
         protected Dictionary<Guid, FDASourceConnection> _connectionsConfig;
         protected Dictionary<Guid, FDADevice> _deviceConfig;
         protected Dictionary<Guid, FDATask> _taskConfig;
@@ -43,6 +44,18 @@ namespace FDA
         public event ForceScheduleHandler ForceScheduleExecution;
 
         protected bool _DBStatus = false;
+        protected bool DBStatus 
+              { get { return _DBStatus; } 
+                set { _DBStatus = value;
+                      if (Globals.MQTTEnabled && Globals.MQTT != null)
+                      {
+                        if (Globals.MQTT.IsConnected)
+                        {
+                            Globals.MQTT.Publish("FDA/DBConnStatus",Encoding.UTF8.GetBytes(value.ToString()),1,true);   
+                        }
+                      }
+                    }
+               }
 
         protected bool _devicesTableExists = false;
         protected bool _tasksTableExists;
@@ -68,6 +81,7 @@ namespace FDA
             _connectionsConfig = new Dictionary<Guid, FDASourceConnection>();
             _deviceConfig = new Dictionary<Guid, FDADevice>();
             _taskConfig = new Dictionary<Guid, FDATask>();
+            _derivedTagConfig = new Dictionary<Guid, DerivedTag>();
 
 
             _dataWriter = new BackgroundWorker();
@@ -772,17 +786,17 @@ namespace FDA
                     // perform the notification (email? audible alarm?)
                     Console.WriteLine(Globals.FDANow().ToString() + ": The database connection downtime has exceeded the limit (future: email? audible alarm?");
                 }
-                _DBStatus = false;
+                DBStatus = false;
                 return;
             }
 
             // current status = true, previous status = false means a recovered connection
-            if (_DBStatus == false)
+            if (DBStatus == false)
             {
                 _DBDownTimer.Stop();
                 _DBDownTimer.Reset();
 
-                _DBStatus = true;
+                DBStatus = true;
                 Globals.SystemManager.LogApplicationEvent(this, "DBManager", "Database connection restored, re-initializing the DBManager");
                 Initialize();
                 LoadConfig();
@@ -965,6 +979,7 @@ namespace FDA
             lock (_connectionsConfig) { _connectionsConfig.Clear(); }
             lock (_taskConfig) { _taskConfig.Clear(); }
             lock (_deviceConfig) { _deviceConfig.Clear(); }
+            lock (_derivedTagConfig) { _derivedTagConfig.Clear(); }
 
 
             string tableName = "";
@@ -1094,10 +1109,7 @@ namespace FDA
             table.Clear();
 
 
-
-
             // new Mar 9, 2020  load last values from the FDALastDataValues table and update the DataPointDefinitionStructure objects in memory
-
             Guid DPDUID;
             tableName = Globals.SystemManager.GetTableName("FDALastDataValues");
             query = "select DPDUID,value,timestamp,quality from " + tableName + ";";
@@ -1125,6 +1137,62 @@ namespace FDA
                 catch
                 {
                     Globals.SystemManager.LogApplicationEvent(this, "", "FDA Start, Config Error - DPDS ID '" + ID + "' rejected", true);
+                }
+            }
+            table.Clear();
+
+            // new May 7, 2021 load derived tags
+
+            // make PLC tags available to derived tags
+            DerivedTag.PLCTags = _dataPointConfig;
+
+            Guid SoftTagID;
+            tableName = Globals.SystemManager.GetTableName("FDADerivedTags");
+            query = "select tag_id,protocol,read_detail_01,physical_point,enabled from " + tableName + ";";
+            table = ExecuteQuery(query);
+            DerivedTag newSoftPoint;
+            string tagtype;
+            string arguments;
+            bool enabled;
+            foreach (DataRow row in table.Rows)
+            {
+                ID = "(unknown)";
+                try
+                {
+                    ID = row["tag_id"].ToString();
+
+                    SoftTagID = (Guid)row["tag_id"];
+                    tagtype = (string)row["read_detail_01"];
+                    tagtype = tagtype.ToLower();
+                    arguments = (string)row["physical_point"];
+                    enabled = (bool)row["enabled"];
+                    newSoftPoint = DerivedTag.Create(SoftTagID.ToString(), tagtype, arguments, enabled);
+                    if (newSoftPoint != null)
+                    {
+                        if (!_derivedTagConfig.ContainsKey(newSoftPoint.ID))
+                        {
+                            lock (_derivedTagConfig)
+                            {
+                                _derivedTagConfig.Add(newSoftPoint.ID, newSoftPoint);
+                                newSoftPoint.OnUpdate += SoftPoint_OnUpdate;
+                            }
+
+                            if (!newSoftPoint.IsValid)
+                            {
+                                Globals.SystemManager.LogApplicationEvent(this, "", "FDA Start, Config Error - Derived tag ID '" + ID + "' automatically disabled because of invalid configuration: " + newSoftPoint.ErrorMessage, true);
+                            }
+                        }
+                        else
+                            Globals.SystemManager.LogApplicationEvent(this, "", "FDA Start, Config Error - Derived tag ID '" + ID + "' rejected: duplicate tag ID", true);
+                    }
+                    else
+                    {
+                        Globals.SystemManager.LogApplicationEvent(this, "", "FDA Start, Config Error - Derived tag ID '" + ID + "' rejected: Invalid derived tag ID", true);
+                    }
+                }
+                catch
+                {
+                    Globals.SystemManager.LogApplicationEvent(this, "", "FDA Start, Config Error - Derived tag ID '" + ID + "' rejected, unable to load from database (bad value or null)", true);
                 }
             }
             table.Clear();
@@ -1295,8 +1363,16 @@ namespace FDA
             return true;
         }
 
+        private void SoftPoint_OnUpdate(object sender, EventArgs e)
+        {
+            DerivedTag updatedSoftpoint = (DerivedTag)sender;
 
+            // this will have to go to the database, but we don't know what table to send it to because this value didn't result from a request string (which specifies the destination table)
+            // that's Buddy question
 
+            // for now, just log a message about the update
+            Globals.SystemManager.LogApplicationEvent(this, "", "Softpoint " + updatedSoftpoint.ID + " was updated. New values are Timestamp = " + updatedSoftpoint.Timestamp.ToString() + ", Quality = " + updatedSoftpoint.Quality + ", Value = " + updatedSoftpoint.Value);
+        }
 
         public void UpdateAlmEvtCurrentPtrs(DataRequest PtrPositionRequest)
         {
@@ -2044,11 +2120,11 @@ namespace FDA
             if (!TestConnection())
             {
                 Globals.SystemManager.LogApplicationEvent(this,"", "Unable to connect to the database");
-                _DBStatus = false;
+                DBStatus = false;
                 return false;
             }
 
-            _DBStatus = true;
+            DBStatus = true;
 
             _PreviousDBStartTime = GetDBStartTime();
 

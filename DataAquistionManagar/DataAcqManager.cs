@@ -359,9 +359,10 @@ namespace FDA
                         lock (tagDef)
                         {
                             tagDef.PreviousTimestamp = tagDef.LastReadDataTimestamp;
-                            tagDef.LastReadDataValue = Convert.ToDouble(tag.Value);
-                            tagDef.LastReadDataTimestamp = tag.Timestamp;
+                            tagDef.LastReadDataValue = Convert.ToDouble(tag.Value);                          
                             tagDef.LastReadQuality = tag.Quality;
+                            tagDef.LastReadDataType = tag.ProtocolDataType;
+                            tagDef.LastReadDataTimestamp = tag.Timestamp;  // update the timestamp last, because that's what triggers the re-calclation of any softtags that depend on this one                           
                         }
                     }
                 }

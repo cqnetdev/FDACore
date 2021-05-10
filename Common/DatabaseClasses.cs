@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Data.SqlTypes;
 using System.Linq;
@@ -52,7 +53,7 @@ namespace Common
         public int Priority { get; set; }
         public string RequestGroupList { get; set; }
         public bool CommsLogEnabled { get; set; }
- 
+
     }
 
     public class FDARequestGroupScheduler
@@ -88,31 +89,31 @@ namespace Common
         public string DPSType { get => _dPSType; set { if (_dPSType != value) { _dPSType = value; NotifyPropertyChanged(); } } }
         public Boolean read_scaling { get => _read_scaling; set { if (_read_scaling != value) { _read_scaling = value; NotifyPropertyChanged(); } } }
 
-        public Double read_scale_raw_low { get => _read_scale_raw_low; set { if (_read_scale_raw_low != value) { _read_scale_raw_low = value; NotifyPropertyChanged(); } }  }
+        public Double read_scale_raw_low { get => _read_scale_raw_low; set { if (_read_scale_raw_low != value) { _read_scale_raw_low = value; NotifyPropertyChanged(); } } }
         public Double read_scale_raw_high { get => _read_scale_raw_high; set { if (_read_scale_raw_high != value) { _read_scale_raw_high = value; NotifyPropertyChanged(); } } }
         public Double read_scale_eu_low { get => _read_scale_eu_low; set => _read_scale_eu_low = value; }
 
-        public Double read_scale_eu_high { get => _read_scale_eu_high; set { if ( _read_scale_eu_high != value) { _read_scale_eu_high = value; NotifyPropertyChanged(); }} }
-        public Boolean write_scaling { get => _write_scaling; set { if ( _write_scaling != value) { _write_scaling = value; NotifyPropertyChanged(); }} }
-        public Double write_scale_raw_low { get => _write_scale_raw_low; set { if ( _write_scale_raw_low != value) { _write_scale_raw_low = value; NotifyPropertyChanged(); }} }
-        public Double write_scale_raw_high { get => _write_scale_raw_high; set { if ( _write_scale_raw_high != value) { _write_scale_raw_high = value; NotifyPropertyChanged(); }} }
-        public Double write_scale_eu_low { get => _write_scale_eu_low; set { if ( _write_scale_eu_low != value) { _write_scale_eu_low = value; NotifyPropertyChanged(); }} }
-        public Double write_scale_eu_high { get => _write_scale_eu_high; set { if ( _write_scale_eu_high != value) { _write_scale_eu_high = value; NotifyPropertyChanged(); }} }
-        public Boolean backfill_enabled { get => _backfill_enabled; set { if ( _backfill_enabled != value) { _backfill_enabled = value; NotifyPropertyChanged(); }} }
-        public int backfill_data_ID { get => _backfill_data_ID; set { if ( _backfill_data_ID != value) { _backfill_data_ID = value; NotifyPropertyChanged(); }} }
-        public double LastReadDataValue { get => _lastReadDataValue; set { if (_lastReadDataValue != value) { _lastReadDataValue = value; NotifyPropertyChanged("LastReadDataValue",0,new string[] { "LastReadDataTimestamp", "LastReadQuality" }); }} }
-        public DateTime LastReadDataTimestamp { get => _lastReadDataTimestamp; set { if (_lastReadDataTimestamp != value) { _lastReadDataTimestamp = value; NotifyPropertyChanged("LastReadDataTimestamp",0, new string[] { "LastReadDataValue", "LastReadQuality" }); } } }
-        public int LastReadQuality { get => _lastReadQuality; set { if (_lastReadQuality != value) { _lastReadQuality = value; NotifyPropertyChanged("LastReadQuality", 0, new string[] { "LastReadDataTimestamp","LastReadDataValue" }); } }}
-        public int backfill_data_structure_type { get => _backfill_data_structure_type; set { if ( _backfill_data_structure_type != value) { _backfill_data_structure_type = value; NotifyPropertyChanged(); }} }
-        public double backfill_data_lapse_limit { get => _backfill_data_lapse_limit; set { if ( _backfill_data_lapse_limit != value) { _backfill_data_lapse_limit = value; NotifyPropertyChanged(); }} }
-        public double backfill_data_interval { get => _backfill_data_interval; set { if ( _backfill_data_interval != value) { _backfill_data_interval = value; NotifyPropertyChanged(); }} }
-        public DateTime PreviousTimestamp { get => _previousTimestamp; set { if ( _previousTimestamp != value) { _previousTimestamp = value; NotifyPropertyChanged(); }} }
- 
+        public Double read_scale_eu_high { get => _read_scale_eu_high; set { if (_read_scale_eu_high != value) { _read_scale_eu_high = value; NotifyPropertyChanged(); } } }
+        public Boolean write_scaling { get => _write_scaling; set { if (_write_scaling != value) { _write_scaling = value; NotifyPropertyChanged(); } } }
+        public Double write_scale_raw_low { get => _write_scale_raw_low; set { if (_write_scale_raw_low != value) { _write_scale_raw_low = value; NotifyPropertyChanged(); } } }
+        public Double write_scale_raw_high { get => _write_scale_raw_high; set { if (_write_scale_raw_high != value) { _write_scale_raw_high = value; NotifyPropertyChanged(); } } }
+        public Double write_scale_eu_low { get => _write_scale_eu_low; set { if (_write_scale_eu_low != value) { _write_scale_eu_low = value; NotifyPropertyChanged(); } } }
+        public Double write_scale_eu_high { get => _write_scale_eu_high; set { if (_write_scale_eu_high != value) { _write_scale_eu_high = value; NotifyPropertyChanged(); } } }
+        public Boolean backfill_enabled { get => _backfill_enabled; set { if (_backfill_enabled != value) { _backfill_enabled = value; NotifyPropertyChanged(); } } }
+        public int backfill_data_ID { get => _backfill_data_ID; set { if (_backfill_data_ID != value) { _backfill_data_ID = value; NotifyPropertyChanged(); } } }
+        public Double LastReadDataValue { get => _lastReadDataValue; set { if (_getBits) { ExtractBits(value); }; if (_lastReadDataValue != value) { _lastReadDataValue = value; NotifyPropertyChanged("LastReadDataValue", 0, new string[] { "LastReadDataTimestamp", "LastReadQuality" }); } } }
+        public DateTime LastReadDataTimestamp { get => _lastReadDataTimestamp; set { if (_lastReadDataTimestamp != value) { _lastReadDataTimestamp = value; NotifyPropertyChanged("LastReadDataTimestamp", 0, new string[] { "LastReadDataValue", "LastReadQuality" }); } } }
+        public DataTypeBase LastReadDataType { get => _datatype; set => _datatype = value; }
+        public int LastReadQuality { get => _lastReadQuality; set { if (_lastReadQuality != value) { _lastReadQuality = value; NotifyPropertyChanged("LastReadQuality", 0, new string[] { "LastReadQuality", "LastReadDataValue" }); } } }
+        public int backfill_data_structure_type { get => _backfill_data_structure_type; set { if (_backfill_data_structure_type != value) { _backfill_data_structure_type = value; NotifyPropertyChanged(); } } }
+        public double backfill_data_lapse_limit { get => _backfill_data_lapse_limit; set { if (_backfill_data_lapse_limit != value) { _backfill_data_lapse_limit = value; NotifyPropertyChanged(); } } }
+        public double backfill_data_interval { get => _backfill_data_interval; set { if (_backfill_data_interval != value) { _backfill_data_interval = value; NotifyPropertyChanged(); } } }
+        public DateTime PreviousTimestamp { get => _previousTimestamp; set { if (_previousTimestamp != value) { _previousTimestamp = value; NotifyPropertyChanged(); } } }
         public String DeviceTagName { get => _deviceTagName; set => _deviceTagName = value; }
-
         public String DeviceTagAddress { get => _deviceTagAddress; set => _deviceTagAddress = value; }
-
-
+        public bool GetBits { get => _getBits; set => _getBits = value; }
+        public BitArray Bits { get => _bits; }
+  
         private Guid _DPDUID;
         private double _lastReadDataValue;
         private DateTime _lastReadDataTimestamp;
@@ -137,10 +138,56 @@ namespace Common
         private DateTime _previousTimestamp;
         private string _deviceTagName = "";
         private string _deviceTagAddress = "-1";
+        private bool _getBits = false;
+        private BitArray _bits;
+        private DataTypeBase _datatype;
+
 
         public FDADataPointDefinitionStructure()
         {
             base.ObjectType = "Tag";
+            _bits = new BitArray(0);
+        }
+
+        private void ExtractBits(Double newValue)
+        {
+            // break out the bits (if the value is a positive integer in the unsigned Int32 range)  
+            // store in BitArray _bits
+
+            bool isValidForBits = true;
+            UInt32 intValue = 0;
+
+            // convert to uint32
+            try
+            {
+                intValue = Convert.ToUInt32(newValue);
+            }
+            catch
+            {
+                // out of uint32 range
+                isValidForBits = false;
+            }
+
+            // it's in range, does it have a fractional part?
+            if (isValidForBits)
+                if (HasFraction(newValue))
+                    isValidForBits = false;
+
+            // if it's an in-range integer value, go ahead and extract the bits
+            if (isValidForBits)
+            {
+                _bits = new BitArray(BitConverter.GetBytes(intValue));
+            }
+            else
+                _bits = new BitArray(0);
+        }
+
+        private bool HasFraction(Double value)
+        {
+            double intPart = Math.Truncate(value);
+            double fractionalPart = value - intPart;
+
+            return fractionalPart != 0;
         }
     }
 
@@ -167,8 +214,8 @@ namespace Common
     public class FDADevice
     {
         public Guid DEVICE_ID { get; set; }
-        public int request_timeout { get; set;}
-        public int max_request_attempts { get; set;}
+        public int request_timeout { get; set; }
+        public int max_request_attempts { get; set; }
         public int inter_request_delay { get; set; }
         public int request_retry_delay { get; set; }
     }
@@ -184,7 +231,7 @@ namespace Common
     {
         public string OPTIONNAME { get; set; }
         public string OptionValue { get; set; }
-        public int ConfigType {get; set; }
+        public int ConfigType { get; set; }
     }
 
 
@@ -206,4 +253,6 @@ namespace Common
         public string DescShort { get; set; }
         public string DescLong { get; set; }
     }
+
+
 }
