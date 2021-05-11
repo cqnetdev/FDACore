@@ -16,7 +16,7 @@ namespace FDA
         protected Dictionary<Guid, FDARequestGroupScheduler> _schedConfig;
         protected Dictionary<Guid, FDADataBlockRequestGroup> _requestgroupConfig;
         protected Dictionary<Guid, FDADataPointDefinitionStructure> _dataPointConfig;
-        protected Dictionary<Guid, DerivedTag> _derivedTagConfig;
+        //protected Dictionary<Guid, DerivedTag> _derivedTagConfig;
         protected Dictionary<Guid, FDASourceConnection> _connectionsConfig;
         protected Dictionary<Guid, FDADevice> _deviceConfig;
         protected Dictionary<Guid, FDATask> _taskConfig;
@@ -81,7 +81,7 @@ namespace FDA
             _connectionsConfig = new Dictionary<Guid, FDASourceConnection>();
             _deviceConfig = new Dictionary<Guid, FDADevice>();
             _taskConfig = new Dictionary<Guid, FDATask>();
-            _derivedTagConfig = new Dictionary<Guid, DerivedTag>();
+            //_derivedTagConfig = new Dictionary<Guid, DerivedTag>();
 
 
             _dataWriter = new BackgroundWorker();
@@ -482,16 +482,16 @@ namespace FDA
                     // write it out to the database
                     if (batch.Length != 0)
                     {
-                        // retries and error messages are handled in ExecuteNonQuery()
+                        // note: retries and error messages are handled in ExecuteNonQuery() in child classes
                         int result = ExecuteNonQuery(batch.ToString());
-                        if (result > 0)
-                        {
-                            Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "DBManager", "Group " + transactionToLog.GroupID + ", index " + transactionToLog.GroupIdxNumber + " successfully recorded in the database");
-                        }
-                        else
-                        {
-                            Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "DBManager", "Group " + transactionToLog.GroupID + ", index " + transactionToLog.GroupIdxNumber + " failed to write to the database");
-                        }
+                        //if (result > 0)
+                        //{
+                        //    Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "DBManager", "Group " + transactionToLog.GroupID + ", index " + transactionToLog.GroupIdxNumber + " successfully recorded in the database");
+                        //}
+                        //else
+                        //{
+                        //    Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "DBManager", "Group " + transactionToLog.GroupID + ", index " + transactionToLog.GroupIdxNumber + " failed to write to the database");
+                        //}
 
                         lock (_writeQueue) { _writeQueue.Dequeue(); }
                     }
@@ -979,7 +979,7 @@ namespace FDA
             lock (_connectionsConfig) { _connectionsConfig.Clear(); }
             lock (_taskConfig) { _taskConfig.Clear(); }
             lock (_deviceConfig) { _deviceConfig.Clear(); }
-            lock (_derivedTagConfig) { _derivedTagConfig.Clear(); }
+            //lock (_derivedTagConfig) { _derivedTagConfig.Clear(); }
 
 
             string tableName = "";
@@ -1043,7 +1043,7 @@ namespace FDA
 
 
 
-            // load datapoint (tag) definitions
+            // load datapoint definitions (both PLC tags and soft tags)
             DateTime currentTime = Globals.FDANow();
             tableName = Globals.SystemManager.GetTableName("DataPointDefinitionStructures");
 
@@ -1053,45 +1053,92 @@ namespace FDA
                     "case when backfill_data_structure_type is NULL then 0 else backfill_data_structure_type END as nullsafe_backfill_data_structure_type," +
                     "case when backfill_data_lapse_limit is NULL then 60 else backfill_data_lapse_limit END as nullsafe_backfill_data_lapse_limit," +
                     "case when backfill_data_interval is NULL then 1 else backfill_data_interval END as nullsafe_backfill_data_interval " +
-                    "from DataPointDefinitionStructures;";
+                    "from DataPointDefinitionStructures";
 
             FDADataPointDefinitionStructure newTag;
 
 
             //MQTTColumnExists = HasColumn(sqlDataReader, "MQTTEnabled");
             table = ExecuteQuery(query);
+            string DPSType;
+            string softtagtype;
+            string softtagarguments;
+            bool softtagenabled;
             foreach (DataRow row in table.Rows)
             {
                 ID = "(unknown)";
                 try
                 {
                     ID = row["DPDUID"].ToString();
-                    newTag = new FDADataPointDefinitionStructure()
+                    DPSType = row["DPSType"].ToString().ToUpper();
+                    if (DPSType == "SOFTTAG")
                     {
-                        DPDUID = (Guid)row["DPDUID"],
-                        DPDSEnabled = (bool)row["DPDSEnabled"],
-                        DPSType = row["DPSType"].ToString(),
-                        read_scaling = (bool)row["read_scaling"],
-                        read_scale_raw_low = (double)row["read_scale_raw_low"],
-                        read_scale_raw_high = (double)row["read_scale_raw_high"],
-                        read_scale_eu_low = (double)row["read_scale_eu_low"],
-                        read_scale_eu_high = (double)row["read_scale_eu_high"],
-                        write_scaling = (bool)row["write_scaling"],
-                        write_scale_raw_low = (double)row["write_scale_raw_low"],
-                        write_scale_raw_high = (double)row["write_scale_raw_high"],
-                        write_scale_eu_low = (double)row["write_scale_eu_low"],
-                        write_scale_eu_high = (double)row["write_scale_eu_high"],
-                        backfill_enabled = (bool)row["nullsafe_backfill_enabled"],
-                        backfill_data_ID = (Int32)row["nullsafe_backfill_data_id"],
-                        // Feb 12, 2020: ignore the last read columns from the database, default to 0 value at current timestamp
-                        LastReadDataValue = 0.0,
-                        LastReadQuality = 32,
-                        LastReadDataTimestamp = currentTime,
-                        backfill_data_structure_type = (Int32)row["nullsafe_backfill_data_structure_type"],
-                        backfill_data_lapse_limit = (double)row["nullsafe_backfill_data_lapse_limit"],
-                        backfill_data_interval = (double)row["nullsafe_backfill_data_interval"],
-                        //MQTTEnabled = false
-                    };
+                        // create a soft tag
+                        softtagtype = (string)row["read_detail_01"];
+                        softtagarguments = (string)row["physical_point"];
+                        softtagenabled = (bool)row["DPDSEnabled"];
+                        DerivedTag newDerivedTag = DerivedTag.Create(ID, softtagtype, softtagarguments,softtagenabled);
+                        if (newDerivedTag == null)
+                        {
+                            Globals.SystemManager.LogApplicationEvent(this, "", "FDA Start, Config Error - DPDS ID '" + ID + "' rejected. Unrecognized soft tag type '"+ softtagtype + "'", true);
+                            continue;
+                        }
+                       
+                        newDerivedTag.DPDSEnabled = (bool)row["DPDSEnabled"];
+                        newDerivedTag.DPSType = row["DPSType"].ToString();
+                        newDerivedTag.read_scaling = (bool)row["read_scaling"];
+                        newDerivedTag.read_scale_raw_low = (double)row["read_scale_raw_low"];
+                        newDerivedTag.read_scale_raw_high = (double)row["read_scale_raw_high"];
+                        newDerivedTag.read_scale_eu_low = (double)row["read_scale_eu_low"];
+                        newDerivedTag.read_scale_eu_high = (double)row["read_scale_eu_high"];
+                        newDerivedTag.write_scaling = (bool)row["write_scaling"];
+                        newDerivedTag.write_scale_raw_low = (double)row["write_scale_raw_low"];
+                        newDerivedTag.write_scale_raw_high = (double)row["write_scale_raw_high"];
+                        newDerivedTag.write_scale_eu_low = (double)row["write_scale_eu_low"];
+                        newDerivedTag.write_scale_eu_high = (double)row["write_scale_eu_high"];
+                        newDerivedTag.LastReadDataValue = 0.0;
+                        newDerivedTag.LastReadQuality = 32;
+                        newDerivedTag.LastReadDataTimestamp = currentTime;
+
+                        // these properties don't apply to soft tags
+                        newDerivedTag.backfill_enabled = false;
+                        newDerivedTag.backfill_data_ID = -1;
+                        newDerivedTag.backfill_data_structure_type = 0;
+                        newDerivedTag.backfill_data_lapse_limit = 0;
+                        newDerivedTag.backfill_data_interval = 0;
+
+                        newTag = newDerivedTag;
+                    }
+                    else
+                    {
+                        // create a regular tag
+                        newTag = new FDADataPointDefinitionStructure()
+                        {
+                            DPDUID = (Guid)row["DPDUID"],
+                            DPDSEnabled = (bool)row["DPDSEnabled"],
+                            DPSType = row["DPSType"].ToString(),
+                            read_scaling = (bool)row["read_scaling"],
+                            read_scale_raw_low = (double)row["read_scale_raw_low"],
+                            read_scale_raw_high = (double)row["read_scale_raw_high"],
+                            read_scale_eu_low = (double)row["read_scale_eu_low"],
+                            read_scale_eu_high = (double)row["read_scale_eu_high"],
+                            write_scaling = (bool)row["write_scaling"],
+                            write_scale_raw_low = (double)row["write_scale_raw_low"],
+                            write_scale_raw_high = (double)row["write_scale_raw_high"],
+                            write_scale_eu_low = (double)row["write_scale_eu_low"],
+                            write_scale_eu_high = (double)row["write_scale_eu_high"],
+                            backfill_enabled = (bool)row["nullsafe_backfill_enabled"],
+                            backfill_data_ID = (Int32)row["nullsafe_backfill_data_id"],
+                            // Feb 12, 2020: ignore the last read columns from the database, default to 0 value at current timestamp
+                            LastReadDataValue = 0.0,
+                            LastReadQuality = 32,
+                            LastReadDataTimestamp = currentTime,
+                            backfill_data_structure_type = (Int32)row["nullsafe_backfill_data_structure_type"],
+                            backfill_data_lapse_limit = (double)row["nullsafe_backfill_data_lapse_limit"],
+                            backfill_data_interval = (double)row["nullsafe_backfill_data_interval"]
+                            //MQTTEnabled = false
+                        };
+                    }
 
                     //if (MQTTColumnExists)
                     //    newTag.MQTTEnabled = sqlDataReader.GetBoolean(sqlDataReader.GetOrdinal("MQTTEnabled"));
@@ -1141,61 +1188,81 @@ namespace FDA
             }
             table.Clear();
 
-            // new May 7, 2021 load derived tags
+            // make the dictionary of all tags (PLC and soft tags) available to each individual soft tag
+            DerivedTag.Tags = _dataPointConfig;
 
-            // make PLC tags available to derived tags
-            DerivedTag.PLCTags = _dataPointConfig;
-
-            Guid SoftTagID;
-            tableName = Globals.SystemManager.GetTableName("FDADerivedTags");
-            query = "select tag_id,protocol,read_detail_01,physical_point,enabled from " + tableName + ";";
-            table = ExecuteQuery(query);
-            DerivedTag newSoftPoint;
-            string tagtype;
-            string arguments;
-            bool enabled;
-            foreach (DataRow row in table.Rows)
+            // validate and activate any soft tags
+            DerivedTag thisTag;
+            foreach (FDADataPointDefinitionStructure tag in _dataPointConfig.Values)
             {
-                ID = "(unknown)";
-                try
+                if (tag.DPSType.ToLower() == "softtag")
                 {
-                    ID = row["tag_id"].ToString();
-
-                    SoftTagID = (Guid)row["tag_id"];
-                    tagtype = (string)row["read_detail_01"];
-                    tagtype = tagtype.ToLower();
-                    arguments = (string)row["physical_point"];
-                    enabled = (bool)row["enabled"];
-                    newSoftPoint = DerivedTag.Create(SoftTagID.ToString(), tagtype, arguments, enabled);
-                    if (newSoftPoint != null)
+                    thisTag = (DerivedTag)tag;
+                    thisTag.Initialize();
+                    if (!thisTag.IsValid)
                     {
-                        if (!_derivedTagConfig.ContainsKey(newSoftPoint.ID))
-                        {
-                            lock (_derivedTagConfig)
-                            {
-                                _derivedTagConfig.Add(newSoftPoint.ID, newSoftPoint);
-                                newSoftPoint.OnUpdate += SoftPoint_OnUpdate;
-                            }
-
-                            if (!newSoftPoint.IsValid)
-                            {
-                                Globals.SystemManager.LogApplicationEvent(this, "", "FDA Start, Config Error - Derived tag ID '" + ID + "' automatically disabled because of invalid configuration: " + newSoftPoint.ErrorMessage, true);
-                            }
-                        }
-                        else
-                            Globals.SystemManager.LogApplicationEvent(this, "", "FDA Start, Config Error - Derived tag ID '" + ID + "' rejected: duplicate tag ID", true);
+                        Globals.SystemManager.LogApplicationEvent(this, "", "FDA Start, Config Error - DPDS ID '" + thisTag.DPDUID + "' rejected. " + thisTag.ErrorMessage, true);
                     }
-                    else
-                    {
-                        Globals.SystemManager.LogApplicationEvent(this, "", "FDA Start, Config Error - Derived tag ID '" + ID + "' rejected: Invalid derived tag ID", true);
-                    }
-                }
-                catch
-                {
-                    Globals.SystemManager.LogApplicationEvent(this, "", "FDA Start, Config Error - Derived tag ID '" + ID + "' rejected, unable to load from database (bad value or null)", true);
+                    thisTag.OnUpdate += SoftPoint_OnUpdate;
                 }
             }
-            table.Clear();
+
+
+            //// new May 7, 2021 load derived tags
+
+            //// make PLC tags available to derived tags
+            //DerivedTag.PLCTags = _dataPointConfig;
+
+            //Guid SoftTagID;
+            //tableName = Globals.SystemManager.GetTableName("FDADerivedTags");
+            //query = "select tag_id,protocol,read_detail_01,physical_point,enabled from " + tableName + ";";
+            //table = ExecuteQuery(query);
+            //DerivedTag newSoftPoint;
+            //string tagtype;
+            //string arguments;
+            //bool enabled;
+            //foreach (DataRow row in table.Rows)
+            //{
+            //    ID = "(unknown)";
+            //    try
+            //    {
+            //        ID = row["tag_id"].ToString();
+
+            //        SoftTagID = (Guid)row["tag_id"];
+            //        tagtype = (string)row["read_detail_01"];
+            //        tagtype = tagtype.ToLower();
+            //        arguments = (string)row["physical_point"];
+            //        enabled = (bool)row["enabled"];
+            //        newSoftPoint = DerivedTag.Create(SoftTagID.ToString(), tagtype, arguments, enabled);
+            //        if (newSoftPoint != null)
+            //        {
+            //            if (!_derivedTagConfig.ContainsKey(newSoftPoint.DPDUID))
+            //            {
+            //                lock (_derivedTagConfig)
+            //                {
+            //                    _derivedTagConfig.Add(newSoftPoint.DPDUID, newSoftPoint);
+            //                    newSoftPoint.OnUpdate += SoftPoint_OnUpdate;
+            //                }
+
+            //                if (!newSoftPoint.IsValid)
+            //                {
+            //                    Globals.SystemManager.LogApplicationEvent(this, "", "FDA Start, Config Error - Derived tag ID '" + ID + "' automatically disabled because of invalid configuration: " + newSoftPoint.ErrorMessage, true);
+            //                }
+            //            }
+            //            else
+            //                Globals.SystemManager.LogApplicationEvent(this, "", "FDA Start, Config Error - Derived tag ID '" + ID + "' rejected: duplicate tag ID", true);
+            //        }
+            //        else
+            //        {
+            //            Globals.SystemManager.LogApplicationEvent(this, "", "FDA Start, Config Error - Derived tag ID '" + ID + "' rejected: Invalid derived tag ID", true);
+            //        }
+            //    }
+            //    catch
+            //    {
+            //        Globals.SystemManager.LogApplicationEvent(this, "", "FDA Start, Config Error - Derived tag ID '" + ID + "' rejected, unable to load from database (bad value or null)", true);
+            //    }
+            //}
+            //table.Clear();
 
 
             if (_devicesTableExists)
@@ -1367,11 +1434,26 @@ namespace FDA
         {
             DerivedTag updatedSoftpoint = (DerivedTag)sender;
 
-            // this will have to go to the database, but we don't know what table to send it to because this value didn't result from a request string (which specifies the destination table)
-            // that's Buddy question
+            // the data logger requires a DataRequest object, containing a list of Tag objects with data to be written
+            // we'll create one for the updated soft point
 
-            // for now, just log a message about the update
-            Globals.SystemManager.LogApplicationEvent(this, "", "Softpoint " + updatedSoftpoint.ID + " was updated. New values are Timestamp = " + updatedSoftpoint.Timestamp.ToString() + ", Quality = " + updatedSoftpoint.Quality + ", Value = " + updatedSoftpoint.Value);
+            Tag softPointTag = new Tag(updatedSoftpoint.DPDUID);
+            softPointTag.Timestamp = updatedSoftpoint.LastReadDataTimestamp;
+            softPointTag.Quality = updatedSoftpoint.LastReadQuality;
+            softPointTag.Value = updatedSoftpoint.LastReadDataValue;
+            softPointTag.TagID = updatedSoftpoint.DPDUID;
+
+            DataRequest softTagRequestObject = new DataRequest();
+            softTagRequestObject.RequestID = Guid.NewGuid().ToString();
+            softTagRequestObject.TagList = new List<Tag> { softPointTag };
+            softTagRequestObject.Destination = updatedSoftpoint.LastReadDestTable;
+            softTagRequestObject.DBWriteMode = updatedSoftpoint.LastReadDatabaseWriteMode;
+
+            // and insert it into the pipeline to be written to the database
+            WriteDataToDB(softTagRequestObject);
+
+            // and log a message about the update 
+            Globals.SystemManager.LogApplicationEvent(this, "", "Softpoint " + updatedSoftpoint.DPDUID.ToString() + " re-calculated",false,true);
         }
 
         public void UpdateAlmEvtCurrentPtrs(DataRequest PtrPositionRequest)
@@ -1693,7 +1775,7 @@ namespace FDA
             // check for nulls
             if (changeType == "INSERT" || changeType == "UPDATE")
             {
-                List<string> exceptionList = new List<string>(new string[] { "backfill_enabled", "backfill_dataID", "backfill_data_structure_type", "backfill_data_lapse_limit", "backfill_data_interval" });
+                List<string> exceptionList = new List<string>(new string[] { "backfill_enabled", "backfill_dataID", "backfill_data_structure_type", "backfill_data_lapse_limit", "backfill_data_interval","LastReadDataType"});
                 string[] nulls = FindNulls(datapoint, exceptionList);
                 if (nulls.Length > 0)
                 {
@@ -1708,14 +1790,70 @@ namespace FDA
                 switch (changeType)
                 {
 
-                    case "INSERT":
-                        _dataPointConfig.Add(datapoint.DPDUID, datapoint);
+                    case "INSERT":                    
+                        if (datapoint.DPSType.ToUpper() == "SOFTTAG")
+                        {
+                            // create a soft tag
+                            string softtagtype = datapoint.read_detail_01;
+                            string softtagarguments = datapoint.physical_point;
+                            bool softtagenabled = datapoint.DPDSEnabled;
+                            DerivedTag newTag = DerivedTag.Create(datapoint.DPDUID.ToString(), softtagtype, softtagarguments, softtagenabled);
+                            if (newTag == null)
+                            {
+                                Globals.SystemManager.LogApplicationEvent(this, "", "Config Error: DPDS ID '" + datapoint.DPDUID + "' insert rejected. Unrecognized soft tag type '" + datapoint.read_detail_01 + "'", true);
+                                return;    
+                            }
+                            
+                            newTag.DPDSEnabled = datapoint.DPDSEnabled;
+                            newTag.DPSType = datapoint.DPSType;
+                            newTag.read_scaling = datapoint.read_scaling;
+                            newTag.read_scale_raw_low = datapoint.read_scale_raw_low;
+                            newTag.read_scale_raw_high = datapoint.read_scale_raw_high;
+                            newTag.read_scale_eu_low = datapoint.read_scale_eu_low;
+                            newTag.read_scale_eu_high = datapoint.read_scale_eu_high;
+                            newTag.write_scaling = datapoint.write_scaling;
+                            newTag.write_scale_raw_low = datapoint.write_scale_raw_low;
+                            newTag.write_scale_raw_high = datapoint.write_scale_raw_high;
+                            newTag.write_scale_eu_low = datapoint.write_scale_eu_low;
+                            newTag.write_scale_eu_high = datapoint.write_scale_eu_high;
+                            newTag.LastReadDataValue = 0.0;
+                            newTag.LastReadQuality = 32;
+                            newTag.LastReadDataTimestamp = Globals.FDANow();
+
+                            // these properties don't apply to soft tags
+                            newTag.backfill_enabled = false;
+                            newTag.backfill_data_ID = -1;
+                            newTag.backfill_data_structure_type = 0;
+                            newTag.backfill_data_lapse_limit = 0;
+                            newTag.backfill_data_interval = 0;
+                            
+                            
+                            newTag.Initialize();
+                            if (!newTag.IsValid)
+                            {
+                                Globals.SystemManager.LogApplicationEvent(this, "", "Config Error: DPDS ID '" + datapoint.DPDUID + "' insert rejected. " + newTag.ErrorMessage, true);                               
+                            }
+                            newTag.OnUpdate += SoftPoint_OnUpdate;
+                            _dataPointConfig.Add(newTag.DPDUID, newTag);
+                        }
+                        else
+                        {
+                            _dataPointConfig.Add(datapoint.DPDUID, datapoint);
+                        }
+
+                        
                         action = "added";
                         break;
                     case "DELETE":
                         if (_dataPointConfig.ContainsKey(datapoint.DPDUID))
                         {
+                            if (datapoint.DPSType.ToLower() == "softtag")
+                            {
+                                DerivedTag deletedTag = (DerivedTag)_dataPointConfig[datapoint.DPDUID];
+                                deletedTag.Dispose();
+                            }
                             _dataPointConfig.Remove(datapoint.DPDUID);
+
                             action = "deleted";
                         }
                         else
@@ -1727,7 +1865,31 @@ namespace FDA
                     case "UPDATE":
                         if (_dataPointConfig.ContainsKey(datapoint.DPDUID))
                         {
-                            _dataPointConfig[datapoint.DPDUID] = datapoint;
+                            if (_dataPointConfig[datapoint.DPDUID].DPSType.ToLower() == "softtag")
+                            {
+                                DerivedTag tagToChange = (DerivedTag)_dataPointConfig[datapoint.DPDUID];
+                                if (datapoint.read_detail_01.ToLower() != tagToChange.read_detail_01.ToLower())
+                                {
+                                    // derived tag type has changed, we'll need to destroy the old one and create a brand new one
+                                    Globals.SystemManager.LogApplicationEvent(this, "", "DPDS ID '" + datapoint.DPDUID + "' update requires removing and re-inserting the datapoint because the soft type type was changed. Removing old datapoint now", true);
+
+                                    tagToChange.Dispose();
+                                    _dataPointConfig.Remove(datapoint.DPDUID);
+                                    DataPointMonitorNotification("INSERT", datapoint);
+                                    return;
+                                }
+
+                                // same derived tag type, we can just change its arguments
+                                tagToChange.Alter(datapoint.physical_point);
+                                if (!tagToChange.IsValid)
+                                {
+                                    Globals.SystemManager.LogApplicationEvent(this, "", "Config Error: DPDS ID '" + datapoint.DPDUID + "' update invalid. " + tagToChange.ErrorMessage, true);
+                                }
+                            }
+                            else
+                            {
+                                _dataPointConfig[datapoint.DPDUID] = datapoint;
+                            }
                             action = "updated";
                         }
                         else
@@ -1751,12 +1913,9 @@ namespace FDA
                             }
                             */
 
-                            // record not found so do an insert instead
-                            _dataPointConfig.Add(datapoint.DPDUID, datapoint);
-                            action = "not found, adding it as a new DataPointDefinitionStructure";
-                            changeType = "INSERT";
-                            break;
-
+                            // record not found, re-run this function with action set to insert instead
+                            DataPointMonitorNotification("INSERT", datapoint);
+                            return;
                         }
 
 

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Common;
+using Modbus;
 
 namespace Tests
 {
@@ -18,7 +19,7 @@ namespace Tests
             FDADataPointDefinitionStructure srcTag = new FDADataPointDefinitionStructure();
             srcTag.DPDUID = Guid.NewGuid();
             srcTags.Add(srcTag.DPDUID, srcTag);
-            DerivedTag.PLCTags = srcTags;
+            DerivedTag.Tags = srcTags;
 
             // good arguments, should all produce a valid and enabled derived tag
             List<string> goodArgs = new List<string>();
@@ -53,79 +54,31 @@ namespace Tests
 
             // check that bad softtag id is detected
             BitSeriesDerivedTag softTag = (BitSeriesDerivedTag)DerivedTag.Create("12345-678","bitser", goodArgs[0], true);
+            softTag.Initialize();
+
             Assert.AreEqual(softTag.IsValid, false);
-            Assert.AreEqual(softTag.Enabled, false);
+            Assert.AreEqual(softTag.DPDSEnabled, false);
             
             // check that bad arguments are detected
-            foreach (string badArgAtring in badArgs)
+            foreach (string badArgString in badArgs)
             {
-                softTag = (BitSeriesDerivedTag)DerivedTag.Create(srcTag.DPDUID.ToString(), "bitser", badArgAtring, true);
+                softTag = (BitSeriesDerivedTag)DerivedTag.Create(srcTag.DPDUID.ToString(), "bitser", badArgString, true);
+                softTag.Initialize();
                 Assert.AreEqual(softTag.IsValid, false);
-                Assert.AreEqual(softTag.Enabled, false);
+                Assert.AreEqual(softTag.DPDSEnabled, false);
             }
 
             // check that good arguments are determined to be valid
             foreach (string goodArgString in goodArgs)
             {
                 softTag = (BitSeriesDerivedTag)DerivedTag.Create(srcTag.DPDUID.ToString(), "bitser", goodArgString, true);
+                softTag.Initialize();
                 Assert.AreEqual(softTag.IsValid, true);
-                Assert.AreEqual(softTag.Enabled, true);
+                Assert.AreEqual(softTag.DPDSEnabled, true);
             }
         }
 
-        [TestMethod]
-        public void BitSeriesCreationTest()
-        {
-            // set up a source tag, put it in a dictionary (like in the FDA), and make the dictionary available to the derived tags class
-            Dictionary<Guid, FDADataPointDefinitionStructure> srcTags = new Dictionary<Guid, FDADataPointDefinitionStructure>();
-            FDADataPointDefinitionStructure srcTag = new FDADataPointDefinitionStructure();
-            srcTag.DPDUID = Guid.NewGuid();
-            srcTags.Add(srcTag.DPDUID, srcTag);
-            DerivedTag.PLCTags = srcTags;
 
-            // these are all good arguments, should all produce a valid an enabled derived tag, with the correct parameters
-            Guid softtagID = Guid.NewGuid();
-            BitSeriesDerivedTag softtag = (BitSeriesDerivedTag)DerivedTag.Create(softtagID.ToString(), "bitser", srcTag.DPDUID + ":0:1",true);
-            Assert.IsTrue(softtag.ID == softtagID);
-            Assert.IsTrue(softtag.SourceTag == srcTag.DPDUID);
-            Assert.IsTrue(softtag.IsValid == true);
-            Assert.IsTrue(softtag.Enabled == true);
-            Assert.IsTrue(softtag.StartBit == 0);
-            Assert.IsTrue(softtag.NumBits == 1);
-
-
-            softtag = (BitSeriesDerivedTag)DerivedTag.Create(softtagID.ToString(), "bitser", srcTag.DPDUID + ":0:2", true);
-            Assert.IsTrue(softtag.ID == softtagID);
-            Assert.IsTrue(softtag.SourceTag == srcTag.DPDUID);
-            Assert.IsTrue(softtag.IsValid == true);
-            Assert.IsTrue(softtag.Enabled == true);
-            Assert.IsTrue(softtag.StartBit == 0);
-            Assert.IsTrue(softtag.NumBits == 2);
-
-            softtag = (BitSeriesDerivedTag)DerivedTag.Create(softtagID.ToString(), "bitser", srcTag.DPDUID + ":10:4", true);
-            Assert.IsTrue(softtag.ID == softtagID);
-            Assert.IsTrue(softtag.SourceTag == srcTag.DPDUID);
-            Assert.IsTrue(softtag.IsValid == true);
-            Assert.IsTrue(softtag.Enabled == true);
-            Assert.IsTrue(softtag.StartBit == 10);
-            Assert.IsTrue(softtag.NumBits == 4);
-
-            softtag = (BitSeriesDerivedTag)DerivedTag.Create(softtagID.ToString(), "bitser", srcTag.DPDUID + ":0:32", true);
-            Assert.IsTrue(softtag.ID == softtagID);
-            Assert.IsTrue(softtag.SourceTag == srcTag.DPDUID);
-            Assert.IsTrue(softtag.IsValid == true);
-            Assert.IsTrue(softtag.Enabled == true);
-            Assert.IsTrue(softtag.StartBit == 0);
-            Assert.IsTrue(softtag.NumBits == 32);
-
-            softtag = (BitSeriesDerivedTag)DerivedTag.Create(softtagID.ToString(), "bitser", srcTag.DPDUID + ":31:1", true);
-            Assert.IsTrue(softtag.ID == softtagID);
-            Assert.IsTrue(softtag.SourceTag == srcTag.DPDUID);
-            Assert.IsTrue(softtag.IsValid == true);
-            Assert.IsTrue(softtag.Enabled == true);
-            Assert.IsTrue(softtag.StartBit == 31);
-            Assert.IsTrue(softtag.NumBits == 1);
-        }
 
         [TestMethod]
         public void BitSeriesFunctionalTest()
@@ -136,7 +89,7 @@ namespace Tests
             srcTag.DPDUID = Guid.NewGuid();
             srcTag.DPDSEnabled = true;
             srcTags.Add(srcTag.DPDUID, srcTag);
-            DerivedTag.PLCTags = srcTags;
+            DerivedTag.Tags = srcTags;
 
             // generate 1000 random unsigned Int32 values for testing
             List<UInt32> testValues = new List<UInt32>();
@@ -148,28 +101,33 @@ namespace Tests
                 testValues.Add(BitConverter.ToUInt32(bytes));
             }
 
+            DataTypeBase datatype = Modbus.ModbusProtocol.DataType.UINT32;
+
             // extract bit 0 only
             BitSeriesDerivedTag softTag = (BitSeriesDerivedTag)DerivedTag.Create(Guid.NewGuid().ToString(),"bitser",srcTag.DPDUID.ToString() + ":0:1",true);
+            softTag.Initialize();
             UInt32 expectedDerivedVal;
             foreach (UInt32 testVal in testValues)
             {
                 // update the value in the source tag
                 srcTag.LastReadDataValue = testVal;
                 srcTag.LastReadQuality = 192;
+                srcTag.LastReadDataType = datatype;
                 srcTag.LastReadDataTimestamp = DateTime.Now;
 
                 // check that the derived tag has the same timestamp and quality as the source tag
-                Assert.AreEqual(srcTag.LastReadDataTimestamp,softTag.Timestamp);
-                Assert.AreEqual(srcTag.LastReadQuality,softTag.Quality);
+                Assert.AreEqual(srcTag.LastReadDataTimestamp,softTag.LastReadDataTimestamp);
+                Assert.AreEqual(srcTag.LastReadQuality,softTag.LastReadQuality);
 
                 // check that the value of the derived tag is correct
                 expectedDerivedVal = testVal & 1; 
-                Assert.AreEqual(expectedDerivedVal, softTag.Value);
+                Assert.AreEqual(expectedDerivedVal, softTag.LastReadDataValue);
             }
 
 
             // extract bit 31 only
             softTag = (BitSeriesDerivedTag)DerivedTag.Create(Guid.NewGuid().ToString(), "bitser", srcTag.DPDUID.ToString() + ":31:1", true);
+            softTag.Initialize();
             foreach (UInt32 testVal in testValues)
             {
                 // update the value in the source tag
@@ -178,17 +136,18 @@ namespace Tests
                 srcTag.LastReadDataTimestamp = DateTime.Now;
 
                 // check that the derived tag has the same timestamp and quality as the source tag
-                Assert.AreEqual(softTag.Timestamp, srcTag.LastReadDataTimestamp);
-                Assert.AreEqual(softTag.Quality, srcTag.LastReadQuality);
+                Assert.AreEqual(softTag.LastReadDataTimestamp, srcTag.LastReadDataTimestamp);
+                Assert.AreEqual(softTag.LastReadQuality, srcTag.LastReadQuality);
 
                 // check that the value of the derived tag is correct
                 expectedDerivedVal = (testVal & (UInt32)Math.Pow(2, 31))>>31;
-                Assert.AreEqual(expectedDerivedVal, softTag.Value);
+                Assert.AreEqual(expectedDerivedVal, softTag.LastReadDataValue);
             }
 
 
             // extract bit 20 only
             softTag = (BitSeriesDerivedTag)DerivedTag.Create(Guid.NewGuid().ToString(), "bitser", srcTag.DPDUID.ToString() + ":20:1", true);
+            softTag.Initialize();
             foreach (UInt32 testVal in testValues)
             {
                 // update the value in the source tag
@@ -197,16 +156,17 @@ namespace Tests
                 srcTag.LastReadDataTimestamp = DateTime.Now;
 
                 // check that the derived tag has the same timestamp and quality as the source tag
-                Assert.AreEqual(softTag.Timestamp, srcTag.LastReadDataTimestamp);
-                Assert.AreEqual(softTag.Quality, srcTag.LastReadQuality);
+                Assert.AreEqual(softTag.LastReadDataTimestamp, srcTag.LastReadDataTimestamp);
+                Assert.AreEqual(softTag.LastReadQuality, srcTag.LastReadQuality);
 
                 // check that the value of the derived tag is correct
                 expectedDerivedVal = (testVal & (UInt32)Math.Pow(2, 20)) >> 20;
-                Assert.AreEqual(expectedDerivedVal, softTag.Value);
+                Assert.AreEqual(expectedDerivedVal, softTag.LastReadDataValue);
             }
 
             // extract bits 0-1
             softTag = (BitSeriesDerivedTag)DerivedTag.Create(Guid.NewGuid().ToString(), "bitser", srcTag.DPDUID.ToString() + ":0:2", true);
+            softTag.Initialize();
             foreach (UInt32 testVal in testValues)
             {
                 // update the value in the source tag
@@ -215,16 +175,17 @@ namespace Tests
                 srcTag.LastReadDataTimestamp = DateTime.Now;
 
                 // check that the derived tag has the same timestamp and quality as the source tag
-                Assert.AreEqual(softTag.Timestamp, srcTag.LastReadDataTimestamp);
-                Assert.AreEqual(softTag.Quality, srcTag.LastReadQuality);
+                Assert.AreEqual(softTag.LastReadDataTimestamp, srcTag.LastReadDataTimestamp);
+                Assert.AreEqual(softTag.LastReadQuality, srcTag.LastReadQuality);
 
                 // check that the value of the derived tag is correct
                 expectedDerivedVal = testVal & ((UInt32)Math.Pow(2,1) + (UInt32)Math.Pow(2, 0)) >> 0;
-                Assert.AreEqual(expectedDerivedVal, softTag.Value);
+                Assert.AreEqual(expectedDerivedVal, softTag.LastReadDataValue);
             }
 
             // extract bits 10-13
             softTag = (BitSeriesDerivedTag)DerivedTag.Create(Guid.NewGuid().ToString(), "bitser", srcTag.DPDUID.ToString() + ":10:4", true);
+            softTag.Initialize();
             foreach (UInt32 testVal in testValues)
             {
                 // update the value in the source tag
@@ -233,16 +194,17 @@ namespace Tests
                 srcTag.LastReadDataTimestamp = DateTime.Now;
 
                 // check that the derived tag has the same timestamp and quality as the source tag
-                Assert.AreEqual(softTag.Timestamp, srcTag.LastReadDataTimestamp);
-                Assert.AreEqual(softTag.Quality, srcTag.LastReadQuality);
+                Assert.AreEqual(softTag.LastReadDataTimestamp, srcTag.LastReadDataTimestamp);
+                Assert.AreEqual(softTag.LastReadQuality, srcTag.LastReadQuality);
 
                 // check that the value of the derived tag is correct
                 expectedDerivedVal = (testVal & ((UInt32)Math.Pow(2, 10) + (UInt32)Math.Pow(2,11) +  (UInt32)Math.Pow(2,12) + (UInt32)Math.Pow(2,13))) >> 10;
-                Assert.AreEqual(expectedDerivedVal, softTag.Value);
+                Assert.AreEqual(expectedDerivedVal, softTag.LastReadDataValue);
             }
 
             // "extract" all the bits
             softTag = (BitSeriesDerivedTag)DerivedTag.Create(Guid.NewGuid().ToString(), "bitser", srcTag.DPDUID.ToString() + ":0:32", true);
+            softTag.Initialize();
             foreach (UInt32 testVal in testValues)
             {
                 // update the value in the source tag
@@ -251,16 +213,17 @@ namespace Tests
                 srcTag.LastReadDataTimestamp = DateTime.Now;
 
                 // check that the derived tag has the same timestamp and quality as the source tag
-                Assert.AreEqual(softTag.Timestamp, srcTag.LastReadDataTimestamp);
-                Assert.AreEqual(softTag.Quality, srcTag.LastReadQuality);
+                Assert.AreEqual(softTag.LastReadDataTimestamp, srcTag.LastReadDataTimestamp);
+                Assert.AreEqual(softTag.LastReadQuality, srcTag.LastReadQuality);
 
                 // check that the value of the derived tag is correct
                 expectedDerivedVal = testVal;
-                Assert.AreEqual(expectedDerivedVal, softTag.Value);
+                Assert.AreEqual(expectedDerivedVal, softTag.LastReadDataValue);
             }
 
             // extract the highest 6 bits
             softTag = (BitSeriesDerivedTag)DerivedTag.Create(Guid.NewGuid().ToString(), "bitser", srcTag.DPDUID.ToString() + ":26:6", true);
+            softTag.Initialize();
             foreach (UInt32 testVal in testValues)
             {
                 // update the value in the source tag
@@ -269,13 +232,13 @@ namespace Tests
                 srcTag.LastReadDataTimestamp = DateTime.Now;
 
                 // check that the derived tag has the same timestamp and quality as the source tag
-                Assert.AreEqual(srcTag.LastReadDataTimestamp,softTag.Timestamp);
-                Assert.AreEqual(srcTag.LastReadQuality,softTag.Quality);
+                Assert.AreEqual(srcTag.LastReadDataTimestamp,softTag.LastReadDataTimestamp);
+                Assert.AreEqual(srcTag.LastReadQuality,softTag.LastReadQuality);
 
                 // check that the value of the derived tag is correct
                 expectedDerivedVal = expectedDerivedVal = (testVal & ((UInt32)Math.Pow(2, 26) + (UInt32)Math.Pow(2, 27) + (UInt32)Math.Pow(2, 28) + (UInt32)Math.Pow(2, 29) + (UInt32)Math.Pow(2,30) + (UInt32)Math.Pow(2,31))) >> 26;
 
-                Assert.AreEqual(expectedDerivedVal, softTag.Value);
+                Assert.AreEqual(expectedDerivedVal, softTag.LastReadDataValue);
             }
 
 
@@ -290,7 +253,7 @@ namespace Tests
             srcTag.DPDSEnabled = true;
             srcTag.DPDUID = Guid.NewGuid();
             srcTags.Add(srcTag.DPDUID, srcTag);
-            DerivedTag.PLCTags = srcTags;
+            DerivedTag.Tags = srcTags;
 
             // good arguments, should all produce a valid and enabled derived tag
             List<string> goodArgs = new List<string>();
@@ -321,52 +284,28 @@ namespace Tests
             // check that bad softtag id is detected
             DerivedTag softTag = DerivedTag.Create("12345-678", "bitmask", goodArgs[0], true);
             Assert.AreEqual(softTag.IsValid, false);
-            Assert.AreEqual(softTag.Enabled, false);
+            Assert.AreEqual(softTag.DPDSEnabled, false);
 
             // check that bad arguments are detected
-            foreach (string badArgAtring in badArgs)
+            foreach (string badArgString in badArgs)
             {
-                softTag = DerivedTag.Create(srcTag.DPDUID.ToString(), "bitmask", badArgAtring, true);
+                softTag = DerivedTag.Create(srcTag.DPDUID.ToString(), "bitmask", badArgString, true);
+                softTag.Initialize();
                 Assert.AreEqual(softTag.IsValid, false);
-                Assert.AreEqual(softTag.Enabled, false);
+                Assert.AreEqual(softTag.DPDSEnabled, false);
             }
 
             // check that good arguments are determined to be valid
             foreach (string goodArgString in goodArgs)
             {
                 softTag = DerivedTag.Create(srcTag.DPDUID.ToString(), "bitmask", goodArgString, true);
+                softTag.Initialize();
                 Assert.AreEqual(true,softTag.IsValid);
-                Assert.AreEqual(true,softTag.Enabled);
+                Assert.AreEqual(true,softTag.DPDSEnabled);
             }
         }
 
-        [TestMethod]
-        public void BitmaskCreationTest()
-        {
-            // set up a source tag, put it in a dictionary (like in the FDA), and make the dictionary available to the derived tags class
-            Dictionary<Guid, FDADataPointDefinitionStructure> srcTags = new Dictionary<Guid, FDADataPointDefinitionStructure>();
-            FDADataPointDefinitionStructure srcTag = new FDADataPointDefinitionStructure();
-            srcTag.DPDSEnabled = true;
-            srcTag.DPDUID = Guid.NewGuid();
-            srcTags.Add(srcTag.DPDUID, srcTag);
-            DerivedTag.PLCTags = srcTags;
-
-            // these are all good arguments, should all produce a valid an enabled derived tag, with the correct parameters
-            Guid softtagID = Guid.NewGuid();
-            BitmaskDerivedTag softtag = (BitmaskDerivedTag)DerivedTag.Create(softtagID.ToString(), "bitmask", srcTag.DPDUID + ":1", true);
-            Assert.IsTrue(softtag.ID == softtagID);
-            Assert.IsTrue(softtag.SourceTag == srcTag.DPDUID);
-            Assert.IsTrue(softtag.IsValid == true);
-            Assert.IsTrue(softtag.Enabled == true);
-            Assert.IsTrue(softtag.Bitmask == 1);
-
-            softtag = (BitmaskDerivedTag)DerivedTag.Create(softtagID.ToString(), "bitmask", srcTag.DPDUID + ":578", true);
-            Assert.IsTrue(softtag.ID == softtagID);
-            Assert.IsTrue(softtag.SourceTag == srcTag.DPDUID);
-            Assert.IsTrue(softtag.IsValid == true);
-            Assert.IsTrue(softtag.Enabled == true);
-            Assert.IsTrue(softtag.Bitmask == 578);        
-        }
+     
 
         [TestMethod]
         public void BitmaskFunctionalTest()
@@ -377,7 +316,7 @@ namespace Tests
             srcTag.DPDUID = Guid.NewGuid();
             srcTag.DPDSEnabled = true;
             srcTags.Add(srcTag.DPDUID, srcTag);
-            DerivedTag.PLCTags = srcTags;
+            DerivedTag.Tags = srcTags;
 
             // generate 100,000 random unsigned Int32 values for testing
             List<UInt32> testValues = new List<UInt32>();
@@ -390,27 +329,33 @@ namespace Tests
             }
 
             UInt32 expectedDerivedVal;
+            DataTypeBase datatype = Modbus.ModbusProtocol.DataType.UINT32;
+            
 
             // bitmask 0000 0000 0000 0000 0000 0000 0000 0001
             DerivedTag softTag = DerivedTag.Create(Guid.NewGuid().ToString(), "bitmask", srcTag.DPDUID.ToString() + ":1", true);
+            softTag.Initialize();
             foreach (UInt32 testVal in testValues)
             {
                 // update the value in the source tag
+                srcTag.LastReadDataType = datatype;
                 srcTag.LastReadDataValue = testVal;
                 srcTag.LastReadQuality = 192;
                 srcTag.LastReadDataTimestamp = DateTime.Now;
 
                 // check that the derived tag has the same timestamp and quality as the source tag
-                Assert.AreEqual(softTag.Timestamp, srcTag.LastReadDataTimestamp);
-                Assert.AreEqual(softTag.Quality, srcTag.LastReadQuality);
+                Assert.AreEqual(softTag.LastReadDataTimestamp, srcTag.LastReadDataTimestamp);
+                Assert.AreEqual(softTag.LastReadQuality, srcTag.LastReadQuality);
 
                 // check that the value of the derived tag is correct
                 expectedDerivedVal = testVal & 1;
-                Assert.AreEqual(expectedDerivedVal, softTag.Value);
+                Assert.AreEqual(expectedDerivedVal, softTag.LastReadDataValue);
             }
 
             // bitmask 0000 0000 0000 0000 1100 0000 0000 0001
             softTag = DerivedTag.Create(Guid.NewGuid().ToString(), "bitmask", srcTag.DPDUID.ToString() + ":49153", true);
+            softTag.Initialize();
+
             foreach (UInt32 testVal in testValues)
             {
                 // update the value in the source tag
@@ -419,16 +364,17 @@ namespace Tests
                 srcTag.LastReadDataTimestamp = DateTime.Now;
 
                 // check that the derived tag has the same timestamp and quality as the source tag
-                Assert.AreEqual(softTag.Timestamp, srcTag.LastReadDataTimestamp);
-                Assert.AreEqual(softTag.Quality, srcTag.LastReadQuality);
+                Assert.AreEqual(softTag.LastReadDataTimestamp, srcTag.LastReadDataTimestamp);
+                Assert.AreEqual(softTag.LastReadQuality, srcTag.LastReadQuality);
 
                 // check that the value of the derived tag is correct
                 expectedDerivedVal = testVal & 49153;
-                Assert.AreEqual(expectedDerivedVal, softTag.Value);
+                Assert.AreEqual(expectedDerivedVal, softTag.LastReadDataValue);
             }
 
             // bitmask 1111 1111 1111 1111 1111 1111 1111 1111
             softTag = DerivedTag.Create(Guid.NewGuid().ToString(), "bitmask", srcTag.DPDUID.ToString() + ":4294967295", true);
+            softTag.Initialize();
             foreach (UInt32 testVal in testValues)
             {
                 // update the value in the source tag
@@ -437,15 +383,137 @@ namespace Tests
                 srcTag.LastReadDataTimestamp = DateTime.Now;
 
                 // check that the derived tag has the same timestamp and quality as the source tag
-                Assert.AreEqual(softTag.Timestamp, srcTag.LastReadDataTimestamp);
-                Assert.AreEqual(softTag.Quality, srcTag.LastReadQuality);
+                Assert.AreEqual(softTag.LastReadDataTimestamp, srcTag.LastReadDataTimestamp);
+                Assert.AreEqual(softTag.LastReadQuality, srcTag.LastReadQuality);
 
                 // check that the value of the derived tag is correct
                 expectedDerivedVal = testVal;
-                Assert.AreEqual(expectedDerivedVal, softTag.Value);
+                Assert.AreEqual(expectedDerivedVal, softTag.LastReadDataValue);
+            }
+
+        }
+/*
+        [TestMethod]
+        public void SummationArgumentValidityChecks()
+        {
+            // set up a few source tags, put them in a dictionary (like in the FDA), and make the dictionary available to the derived tags class
+            Dictionary<Guid, FDADataPointDefinitionStructure> srcTags = new Dictionary<Guid, FDADataPointDefinitionStructure>();
+            FDADataPointDefinitionStructure srcTag;
+            List<string> goodIDs = new List<string>();
+            for (int i = 0; i < 5; i++)
+            {
+                srcTag = new FDADataPointDefinitionStructure();
+                srcTag.DPDUID = Guid.NewGuid();
+                srcTags.Add(srcTag.DPDUID, srcTag);
+                goodIDs.Add(srcTag.DPDUID.ToString());
+            }
+            DerivedTag.PLCTags = srcTags;
+
+            // good arguments, should all produce a valid and enabled derived tag
+            List<string> goodArgs = new List<string>();
+            goodArgs.Add(goodIDs[0]);  // just one source tag
+            goodArgs.Add(goodIDs[0] + ":" + goodIDs[1]); // two source tags
+            goodArgs.Add(goodIDs[0] + ":" + goodIDs[1] + ":" + goodIDs[2]); // three source tags
+            goodArgs.Add(goodIDs[0] + ":" + goodIDs[1] + ":" + goodIDs[2] + ":" + goodIDs[3]); // four source tags
+            goodArgs.Add(goodIDs[0] + ":" + goodIDs[1] + ":" + goodIDs[2] + ":" + goodIDs[3] + ":" + goodIDs[4]); // 5 source tags 
+        
+
+            // bad arguments, should all produce an invalid and disabled derived tag
+            List<string> badArgs = new List<string>();
+            string nonexistentID = Guid.NewGuid().ToString();
+            badArgs.Add(null);                      // null argument
+            badArgs.Add("");                        // empty argument string
+            badArgs.Add("fdjhkfrahufe");            // not a valid id
+            badArgs.Add(Guid.NewGuid().ToString()); // references non-existent source tag
+            badArgs.Add(goodIDs[0] + ":" + nonexistentID); //references one good source tag, and one that doesn't exist
+            badArgs.Add(goodIDs[0] + ":fdsfehsife"); //references one good source tag, one invalid ID
+
+            // check that bad softtag id is detected
+            DerivedTag softTag = DerivedTag.Create("12345-678", "summation", goodArgs[0], true);
+            Assert.AreEqual(false,softTag.IsValid);
+            Assert.AreEqual(false,softTag.DPDSEnabled);
+
+            // check that bad arguments are detected
+            foreach (string badArgString in badArgs)
+            {
+                softTag = DerivedTag.Create(Guid.NewGuid().ToString(), "summation", badArgString, true);
+                Assert.AreEqual(false,softTag.IsValid);
+                Assert.AreEqual(false,softTag.DPDSEnabled);
+            }
+
+            // check that good arguments are determined to be valid
+            foreach (string goodArgString in goodArgs)
+            {
+                softTag = DerivedTag.Create(Guid.NewGuid().ToString(), "summation", goodArgString, true);
+                Assert.AreEqual(true,softTag.IsValid);
+                Assert.AreEqual(true,softTag.DPDSEnabled);
             }
 
         }
 
+        [TestMethod]
+        public void SummationFunctionalTest()
+        {
+            // set up a few source tags, put them in a dictionary (like in the FDA), and make the dictionary available to the derived tags class
+            Dictionary<Guid, FDADataPointDefinitionStructure> srcTags = new Dictionary<Guid, FDADataPointDefinitionStructure>();
+            FDADataPointDefinitionStructure srcTag;
+            List<string> goodIDs = new List<string>();
+            for (int i = 0; i < 5; i++)
+            {
+                srcTag = new FDADataPointDefinitionStructure();
+                srcTag.DPDUID = Guid.NewGuid();
+                srcTags.Add(srcTag.DPDUID, srcTag);
+                goodIDs.Add(srcTag.DPDUID.ToString());
+            }
+            DerivedTag.PLCTags = srcTags;
+
+            ModbusProtocol.DataType datatypeFloat= ModbusProtocol.DataType.FL;
+                       
+            List<string> goodArgs = new List<string>();
+            goodArgs.Add(goodIDs[0]);  // just one source tag
+            goodArgs.Add(goodIDs[0] + ":" + goodIDs[1]); // two source tags
+            goodArgs.Add(goodIDs[0] + ":" + goodIDs[1] + ":" + goodIDs[2]); // three source tags
+            goodArgs.Add(goodIDs[0] + ":" + goodIDs[1] + ":" + goodIDs[2] + ":" + goodIDs[3]); // four source tags
+            goodArgs.Add(goodIDs[0] + ":" + goodIDs[1] + ":" + goodIDs[2] + ":" + goodIDs[3] + ":" + goodIDs[4]); // 5 source tags 
+
+            Double newValue;
+            Random rnd = new Random();
+            byte[] bytes = new byte[4];
+            int selectedSourceTagIdx;
+            string selectedSourceIDString;
+            Guid selectedSourceIDguid;
+            DerivedTag testTag;
+            Double expectedResult;
+          
+            // create a new summation soft tag that sums all 5 source tags and then do 1000 tests
+            testTag = DerivedTag.Create(Guid.NewGuid().ToString(), "summation", goodArgs[4], true);
+
+            for (int i = 0; i < 1000; i++)
+            {
+                // generate a random double and assign it to a random source tag
+                newValue = rnd.NextDouble();
+
+                selectedSourceTagIdx = rnd.Next(0, 4);
+                selectedSourceIDString = goodIDs[selectedSourceTagIdx];
+                selectedSourceIDguid = Guid.Parse(selectedSourceIDString);
+
+                srcTags[selectedSourceIDguid].LastReadDataType = datatypeFloat;
+                srcTags[selectedSourceIDguid].LastReadQuality = 192;
+                srcTags[selectedSourceIDguid].LastReadDataValue = newValue;
+                srcTags[selectedSourceIDguid].LastReadDataTimestamp = DateTime.Now;
+
+                expectedResult = 0;
+                foreach (FDADataPointDefinitionStructure sourcetag in srcTags.Values)
+                {
+                    expectedResult += sourcetag.LastReadDataValue;
+                }
+
+                Assert.AreEqual(expectedResult, testTag.LastReadDataValue);
+                Assert.AreEqual(srcTags[selectedSourceIDguid].LastReadQuality, testTag.LastReadQuality);
+                Assert.AreEqual(srcTags[selectedSourceIDguid].LastReadDataTimestamp, testTag.LastReadDataTimestamp);
+            }
+        }
+    */
     }
+
 }

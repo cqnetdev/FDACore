@@ -353,7 +353,7 @@ namespace FDA
                     }
 
 
-                    // update the last read data value in the tag definition object
+                    // update the tag definition object
                     if (tag.Quality == 192)
                     {
                         lock (tagDef)
@@ -362,6 +362,8 @@ namespace FDA
                             tagDef.LastReadDataValue = Convert.ToDouble(tag.Value);                          
                             tagDef.LastReadQuality = tag.Quality;
                             tagDef.LastReadDataType = tag.ProtocolDataType;
+                            tagDef.LastReadDestTable = e.RequestRef.Destination;
+                            tagDef.LastReadDatabaseWriteMode = e.RequestRef.DBWriteMode;
                             tagDef.LastReadDataTimestamp = tag.Timestamp;  // update the timestamp last, because that's what triggers the re-calclation of any softtags that depend on this one                           
                         }
                     }
@@ -528,7 +530,7 @@ namespace FDA
                     }
                 }
 
-                // handle connection details change
+                // handle connection details changes
                 if (e.TableName == Globals.SystemManager.GetTableName("FDASourceConnections"))
                 {                    
                     string changeType = e.ChangeType;
@@ -833,13 +835,14 @@ namespace FDA
                 // handle data point definition changes 
                 if (e.TableName == Globals.SystemManager.GetTableName("DataPointDefinitionStructures"))
                 {
-                    // mark request groups for revalidation
-                    if (e.ChangeType == "INSERT")
-                        RevalidateRequestGroups(2);
+                   
+                        // mark request groups for revalidation
+                        if (e.ChangeType == "INSERT")
+                            RevalidateRequestGroups(2);
 
-                    if (e.ChangeType == "DELETE")
-                        RevalidateRequestGroups(1);
-                    
+                        if (e.ChangeType == "DELETE")
+                            RevalidateRequestGroups(1);
+           
                 }
                 
 

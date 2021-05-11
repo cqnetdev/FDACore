@@ -5,27 +5,21 @@ using System.Text;
 
 namespace Common
 {
-    public abstract class DerivedTag
+    public abstract class DerivedTag : FDADataPointDefinitionStructure, IDisposable
     {
-  
-        public Guid ID { get => _tag_id; }
         public bool IsValid { get => _valid; }
         public string ErrorMessage { get => _errorMessage; }
-        public DateTime Timestamp { get => _timestamp; }
-        public int Quality { get => _quality; }
-        public Double Value { get => _value; }
-        public bool Enabled { get => _enabled; set => _enabled = value; }
-
+     
         protected string _errorMessage = "";
-        protected bool _enabled = false;
         protected bool _valid = false;
-        protected Guid _tag_id;
-        protected string _tag_type;
-        protected double _value;
-        protected DateTime _timestamp;
-        protected int _quality;
+        protected string _derived_tag_type;
 
-        public static Dictionary<Guid, FDADataPointDefinitionStructure> PLCTags;
+        // these three properties are the setup value that were passed in when the tag was created
+        protected string _tagID;
+        protected string _arguments;
+        protected bool _enabled;
+
+        public static Dictionary<Guid, FDADataPointDefinitionStructure> Tags;
 
         public delegate void OnUpdateHandler(object sender, EventArgs e);
         public event OnUpdateHandler OnUpdate;
@@ -40,41 +34,25 @@ namespace Common
                 default: return null;
             }
         }
-
+ 
         // base class constructor
         protected DerivedTag(string tagID, string arguments,bool enabled)
         {
-            // tag id is valid
-            if (!IsValidGUID(tagID))
-            {
-                _enabled = false;
-                _valid = false;
-                _errorMessage = "Invalid Tag ID '" + tagID + "', must be a valid UID in the format xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx";
-                return;
-            }
-
-            // arguments string is not null
-            if (arguments == null)
-            {
-                _enabled = false;
-                _valid = false;
-                _errorMessage = "Invalid Argument (NULL)";
-                return;
-            }
-
-            // arguments string is not empty
-            if (arguments == String.Empty)
-            {
-                _enabled = false;
-                _valid = false;
-                _errorMessage = "Invalid Argument ''";
-                return;
-            }
-
-            _tag_id = Guid.Parse(tagID);
-            _valid = true;
+            _tagID = tagID;
+            _arguments = arguments;
+            physical_point = arguments;
             _enabled = enabled;
+            
+            if (IsValidGUID(_tagID))
+            {
+                DPDUID = Guid.Parse(tagID);
+            }
         }
+
+        public abstract void Initialize();
+
+        public abstract void Alter(string arguments);
+ 
 
         protected void RaiseOnUpdateEvent()
         {
@@ -106,6 +84,9 @@ namespace Common
             bitArray.CopyTo(array, 0);
             return BitConverter.ToUInt32(array);
         }
+
+        public abstract void Dispose();
+
     }
 
     public class BitSeriesDerivedTag : DerivedTag
@@ -118,18 +99,55 @@ namespace Common
         private byte _numBits;
         private FDADataPointDefinitionStructure _sourceTag;
 
+
         public BitSeriesDerivedTag(string tagid, string arguments, bool enabled) : base(tagid, arguments, enabled)
         {
-            // if base constructor found something invalid, no need to continue
-            if (!_valid) return;
+            _derived_tag_type = "bitser";
+            read_detail_01 = "bitser";
+        }
+
+        public override void Initialize()
+        {
+            // tag id is valid
+            if (!IsValidGUID(_tagID))
+            {
+                DPDSEnabled = false;
+                _valid = false;
+                _errorMessage = "Invalid Tag ID '" + _tagID + "', must be a valid UID in the format xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx";
+                return;
+            }
+            
+
+            // arguments string is not null
+            if (_arguments == null)
+            {
+                DPDSEnabled = false;
+                _valid = false;
+                _errorMessage = "Invalid Argument (NULL)";
+                return;
+            }
+
+            // arguments string is not empty
+            if (_arguments == String.Empty)
+            {
+                DPDSEnabled = false;
+                _valid = false;
+                _errorMessage = "Invalid Argument ''";
+                return;
+            }
+
+            DPDUID = Guid.Parse(_tagID);
+            _valid = true;
+            DPDSEnabled = _enabled;
+
 
             // examine the arguments and make sure they're all there and valid
-            string[] argumentsList = arguments.Split(':');
+            string[] argumentsList = _arguments.Split(':');
 
             // at least 3 arguments
             if (argumentsList.Length < 3)
             {
-                _enabled = false;
+                DPDSEnabled = false;
                 _valid = false;
                 _errorMessage = "Not enough arguments, requires three arguments 'source tag id:start bit:bit count'";
                 return;
@@ -138,7 +156,7 @@ namespace Common
             // first argument (source tag) must be a valid guid
             if (!IsValidGUID(argumentsList[0]))
             {
-                _enabled = false;
+                DPDSEnabled = false;
                 _valid = false;
                 _errorMessage = "Argument 1 (source tag) must be a valid UID in the format xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx";
                 return;
@@ -146,19 +164,19 @@ namespace Common
             Guid sourceTagID = Guid.Parse(argumentsList[0]);
 
             // first argument (source tag) must exist
-            if (!PLCTags.ContainsKey(sourceTagID))
+            if (!Tags.ContainsKey(sourceTagID))
             {
-                _enabled = false;
+                DPDSEnabled = false;
                 _valid = false;
                 _errorMessage = "Argument 1 (source tag) '" + sourceTagID.ToString() + "', tag not found";
                 return;
             }
-            _sourceTag = PLCTags[sourceTagID];
+            _sourceTag = Tags[sourceTagID];
 
             // second argument must be an integer between 0 and 31
             if (!IsIntegerInRange(argumentsList[1], 0, 31))
             {
-                _enabled = false;
+                DPDSEnabled = false;
                 _valid = false;
                 _errorMessage = "Argument 2 (start bit) must be an integer between 0 and 31";
                 return;
@@ -169,7 +187,7 @@ namespace Common
             UInt32 maxCount = (UInt32)(32 - _startBit);
             if (!IsIntegerInRange(argumentsList[2], 1, maxCount))
             {
-                _enabled = false;
+                DPDSEnabled = false;
                 _valid = false;
                 _errorMessage = "Argument 3 (bit count) must be an integer, and start bit + bit count must be less than or equal to 32";
                 return;
@@ -180,7 +198,6 @@ namespace Common
             // valid configuration, subscribe to update events from the source tag
             _valid = true;
             _sourceTag.PropertyChanged += _sourceTag_PropertyChanged;
-
         }
 
         private void _sourceTag_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -190,7 +207,7 @@ namespace Common
                 return;
 
             // don't do anything if this derived tag is disabled
-            if (!Enabled)
+            if (!DPDSEnabled)
                 return;
 
             // don't do anything if the source tag is disabled
@@ -201,10 +218,17 @@ namespace Common
             string typename = _sourceTag.LastReadDataType.Name.ToLower();
             if (!(typename == "uint8" || typename == "uint16" || typename == "uint32"))
             {
-                Globals.SystemManager.LogApplicationEvent(this,ID.ToString(),"Soft tag " + ID + " unable to calculate, because of incompatible data type. Bitseries soft tags require an unsigned int (8,16, or 32 bits)");
+                Globals.SystemManager?.LogApplicationEvent(this,ID.ToString(),"Soft tag " + ID + " unable to calculate, because of incompatible data type. Bitseries soft tags require an unsigned int (8,16, or 32 bits)");
                 return;
             }
-           
+
+            // don't do anything if the source tag has bad quality
+            if (_sourceTag.LastReadQuality != 192)
+            {
+                Globals.SystemManager?.LogApplicationEvent(this, ID.ToString(), "Soft tag " + ID + " unable to calculate, because the source tag (" + _sourceTag.DPDUID + " has bad quality (" + _sourceTag.LastReadQuality + ")");
+                return;
+            }
+
             // get the new value
             Double dblVal = _sourceTag.LastReadDataValue; 
 
@@ -224,13 +248,38 @@ namespace Common
             }
 
             // convert the requested bits into an int and update the value,timestamp, and quality
-            _value = (double)UInt32FromByteArray(dstBits);
-            _timestamp = _sourceTag.LastReadDataTimestamp;
-            _quality = _sourceTag.LastReadQuality;
+            LastReadDataValue = (double)UInt32FromByteArray(dstBits);
+            LastReadDataType = _sourceTag.LastReadDataType;
+            LastReadQuality = _sourceTag.LastReadQuality;
+            LastReadDatabaseWriteMode = _sourceTag.LastReadDatabaseWriteMode;
+            LastReadDestTable = _sourceTag.LastReadDestTable;
+            LastReadDataTimestamp = _sourceTag.LastReadDataTimestamp;
+            
 
             RaiseOnUpdateEvent(); // let anyone who's listening know that this derived tag has been updated
         }
+
+        public override void Dispose()
+        {
+            if (_sourceTag != null)
+            {
+                _sourceTag.PropertyChanged -= _sourceTag_PropertyChanged;
+            }
+        }
+
+        public override void Alter(string newArguments)
+        {
+            _valid = false;
+            if (_sourceTag != null)
+            {
+                _sourceTag.PropertyChanged -= _sourceTag_PropertyChanged;
+            }
+            _sourceTag = null;
+            _arguments = newArguments;
+            Initialize();
+        }
     }
+    
 
 
     public class BitmaskDerivedTag : DerivedTag
@@ -243,26 +292,59 @@ namespace Common
 
 
         public BitmaskDerivedTag(string tagid, string arguments, bool enabled) : base(tagid, arguments, enabled)
+        {          
+            _derived_tag_type = "bitmask";
+            read_detail_01 = "bitmask";
+        }
+
+        public override void Initialize()
         {
-            // if base constructor found something invalid, no need to continue
-            if (!_valid) return;
+            // tag id is valid
+            if (!IsValidGUID(_tagID))
+            {
+                DPDSEnabled = false;
+                _valid = false;
+                _errorMessage = "Invalid Tag ID '" + _tagID + "', must be a valid UID in the format xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx";
+                return;
+            }
+
+            // arguments string is not null
+            if (_arguments == null)
+            {
+                DPDSEnabled = false;
+                _valid = false;
+                _errorMessage = "Invalid Argument (NULL)";
+                return;
+            }
+
+            // arguments string is not empty
+            if (_arguments == String.Empty)
+            {
+                DPDSEnabled = false;
+                _valid = false;
+                _errorMessage = "Invalid Argument ''";
+                return;
+            }
+
+            DPDUID = Guid.Parse(_tagID);
+            _valid = true;
 
             // examine the arguments and make sure they're all there and valid
-            string[] argumentsList = arguments.Split(':');
+            string[] argumentsList = _arguments.Split(':');
 
             // at least 2 arguments
             if (argumentsList.Length < 2)
             {
-                _enabled = false;
+                DPDSEnabled = false;
                 _valid = false;
-                _errorMessage = "Not enough arguments, requires three arguments 'source tag id:bitmask'";
+                _errorMessage = "Not enough arguments, requires two arguments 'source tag id:bitmask'";
                 return;
             }
 
             // first argument (source tag) must be a valid guid
             if (!IsValidGUID(argumentsList[0]))
             {
-                _enabled = false;
+                DPDSEnabled = false;
                 _valid = false;
                 _errorMessage = "Argument 1 (source tag) must be a valid UID in the format xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx";
                 return;
@@ -270,19 +352,19 @@ namespace Common
             Guid sourceTagID = Guid.Parse(argumentsList[0]);
 
             // first argument (source tag) must exist
-            if (!PLCTags.ContainsKey(sourceTagID))
+            if (!Tags.ContainsKey(sourceTagID))
             {
-                _enabled = false;
+                DPDSEnabled = false;
                 _valid = false;
                 _errorMessage = "Argument 1 (source tag) '" + sourceTagID.ToString() + "', tag not found";
                 return;
             }
-            _sourceTag = PLCTags[sourceTagID];
+            _sourceTag = Tags[sourceTagID];
 
             // second argument must be an integer in the UInt32 range
             if (!IsIntegerInRange(argumentsList[1], 0, UInt32.MaxValue))
             {
-                _enabled = false;
+                DPDSEnabled = false;
                 _valid = false;
                 _errorMessage = "Argument 2 (bitmask) must be an integer between 0 and " + UInt32.MaxValue;
                 return;
@@ -301,8 +383,8 @@ namespace Common
             if (e.PropertyName != "LastReadDataTimestamp")
                 return;
 
-            // don't do anything if this derived tag is disabled
-            if (!Enabled)
+            // don't do anything if this derived tag is disabled or invalid
+            if (!(DPDSEnabled && _valid))
                 return;
 
             // don't do anything if the source tag is disabled
@@ -313,7 +395,14 @@ namespace Common
             string typename = _sourceTag.LastReadDataType.Name.ToLower();
             if (!(typename == "uint8" || typename == "uint16" || typename == "uint32"))
             {
-                Globals.SystemManager.LogApplicationEvent(this, ID.ToString(), "Soft tag " + ID + " unable to calculate, because of incompatible data type. Bitmask soft tags requires an unsigned int (8,16, or 32 bits)");
+                Globals.SystemManager?.LogApplicationEvent(this, ID.ToString(), "Soft tag " + ID + " unable to calculate, because of incompatible data type. Bitmask soft tags requires an unsigned int (8,16, or 32 bits)");
+                return;
+            }
+
+            // don't do anything if the source tag has bad quality
+            if (_sourceTag.LastReadQuality != 192)
+            {
+                Globals.SystemManager?.LogApplicationEvent(this, ID.ToString(), "Soft tag " + ID + " unable to calculate, because the source tag (" + _sourceTag.DPDUID + " has bad quality (" + _sourceTag.LastReadQuality + ")");
                 return;
             }
 
@@ -323,11 +412,151 @@ namespace Common
             // cast it to an Int32
             UInt32 intVal = Convert.ToUInt32(dblVal);
 
-            _value = (double)(intVal & _bitmask);
-            _timestamp = _sourceTag.LastReadDataTimestamp;
-            _quality = _sourceTag.LastReadQuality;
+            LastReadDataValue = (double)(intVal & _bitmask);
+            LastReadDataType = _sourceTag.LastReadDataType;
+            LastReadQuality = _sourceTag.LastReadQuality;
+            LastReadDatabaseWriteMode = _sourceTag.LastReadDatabaseWriteMode;
+            LastReadDestTable = _sourceTag.LastReadDestTable;
+            LastReadDataTimestamp = _sourceTag.LastReadDataTimestamp;
 
-            RaiseOnUpdateEvent(); // let anyone who's listening know that this derived tag has been updated
+            RaiseOnUpdateEvent(); // let anyone who's listening know that this derived tag has been updated 
         }
+
+        public override void Dispose()
+        {
+            if (_sourceTag != null)
+                _sourceTag.PropertyChanged -= _sourceTag_PropertyChanged;
+        }
+
+        public override void Alter(string newArguments)
+        {
+            _valid = false;
+            if (_sourceTag != null)
+            {
+                _sourceTag.PropertyChanged -= _sourceTag_PropertyChanged;
+            }
+            _sourceTag = null;
+            _arguments = newArguments;
+            Initialize();
+        }
+    }
+
+    public class SummationDerivedTag : DerivedTag
+    {
+        List<FDADataPointDefinitionStructure> _sourceTags;
+
+        public SummationDerivedTag(string tagid, string arguments, bool enabled) : base(tagid, arguments, enabled)
+        {
+            // if base constructor found something invalid, no need to continue
+            if (!_valid) return;
+
+            // examine the arguments and make sure they're all there and valid
+            string[] argumentsList = arguments.Split(':');
+
+            // at least 1 argument
+            if (argumentsList.Length < 1)
+            {
+                DPDSEnabled = false;
+                _valid = false;
+                _errorMessage = "Not enough arguments, requires at least 1 source tag id";
+                return;
+            }
+
+            _sourceTags = new List<FDADataPointDefinitionStructure>();
+
+            // for each source tag in the arugments list
+            Guid sourceTagIDguid;
+            foreach (string sourcetagIDstring in argumentsList)
+            {
+                // argument (source tag) must be a valid guid
+                if (!IsValidGUID(sourcetagIDstring))
+                {
+                    DPDSEnabled = false;
+                    _valid = false;
+                    _errorMessage = "Source tag '" + sourcetagIDstring + "' is not a valid UID in the format xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx";
+                    return;
+                }
+                sourceTagIDguid = Guid.Parse(sourcetagIDstring);
+
+                // first argument (source tag) must exist
+                if (!Tags.ContainsKey(sourceTagIDguid))
+                {
+                    DPDSEnabled = false;
+                    _valid = false;
+                    _errorMessage = "Source tag '" + sourcetagIDstring + "' not found";
+                    return;
+                }
+                _sourceTags.Add(Tags[sourceTagIDguid]);
+            }
+
+            // all source tag id's were valid guid's and source tags with these id's were all found, so
+            _valid = true;
+
+            // subscribe to changes to all the source tags
+            foreach (FDADataPointDefinitionStructure sourceTag in _sourceTags)
+            {
+                sourceTag.PropertyChanged += SourceTag_PropertyChanged;
+            }
+
+        }
+
+        public override void Alter(string arguments)
+        {
+            throw new NotImplementedException();
+        }
+
+        public override void Dispose()
+        {
+            throw new NotImplementedException();
+        }
+
+        public override void Initialize()
+        {
+            // to do: move validation and activation from the constructor to here
+        }
+
+        private void SourceTag_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            // we're only interested in changes to the timestamp, this means the value has updated (even if it hasn't changed)
+            if (e.PropertyName != "LastReadDataTimestamp")
+                return;
+
+            FDADataPointDefinitionStructure updatedSourceTag = (FDADataPointDefinitionStructure)sender;
+            
+            // the tag that changed is disabled, ignore it
+            if (!updatedSourceTag.DPDSEnabled)
+                return;
+            // this derived tag is disabled, ignore the change to the source tag
+            if (DPDSEnabled)
+                return;
+
+
+            Double sum = 0;
+            int quality = 192;
+            DateTime timestamp = updatedSourceTag.LastReadDataTimestamp;
+
+            foreach (FDADataPointDefinitionStructure sourceTag in _sourceTags)
+            {
+                // add the the values of all enabled source tags
+                // Buddy question: should disabled source tags be excluded from the summation?
+                if (sourceTag.DPDSEnabled)
+                    sum += sourceTag.LastReadDataValue;
+
+                // Buddy Question: how to handle variety of qualities in the source tags, what quality do I set the derived tag to?
+                if (quality == 192 && sourceTag.LastReadQuality != 192)
+                    quality = sourceTag.LastReadQuality;
+            }
+
+            LastReadDataValue = sum;
+            LastReadQuality = quality;
+            LastReadDataTimestamp = timestamp;
+            
+
+            //RaiseOnUpdateEvent(); // let anyone who's listening know that this tag has been updated
+
+
+        }
+
+
     }
 }
