@@ -361,7 +361,6 @@ namespace FDA
                         }
                     }
 
-
                     StringBuilder batch = new StringBuilder();
                     object value;
                     int querycount = 0;

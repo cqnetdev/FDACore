@@ -384,8 +384,11 @@ namespace FDA
 
         private void BackfillAnalysisCompleteHandler(object sender, BackfillManager.BackfillEventArgs e)
         {
-            // log the value(s) in the database
-            _dbManager.WriteDataToDB(e.Request);
+            // log the value(s) in the database, if a destination was specified
+            if (e.Request.Destination != "")
+            {
+                _dbManager.WriteDataToDB(e.Request);
+            }
 
             // if the analysis resulted in any backfill groups, send them to the connection manager for processing
             // (do they need to go to "PrepareAndSendRequestGroups()"? or can they go directly to the connection?
@@ -1134,6 +1137,7 @@ namespace FDA
                     badGroups.Add(group);
                 }
 
+                // non-null DataPointBlockRequestListVals
                 if (group.DBGroupRequestConfig.DataPointBlockRequestListVals == null)
                 {
                     Globals.SystemManager.LogApplicationEvent(this, "", "The DataBlockRequestGroup '" + group.Description + "' (" + group.ID + ") requested by " + requestor + " has a null DataPointBlockRequestListVals field. This group will not be processed", true);
