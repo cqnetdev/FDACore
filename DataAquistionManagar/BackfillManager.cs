@@ -103,14 +103,14 @@ namespace FDA
                         Globals.SystemManager.LogApplicationEvent(this, "BackfillManager", "The data lapse limit for tag " + tag.TagID.ToString() + " is " + backfillLimit.TotalMinutes + " minutes",false,true);
 
 
-                        tag.LastRead = tagDef.LastReadDataTimestamp;
+                        tag.LastRead = tagDef.LastRead.Timestamp;
 
-                        TimeSpan gap = tagDef.LastReadDataTimestamp.Subtract(tagDef.PreviousTimestamp);
-                        Globals.SystemManager.LogApplicationEvent(this, "BackfillManager", "Read time is " + tagDef.LastReadDataTimestamp + ", previous read time is " + tagDef.PreviousTimestamp + ", a gap of " + gap.TotalMinutes + " minutes",false,true);
+                        TimeSpan gap = tagDef.LastRead.Timestamp.Subtract(tagDef.PreviousTimestamp);
+                        Globals.SystemManager.LogApplicationEvent(this, "BackfillManager", "Read time is " + tagDef.LastRead.Timestamp + ", previous read time is " + tagDef.PreviousTimestamp + ", a gap of " + gap.TotalMinutes + " minutes",false,true);
 
                         if (gap >= backfillLimit)
                         {
-                            Globals.SystemManager.LogApplicationEvent(this, "", "Data gap of " + gap.ToString() + " detected for Tag " + tag.TagID + ". Requesting backfill from " + tagDef.PreviousTimestamp + " to " + tagDef.LastReadDataTimestamp);
+                            Globals.SystemManager.LogApplicationEvent(this, "", "Data gap of " + gap.ToString() + " detected for Tag " + tag.TagID + ". Requesting backfill from " + tagDef.PreviousTimestamp + " to " + tagDef.LastRead.Timestamp);
                             backfillTags.Add(tag);
                         }
                     }

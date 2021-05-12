@@ -195,13 +195,13 @@ namespace Common
 
             // valid configuration, subscribe to update events from the source tag
             _valid = true;
-            _sourceTag.PropertyChanged += _sourceTag_PropertyChanged;
+            _sourceTag.PropertyChanged += SourceTag_PropertyChanged;
         }
 
-        private void _sourceTag_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+        private void SourceTag_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
-            // we're only interested in changes to the timestamp, this means the value has updated (even if it hasn't changed)
-            if (e.PropertyName != "LastReadDataTimestamp")
+            // we're only interested if the last read property has changed
+            if (e.PropertyName != "LastRead")
                 return;
 
             // don't do anything if this derived tag is disabled
@@ -213,7 +213,7 @@ namespace Common
                 return;
 
             // don't do anything if the datatype isn't an int type
-            string typename = _sourceTag.LastReadDataType.Name.ToLower();
+            string typename = _sourceTag.LastRead.DataType.Name.ToLower();
             if (!(typename == "uint8" || typename == "uint16" || typename == "uint32"))
             {
                 Globals.SystemManager?.LogApplicationEvent(this,ID.ToString(),"Soft tag " + ID + " unable to calculate, because of incompatible data type. Bitseries soft tags require an unsigned int (8,16, or 32 bits)");
@@ -221,14 +221,14 @@ namespace Common
             }
 
             // don't do anything if the source tag has bad quality
-            if (_sourceTag.LastReadQuality != 192)
+            if (_sourceTag.LastRead.Quality != 192)
             {
-                Globals.SystemManager?.LogApplicationEvent(this, ID.ToString(), "Soft tag " + ID + " unable to calculate, because the source tag (" + _sourceTag.DPDUID + " has bad quality (" + _sourceTag.LastReadQuality + ")");
+                Globals.SystemManager?.LogApplicationEvent(this, ID.ToString(), "Soft tag " + ID + " unable to calculate, because the source tag (" + _sourceTag.DPDUID + " has bad quality (" + _sourceTag.LastRead.Quality + ")");
                 return;
             }
 
             // get the new value
-            Double dblVal = _sourceTag.LastReadDataValue; 
+            Double dblVal = _sourceTag.LastRead.Value;
 
             // cast it to an Int32
             UInt32 intVal = Convert.ToUInt32(dblVal);
@@ -245,14 +245,23 @@ namespace Common
                 destIdx++;
             }
 
-            // convert the requested bits into an int and update the value,timestamp, and quality
+            // convert the requested bits into an int and update the last read for this tag
+            LastRead = new Datapoint(
+                    (double)UInt32FromByteArray(dstBits),
+                    _sourceTag.LastRead.Quality,
+                    _sourceTag.LastRead.Timestamp,
+                    _sourceTag.LastRead.DestTable,
+                    _sourceTag.LastRead.DataType,
+                    _sourceTag.LastRead.WriteMode);
+            
+            /* old style
             LastReadDataValue = (double)UInt32FromByteArray(dstBits);
             LastReadDataType = _sourceTag.LastReadDataType;
             LastReadQuality = _sourceTag.LastReadQuality;
             LastReadDatabaseWriteMode = _sourceTag.LastReadDatabaseWriteMode;
             LastReadDestTable = _sourceTag.LastReadDestTable;
             LastReadDataTimestamp = _sourceTag.LastReadDataTimestamp;
-            
+            */
 
             RaiseOnUpdateEvent(); // let anyone who's listening know that this derived tag has been updated
         }
@@ -261,7 +270,7 @@ namespace Common
         {
             if (_sourceTag != null)
             {
-                _sourceTag.PropertyChanged -= _sourceTag_PropertyChanged;
+                _sourceTag.PropertyChanged -= SourceTag_PropertyChanged;
             }
         }
 
@@ -270,7 +279,7 @@ namespace Common
             _valid = false;
             if (_sourceTag != null)
             {
-                _sourceTag.PropertyChanged -= _sourceTag_PropertyChanged;
+                _sourceTag.PropertyChanged -= SourceTag_PropertyChanged;
             }
             _sourceTag = null;
             _arguments = newArguments;
@@ -371,14 +380,14 @@ namespace Common
 
             // valid configuration, subscribe to update events from the source tag
             _valid = true;
-            _sourceTag.PropertyChanged += _sourceTag_PropertyChanged;
+            _sourceTag.PropertyChanged += SourceTag_PropertyChanged;
         }
 
-        private void _sourceTag_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+        private void SourceTag_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
 
             // we're only interested in changes to the timestamp, this means the value has updated (even if it hasn't changed)
-            if (e.PropertyName != "LastReadDataTimestamp")
+            if (e.PropertyName != "LastRead")
                 return;
 
             // don't do anything if this derived tag is disabled or invalid
@@ -390,7 +399,7 @@ namespace Common
                 return;
 
             // don't do anything if the datatype isn't an int type
-            string typename = _sourceTag.LastReadDataType.Name.ToLower();
+            string typename = _sourceTag.LastRead.DataType.Name.ToLower();
             if (!(typename == "uint8" || typename == "uint16" || typename == "uint32"))
             {
                 Globals.SystemManager?.LogApplicationEvent(this, ID.ToString(), "Soft tag " + ID + " unable to calculate, because of incompatible data type. Bitmask soft tags requires an unsigned int (8,16, or 32 bits)");
@@ -398,24 +407,26 @@ namespace Common
             }
 
             // don't do anything if the source tag has bad quality
-            if (_sourceTag.LastReadQuality != 192)
+            if (_sourceTag.LastRead.Quality != 192)
             {
-                Globals.SystemManager?.LogApplicationEvent(this, ID.ToString(), "Soft tag " + ID + " unable to calculate, because the source tag (" + _sourceTag.DPDUID + " has bad quality (" + _sourceTag.LastReadQuality + ")");
+                Globals.SystemManager?.LogApplicationEvent(this, ID.ToString(), "Soft tag " + ID + " unable to calculate, because the source tag (" + _sourceTag.DPDUID + " has bad quality (" + _sourceTag.LastRead.Quality + ")");
                 return;
             }
 
             // get the new value
-            Double dblVal = _sourceTag.LastReadDataValue;
+            Double dblVal = _sourceTag.LastRead.Value;
 
             // cast it to an Int32
             UInt32 intVal = Convert.ToUInt32(dblVal);
+            LastRead = new Datapoint(
+                 (double)(intVal & _bitmask),
+                 _sourceTag.LastRead.Quality,
+                 _sourceTag.LastRead.Timestamp,
+                 _sourceTag.LastRead.DestTable,
+                  _sourceTag.LastRead.DataType,
+                  _sourceTag.LastRead.WriteMode
+                );
 
-            LastReadDataValue = (double)(intVal & _bitmask);
-            LastReadDataType = _sourceTag.LastReadDataType;
-            LastReadQuality = _sourceTag.LastReadQuality;
-            LastReadDatabaseWriteMode = _sourceTag.LastReadDatabaseWriteMode;
-            LastReadDestTable = _sourceTag.LastReadDestTable;
-            LastReadDataTimestamp = _sourceTag.LastReadDataTimestamp;
 
             RaiseOnUpdateEvent(); // let anyone who's listening know that this derived tag has been updated 
         }
@@ -423,7 +434,7 @@ namespace Common
         public override void Dispose()
         {
             if (_sourceTag != null)
-                _sourceTag.PropertyChanged -= _sourceTag_PropertyChanged;
+                _sourceTag.PropertyChanged -= SourceTag_PropertyChanged;
         }
 
         public override void Alter(string newArguments)
@@ -431,7 +442,7 @@ namespace Common
             _valid = false;
             if (_sourceTag != null)
             {
-                _sourceTag.PropertyChanged -= _sourceTag_PropertyChanged;
+                _sourceTag.PropertyChanged -= SourceTag_PropertyChanged;
             }
             _sourceTag = null;
             _arguments = newArguments;
@@ -439,6 +450,7 @@ namespace Common
         }
     }
 
+    /* not doing summation tags yet
     public class SummationDerivedTag : DerivedTag
     {
         List<FDADataPointDefinitionStructure> _sourceTags;
@@ -557,4 +569,5 @@ namespace Common
 
 
     }
+    */
 }

@@ -59,7 +59,7 @@ namespace ROC
             Guid tagID = tagInfo.DPDUID;
             int step = (int)tagInfo.backfill_data_interval;
             DateTime fillFrom = tagInfo.PreviousTimestamp;
-            DateTime fillTo = tagInfo.LastReadDataTimestamp;
+            DateTime fillTo = tagInfo.LastRead.Timestamp;
             string datatypeName = request.TagList.Find(i => i.TagID == tagID).ProtocolDataType.Name;
             Guid connectionID = request.ConnectionID;
 
@@ -2811,8 +2811,8 @@ namespace ROC
                                     if (floatCheck != "good")
                                     {
                                         // oops, it's NaN or +/- infinity. Look up the last value and use that instead and set the quality to indicate stale value
-                                        value = request.DataPointConfig[paramIdx].LastReadDataValue;
-                                        if (request.DataPointConfig[paramIdx].LastReadQuality == 192)
+                                        value = request.DataPointConfig[paramIdx].LastRead.Value;
+                                        if (request.DataPointConfig[paramIdx].LastRead.Quality == 192)
                                             quality = 121;
                                         else
                                             quality = 122;

@@ -1095,9 +1095,10 @@ namespace FDA
                         newDerivedTag.write_scale_raw_high = (double)row["write_scale_raw_high"];
                         newDerivedTag.write_scale_eu_low = (double)row["write_scale_eu_low"];
                         newDerivedTag.write_scale_eu_high = (double)row["write_scale_eu_high"];
-                        newDerivedTag.LastReadDataValue = 0.0;
-                        newDerivedTag.LastReadQuality = 32;
-                        newDerivedTag.LastReadDataTimestamp = currentTime;
+                        //newDerivedTag.LastRead = FDADataPointDefinitionStructure.Datapoint.Empty;
+                        //newDerivedTag.LastReadDataValue = 0.0;
+                        //newDerivedTag.LastReadQuality = 32;
+                        //newDerivedTag.LastReadDataTimestamp = currentTime;
 
                         // these properties don't apply to soft tags
                         newDerivedTag.backfill_enabled = false;
@@ -1128,10 +1129,7 @@ namespace FDA
                             write_scale_eu_high = (double)row["write_scale_eu_high"],
                             backfill_enabled = (bool)row["nullsafe_backfill_enabled"],
                             backfill_data_ID = (Int32)row["nullsafe_backfill_data_id"],
-                            // Feb 12, 2020: ignore the last read columns from the database, default to 0 value at current timestamp
-                            LastReadDataValue = 0.0,
-                            LastReadQuality = 32,
-                            LastReadDataTimestamp = currentTime,
+                            //LastRead = new FDADataPointDefinitionStructure.Datapoint(0, 32, currentTime, "", null, DataRequest.WriteMode.Insert),
                             backfill_data_structure_type = (Int32)row["nullsafe_backfill_data_structure_type"],
                             backfill_data_lapse_limit = (double)row["nullsafe_backfill_data_lapse_limit"],
                             backfill_data_interval = (double)row["nullsafe_backfill_data_interval"]
@@ -1174,9 +1172,14 @@ namespace FDA
                         DPDUID = (Guid)row["DPDUID"];
                         if (_dataPointConfig.ContainsKey(DPDUID))
                         {
-                            _dataPointConfig[DPDUID].LastReadDataValue = (Double)row["value"];
-                            _dataPointConfig[DPDUID].LastReadDataTimestamp = (DateTime)row["timestamp"];
-                            _dataPointConfig[DPDUID].LastReadQuality = (Int32)row["quality"];
+                            _dataPointConfig[DPDUID].LastRead = new FDADataPointDefinitionStructure.Datapoint(
+                                (Double)row["value"],                               
+                                (Int32)row["quality"],
+                                (DateTime)row["timestamp"],
+                                "",
+                                DataType.UNKNOWN,
+                                DataRequest.WriteMode.Insert
+                                );
                         }
                     }
                 }
@@ -1205,64 +1208,6 @@ namespace FDA
                     thisTag.OnUpdate += SoftPoint_OnUpdate;
                 }
             }
-
-
-            //// new May 7, 2021 load derived tags
-
-            //// make PLC tags available to derived tags
-            //DerivedTag.PLCTags = _dataPointConfig;
-
-            //Guid SoftTagID;
-            //tableName = Globals.SystemManager.GetTableName("FDADerivedTags");
-            //query = "select tag_id,protocol,read_detail_01,physical_point,enabled from " + tableName + ";";
-            //table = ExecuteQuery(query);
-            //DerivedTag newSoftPoint;
-            //string tagtype;
-            //string arguments;
-            //bool enabled;
-            //foreach (DataRow row in table.Rows)
-            //{
-            //    ID = "(unknown)";
-            //    try
-            //    {
-            //        ID = row["tag_id"].ToString();
-
-            //        SoftTagID = (Guid)row["tag_id"];
-            //        tagtype = (string)row["read_detail_01"];
-            //        tagtype = tagtype.ToLower();
-            //        arguments = (string)row["physical_point"];
-            //        enabled = (bool)row["enabled"];
-            //        newSoftPoint = DerivedTag.Create(SoftTagID.ToString(), tagtype, arguments, enabled);
-            //        if (newSoftPoint != null)
-            //        {
-            //            if (!_derivedTagConfig.ContainsKey(newSoftPoint.DPDUID))
-            //            {
-            //                lock (_derivedTagConfig)
-            //                {
-            //                    _derivedTagConfig.Add(newSoftPoint.DPDUID, newSoftPoint);
-            //                    newSoftPoint.OnUpdate += SoftPoint_OnUpdate;
-            //                }
-
-            //                if (!newSoftPoint.IsValid)
-            //                {
-            //                    Globals.SystemManager.LogApplicationEvent(this, "", "FDA Start, Config Error - Derived tag ID '" + ID + "' automatically disabled because of invalid configuration: " + newSoftPoint.ErrorMessage, true);
-            //                }
-            //            }
-            //            else
-            //                Globals.SystemManager.LogApplicationEvent(this, "", "FDA Start, Config Error - Derived tag ID '" + ID + "' rejected: duplicate tag ID", true);
-            //        }
-            //        else
-            //        {
-            //            Globals.SystemManager.LogApplicationEvent(this, "", "FDA Start, Config Error - Derived tag ID '" + ID + "' rejected: Invalid derived tag ID", true);
-            //        }
-            //    }
-            //    catch
-            //    {
-            //        Globals.SystemManager.LogApplicationEvent(this, "", "FDA Start, Config Error - Derived tag ID '" + ID + "' rejected, unable to load from database (bad value or null)", true);
-            //    }
-            //}
-            //table.Clear();
-
 
             if (_devicesTableExists)
             {
@@ -1437,22 +1382,22 @@ namespace FDA
             // we'll create one for the updated soft point
 
             Tag softPointTag = new Tag(updatedSoftpoint.DPDUID);
-            softPointTag.Timestamp = updatedSoftpoint.LastReadDataTimestamp;
-            softPointTag.Quality = updatedSoftpoint.LastReadQuality;
-            softPointTag.Value = updatedSoftpoint.LastReadDataValue;
+            softPointTag.Timestamp = updatedSoftpoint.LastRead.Timestamp;
+            softPointTag.Quality = updatedSoftpoint.LastRead.Quality;
+            softPointTag.Value = updatedSoftpoint.LastRead.Value;
             softPointTag.TagID = updatedSoftpoint.DPDUID;
 
             DataRequest softTagRequestObject = new DataRequest();
             softTagRequestObject.RequestID = Guid.NewGuid().ToString();
             softTagRequestObject.TagList = new List<Tag> { softPointTag };
-            softTagRequestObject.Destination = updatedSoftpoint.LastReadDestTable;
-            softTagRequestObject.DBWriteMode = updatedSoftpoint.LastReadDatabaseWriteMode;
+            softTagRequestObject.Destination = updatedSoftpoint.LastRead.DestTable;
+            softTagRequestObject.DBWriteMode = updatedSoftpoint.LastRead.WriteMode;
 
             // and insert it into the pipeline to be written to the database
             WriteDataToDB(softTagRequestObject);
 
             // and log a message about the update 
-            Globals.SystemManager.LogApplicationEvent(this, "", "Softpoint " + updatedSoftpoint.DPDUID.ToString() + " re-calculated",false,true);
+            Globals.SystemManager.LogApplicationEvent(this, "", "Soft tag " + updatedSoftpoint.DPDUID.ToString() + " re-calculated",false,true);
         }
 
         public void UpdateAlmEvtCurrentPtrs(DataRequest PtrPositionRequest)
@@ -1814,9 +1759,10 @@ namespace FDA
                             newTag.write_scale_raw_high = datapoint.write_scale_raw_high;
                             newTag.write_scale_eu_low = datapoint.write_scale_eu_low;
                             newTag.write_scale_eu_high = datapoint.write_scale_eu_high;
-                            newTag.LastReadDataValue = 0.0;
-                            newTag.LastReadQuality = 32;
-                            newTag.LastReadDataTimestamp = Globals.FDANow();
+                            newTag.LastRead = new FDADataPointDefinitionStructure.Datapoint(0, 32, Globals.FDANow(), "", null, DataRequest.WriteMode.Insert);
+                            //newTag.LastReadDataValue = 0.0;
+                            //newTag.LastReadQuality = 32;
+                            //newTag.LastReadDataTimestamp = Globals.FDANow();
 
                             // these properties don't apply to soft tags
                             newTag.backfill_enabled = false;

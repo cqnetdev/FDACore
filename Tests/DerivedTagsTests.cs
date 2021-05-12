@@ -11,6 +11,24 @@ namespace Tests
     [TestClass]
     public class DerivedTagsTests
     {
+        public static List<UInt32> TestValues;
+        public static DataTypeBase DT; 
+
+        static DerivedTagsTests()
+        {
+            // generate a ton of random test values
+            TestValues = new List<UInt32>();
+            Random rnd = new Random();
+            byte[] bytes = new byte[4];
+            for (int i = 0; i < 100000; i++)
+            {
+                rnd.NextBytes(bytes);
+                TestValues.Add(BitConverter.ToUInt32(bytes));
+            }
+
+            DT = Modbus.ModbusProtocol.DataType.UINT32;
+        }
+
         [TestMethod]
         public void BitSeriesArgumentValidityChecks()
         {
@@ -78,7 +96,7 @@ namespace Tests
 
 
 
-        [TestMethod]
+        [TestMethod, TestCategory("BitSeries")]
         public void BitSeriesFunctionalTest()
         {
             // set up a source tag, put it in a dictionary (like in the FDA), and make the dictionary available to the derived tags class
@@ -89,16 +107,7 @@ namespace Tests
             srcTags.Add(srcTag.DPDUID, srcTag);
             DerivedTag.Tags = srcTags;
 
-            // generate 1000 random unsigned Int32 values for testing
-            List<UInt32> testValues = new List<UInt32>();
-            Random rnd = new Random();
-            byte[] bytes = new byte[4];
-            for (int i = 0;i < 100000;i++)
-            {
-                rnd.NextBytes(bytes);
-                testValues.Add(BitConverter.ToUInt32(bytes));
-            }
-
+            
             DataTypeBase datatype = Modbus.ModbusProtocol.DataType.UINT32;
 
             // extract bit 0 only
@@ -106,21 +115,24 @@ namespace Tests
             softTag.Initialize();
             softTag.DPDSEnabled = true;
             UInt32 expectedDerivedVal;
-            foreach (UInt32 testVal in testValues)
+            foreach (UInt32 testVal in TestValues)
             {
                 // update the value in the source tag
-                srcTag.LastReadDataValue = testVal;
-                srcTag.LastReadQuality = 192;
-                srcTag.LastReadDataType = datatype;
-                srcTag.LastReadDataTimestamp = DateTime.Now;
+                srcTag.LastRead = new FDADataPointDefinitionStructure.Datapoint(
+                    testVal,
+                    192,
+                    DateTime.Now,
+                    "",
+                    datatype,
+                    DataRequest.WriteMode.Insert);
 
                 // check that the derived tag has the same timestamp and quality as the source tag
-                Assert.AreEqual(srcTag.LastReadDataTimestamp,softTag.LastReadDataTimestamp);
-                Assert.AreEqual(srcTag.LastReadQuality,softTag.LastReadQuality);
+                Assert.AreEqual(srcTag.LastRead.Timestamp,softTag.LastRead.Timestamp);
+                Assert.AreEqual(srcTag.LastRead.Quality,softTag.LastRead.Quality);
 
                 // check that the value of the derived tag is correct
                 expectedDerivedVal = testVal & 1; 
-                Assert.AreEqual(expectedDerivedVal, softTag.LastReadDataValue);
+                Assert.AreEqual(expectedDerivedVal, softTag.LastRead.Value);
             }
 
 
@@ -128,20 +140,24 @@ namespace Tests
             softTag = (BitSeriesDerivedTag)DerivedTag.Create(Guid.NewGuid().ToString(), "bitser", srcTag.DPDUID.ToString() + ":31:1");
             softTag.Initialize();
             softTag.DPDSEnabled = true;
-            foreach (UInt32 testVal in testValues)
+            foreach (UInt32 testVal in TestValues)
             {
                 // update the value in the source tag
-                srcTag.LastReadDataValue = testVal;
-                srcTag.LastReadQuality = 192;
-                srcTag.LastReadDataTimestamp = DateTime.Now;
+                srcTag.LastRead = new FDADataPointDefinitionStructure.Datapoint(
+                     testVal,
+                     192,
+                     DateTime.Now,
+                     "",
+                     datatype,
+                     DataRequest.WriteMode.Insert);
 
                 // check that the derived tag has the same timestamp and quality as the source tag
-                Assert.AreEqual(softTag.LastReadDataTimestamp, srcTag.LastReadDataTimestamp);
-                Assert.AreEqual(softTag.LastReadQuality, srcTag.LastReadQuality);
+                Assert.AreEqual(softTag.LastRead.Timestamp, srcTag.LastRead.Timestamp);
+                Assert.AreEqual(softTag.LastRead.Quality, srcTag.LastRead.Quality);
 
                 // check that the value of the derived tag is correct
                 expectedDerivedVal = (testVal & (UInt32)Math.Pow(2, 31))>>31;
-                Assert.AreEqual(expectedDerivedVal, softTag.LastReadDataValue);
+                Assert.AreEqual(expectedDerivedVal, softTag.LastRead.Value);
             }
 
 
@@ -149,103 +165,145 @@ namespace Tests
             softTag = (BitSeriesDerivedTag)DerivedTag.Create(Guid.NewGuid().ToString(), "bitser", srcTag.DPDUID.ToString() + ":20:1");
             softTag.Initialize();
             softTag.DPDSEnabled = true;
-            foreach (UInt32 testVal in testValues)
+            foreach (UInt32 testVal in TestValues)
             {
                 // update the value in the source tag
-                srcTag.LastReadDataValue = testVal;
-                srcTag.LastReadQuality = 192;
-                srcTag.LastReadDataTimestamp = DateTime.Now;
+                srcTag.LastRead = new FDADataPointDefinitionStructure.Datapoint(
+                    testVal,
+                    192,
+                    DateTime.Now,
+                    "",
+                    datatype,
+                    DataRequest.WriteMode.Insert);
 
                 // check that the derived tag has the same timestamp and quality as the source tag
-                Assert.AreEqual(softTag.LastReadDataTimestamp, srcTag.LastReadDataTimestamp);
-                Assert.AreEqual(softTag.LastReadQuality, srcTag.LastReadQuality);
+                Assert.AreEqual(softTag.LastRead.Timestamp, srcTag.LastRead.Timestamp);
+                Assert.AreEqual(softTag.LastRead.Quality, srcTag.LastRead.Quality);
 
                 // check that the value of the derived tag is correct
                 expectedDerivedVal = (testVal & (UInt32)Math.Pow(2, 20)) >> 20;
-                Assert.AreEqual(expectedDerivedVal, softTag.LastReadDataValue);
+                Assert.AreEqual(expectedDerivedVal, softTag.LastRead.Value);
             }
 
             // extract bits 0-1
             softTag = (BitSeriesDerivedTag)DerivedTag.Create(Guid.NewGuid().ToString(), "bitser", srcTag.DPDUID.ToString() + ":0:2");
             softTag.Initialize();
             softTag.DPDSEnabled = true;
-            foreach (UInt32 testVal in testValues)
+            foreach (UInt32 testVal in TestValues)
             {
                 // update the value in the source tag
-                srcTag.LastReadDataValue = testVal;
-                srcTag.LastReadQuality = 192;
-                srcTag.LastReadDataTimestamp = DateTime.Now;
+                srcTag.LastRead = new FDADataPointDefinitionStructure.Datapoint(
+                    testVal,
+                    192,
+                    DateTime.Now,
+                    "",
+                    datatype,
+                    DataRequest.WriteMode.Insert);
 
                 // check that the derived tag has the same timestamp and quality as the source tag
-                Assert.AreEqual(softTag.LastReadDataTimestamp, srcTag.LastReadDataTimestamp);
-                Assert.AreEqual(softTag.LastReadQuality, srcTag.LastReadQuality);
+                Assert.AreEqual(softTag.LastRead.Timestamp, srcTag.LastRead.Timestamp);
+                Assert.AreEqual(softTag.LastRead.Quality, srcTag.LastRead.Quality);
 
                 // check that the value of the derived tag is correct
                 expectedDerivedVal = testVal & ((UInt32)Math.Pow(2,1) + (UInt32)Math.Pow(2, 0)) >> 0;
-                Assert.AreEqual(expectedDerivedVal, softTag.LastReadDataValue);
+                Assert.AreEqual(expectedDerivedVal, softTag.LastRead.Value);
             }
 
             // extract bits 10-13
             softTag = (BitSeriesDerivedTag)DerivedTag.Create(Guid.NewGuid().ToString(), "bitser", srcTag.DPDUID.ToString() + ":10:4");
             softTag.Initialize();
             softTag.DPDSEnabled = true;
-            foreach (UInt32 testVal in testValues)
+            foreach (UInt32 testVal in TestValues)
             {
                 // update the value in the source tag
-                srcTag.LastReadDataValue = testVal;
-                srcTag.LastReadQuality = 192;
-                srcTag.LastReadDataTimestamp = DateTime.Now;
+                srcTag.LastRead = new FDADataPointDefinitionStructure.Datapoint(
+                    testVal,
+                    192,
+                    DateTime.Now,
+                    "",
+                    datatype,
+                    DataRequest.WriteMode.Insert);
 
                 // check that the derived tag has the same timestamp and quality as the source tag
-                Assert.AreEqual(softTag.LastReadDataTimestamp, srcTag.LastReadDataTimestamp);
-                Assert.AreEqual(softTag.LastReadQuality, srcTag.LastReadQuality);
+                Assert.AreEqual(softTag.LastRead.Timestamp, srcTag.LastRead.Timestamp);
+                Assert.AreEqual(softTag.LastRead.Quality, srcTag.LastRead.Quality);
 
                 // check that the value of the derived tag is correct
                 expectedDerivedVal = (testVal & ((UInt32)Math.Pow(2, 10) + (UInt32)Math.Pow(2,11) +  (UInt32)Math.Pow(2,12) + (UInt32)Math.Pow(2,13))) >> 10;
-                Assert.AreEqual(expectedDerivedVal, softTag.LastReadDataValue);
+                Assert.AreEqual(expectedDerivedVal, softTag.LastRead.Value);
             }
 
             // "extract" all the bits
             softTag = (BitSeriesDerivedTag)DerivedTag.Create(Guid.NewGuid().ToString(), "bitser", srcTag.DPDUID.ToString() + ":0:32");
             softTag.Initialize();
             softTag.DPDSEnabled = true;
-            foreach (UInt32 testVal in testValues)
+            foreach (UInt32 testVal in TestValues)
             {
                 // update the value in the source tag
-                srcTag.LastReadDataValue = testVal;
-                srcTag.LastReadQuality = 192;
-                srcTag.LastReadDataTimestamp = DateTime.Now;
+                srcTag.LastRead = new FDADataPointDefinitionStructure.Datapoint(
+                     testVal,
+                     192,
+                     DateTime.Now,
+                     "",
+                     datatype,
+                     DataRequest.WriteMode.Insert);
 
                 // check that the derived tag has the same timestamp and quality as the source tag
-                Assert.AreEqual(softTag.LastReadDataTimestamp, srcTag.LastReadDataTimestamp);
-                Assert.AreEqual(softTag.LastReadQuality, srcTag.LastReadQuality);
+                Assert.AreEqual(softTag.LastRead.Timestamp, srcTag.LastRead.Timestamp);
+                Assert.AreEqual(softTag.LastRead.Quality, srcTag.LastRead.Quality);
 
                 // check that the value of the derived tag is correct
                 expectedDerivedVal = testVal;
-                Assert.AreEqual(expectedDerivedVal, softTag.LastReadDataValue);
+                Assert.AreEqual(expectedDerivedVal, softTag.LastRead.Value);
             }
 
             // extract the highest 6 bits
             softTag = (BitSeriesDerivedTag)DerivedTag.Create(Guid.NewGuid().ToString(), "bitser", srcTag.DPDUID.ToString() + ":26:6");
             softTag.Initialize();
             softTag.DPDSEnabled = true;
-            foreach (UInt32 testVal in testValues)
+            foreach (UInt32 testVal in TestValues)
             {
                 // update the value in the source tag
-                srcTag.LastReadDataValue = testVal;
-                srcTag.LastReadQuality = 192;
-                srcTag.LastReadDataTimestamp = DateTime.Now;
+                srcTag.LastRead = new FDADataPointDefinitionStructure.Datapoint(
+                    testVal,
+                    192,
+                    DateTime.Now,
+                    "",
+                    datatype,
+                    DataRequest.WriteMode.Insert);
 
                 // check that the derived tag has the same timestamp and quality as the source tag
-                Assert.AreEqual(srcTag.LastReadDataTimestamp,softTag.LastReadDataTimestamp);
-                Assert.AreEqual(srcTag.LastReadQuality,softTag.LastReadQuality);
+                Assert.AreEqual(srcTag.LastRead.Timestamp,softTag.LastRead.Timestamp);
+                Assert.AreEqual(srcTag.LastRead.Quality,softTag.LastRead.Quality);
 
                 // check that the value of the derived tag is correct
                 expectedDerivedVal = expectedDerivedVal = (testVal & ((UInt32)Math.Pow(2, 26) + (UInt32)Math.Pow(2, 27) + (UInt32)Math.Pow(2, 28) + (UInt32)Math.Pow(2, 29) + (UInt32)Math.Pow(2,30) + (UInt32)Math.Pow(2,31))) >> 26;
 
-                Assert.AreEqual(expectedDerivedVal, softTag.LastReadDataValue);
+                Assert.AreEqual(expectedDerivedVal, softTag.LastRead.Value);
             }
 
+
+            // extract the highest 6 bits, source tag has bad quality
+            softTag = (BitSeriesDerivedTag)DerivedTag.Create(Guid.NewGuid().ToString(), "bitser", srcTag.DPDUID.ToString() + ":26:6");
+            softTag.Initialize();
+            softTag.DPDSEnabled = true;
+            FDADataPointDefinitionStructure.Datapoint lastread_before;
+            foreach (UInt32 testVal in TestValues)
+            {
+                lastread_before = softTag.LastRead;
+                // update the value in the source tag
+                srcTag.LastRead = new FDADataPointDefinitionStructure.Datapoint(
+                    testVal,
+                    0,
+                    DateTime.Now,
+                    "",
+                    datatype,
+                    DataRequest.WriteMode.Insert);
+
+                // soft tag should not have updated
+                Assert.AreSame(lastread_before, softTag.LastRead);
+              
+            }
 
         }
 
@@ -321,80 +379,107 @@ namespace Tests
             srcTag.DPDSEnabled = true;
             srcTags.Add(srcTag.DPDUID, srcTag);
             DerivedTag.Tags = srcTags;
+           
 
-            // generate 100,000 random unsigned Int32 values for testing
-            List<UInt32> testValues = new List<UInt32>();
-            Random rnd = new Random();
-            byte[] bytes = new byte[4];
-            for (int i = 0; i < 100000; i++)
-            {
-                rnd.NextBytes(bytes);
-                testValues.Add(BitConverter.ToUInt32(bytes));
-            }
+           
 
             UInt32 expectedDerivedVal;
-            DataTypeBase datatype = Modbus.ModbusProtocol.DataType.UINT32;
+            
             
 
             // bitmask 0000 0000 0000 0000 0000 0000 0000 0001
             DerivedTag softTag = DerivedTag.Create(Guid.NewGuid().ToString(), "bitmask", srcTag.DPDUID.ToString() + ":1");
             softTag.Initialize();
             softTag.DPDSEnabled = true;
-            foreach (UInt32 testVal in testValues)
+            foreach (UInt32 testVal in TestValues)
             {
                 // update the value in the source tag
-                srcTag.LastReadDataType = datatype;
-                srcTag.LastReadDataValue = testVal;
-                srcTag.LastReadQuality = 192;
-                srcTag.LastReadDataTimestamp = DateTime.Now;
+                srcTag.LastRead = new FDADataPointDefinitionStructure.Datapoint(
+                    testVal,
+                    192,
+                    DateTime.Now,
+                    "",
+                    DT,
+                    DataRequest.WriteMode.Insert);
+
 
                 // check that the derived tag has the same timestamp and quality as the source tag
-                Assert.AreEqual(srcTag.LastReadDataTimestamp,softTag.LastReadDataTimestamp);
-                Assert.AreEqual(srcTag.LastReadQuality,softTag.LastReadQuality);
+                Assert.AreEqual(srcTag.LastRead.Timestamp,softTag.LastRead.Timestamp);
+                Assert.AreEqual(srcTag.LastRead.Quality,softTag.LastRead.Quality);
 
                 // check that the value of the derived tag is correct
                 expectedDerivedVal = testVal & 1;
-                Assert.AreEqual(expectedDerivedVal, softTag.LastReadDataValue);
+                Assert.AreEqual(expectedDerivedVal, softTag.LastRead.Value);
             }
 
             // bitmask 0000 0000 0000 0000 1100 0000 0000 0001
             softTag = DerivedTag.Create(Guid.NewGuid().ToString(), "bitmask", srcTag.DPDUID.ToString() + ":49153");
             softTag.Initialize();
             softTag.DPDSEnabled = true;
-            foreach (UInt32 testVal in testValues)
+            foreach (UInt32 testVal in TestValues)
             {
                 // update the value in the source tag
-                srcTag.LastReadDataValue = testVal;
-                srcTag.LastReadQuality = 192;
-                srcTag.LastReadDataTimestamp = DateTime.Now;
+                srcTag.LastRead = new FDADataPointDefinitionStructure.Datapoint(
+                    testVal,
+                    192,
+                    DateTime.Now,
+                    "",
+                    DT,
+                    DataRequest.WriteMode.Insert);
 
                 // check that the derived tag has the same timestamp and quality as the source tag
-                Assert.AreEqual(softTag.LastReadDataTimestamp, srcTag.LastReadDataTimestamp);
-                Assert.AreEqual(softTag.LastReadQuality, srcTag.LastReadQuality);
+                Assert.AreEqual(softTag.LastRead.Timestamp, srcTag.LastRead.Timestamp);
+                Assert.AreEqual(softTag.LastRead.Quality, srcTag.LastRead.Quality);
 
                 // check that the value of the derived tag is correct
                 expectedDerivedVal = testVal & 49153;
-                Assert.AreEqual(expectedDerivedVal, softTag.LastReadDataValue);
+                Assert.AreEqual(expectedDerivedVal, softTag.LastRead.Value);
             }
 
             // bitmask 1111 1111 1111 1111 1111 1111 1111 1111
             softTag = DerivedTag.Create(Guid.NewGuid().ToString(), "bitmask", srcTag.DPDUID.ToString() + ":4294967295");
             softTag.Initialize();
             softTag.DPDSEnabled = true;
-            foreach (UInt32 testVal in testValues)
+            foreach (UInt32 testVal in TestValues)
             {
                 // update the value in the source tag
-                srcTag.LastReadDataValue = testVal;
-                srcTag.LastReadQuality = 192;
-                srcTag.LastReadDataTimestamp = DateTime.Now;
+                srcTag.LastRead = new FDADataPointDefinitionStructure.Datapoint(
+                     testVal,
+                     192,
+                     DateTime.Now,
+                     "",
+                     DT,
+                     DataRequest.WriteMode.Insert);
 
                 // check that the derived tag has the same timestamp and quality as the source tag
-                Assert.AreEqual(srcTag.LastReadDataTimestamp,softTag.LastReadDataTimestamp);
-                Assert.AreEqual(srcTag.LastReadQuality,softTag.LastReadQuality);
+                Assert.AreEqual(srcTag.LastRead.Timestamp,softTag.LastRead.Timestamp);
+                Assert.AreEqual(srcTag.LastRead.Quality,softTag.LastRead.Quality);
 
                 // check that the value of the derived tag is correct
                 expectedDerivedVal = testVal;
-                Assert.AreEqual(expectedDerivedVal, softTag.LastReadDataValue);
+                Assert.AreEqual(expectedDerivedVal, softTag.LastRead.Value);
+            }
+
+
+            // bitmask 0000 0000 0000 0000 1100 0000 0000 0001, source tag has bad quality
+            softTag = DerivedTag.Create(Guid.NewGuid().ToString(), "bitmask", srcTag.DPDUID.ToString() + ":49153");
+            softTag.Initialize();
+            softTag.DPDSEnabled = true;
+            FDADataPointDefinitionStructure.Datapoint lastRead_before_trigger;
+            foreach (UInt32 testVal in TestValues)
+            {
+                lastRead_before_trigger = softTag.LastRead;
+                // update the value in the source tag
+                srcTag.LastRead = new FDADataPointDefinitionStructure.Datapoint(
+                    testVal,
+                    0,   // bad quality
+                    DateTime.Now,
+                    "",
+                    DT,
+                    DataRequest.WriteMode.Insert);
+
+                // derived tag should not have updated (LastRead datapoint should not have changed)
+                Assert.AreSame(lastRead_before_trigger, softTag.LastRead);              
             }
 
         }
@@ -504,19 +589,19 @@ namespace Tests
                 selectedSourceIDguid = Guid.Parse(selectedSourceIDString);
 
                 srcTags[selectedSourceIDguid].LastReadDataType = datatypeFloat;
-                srcTags[selectedSourceIDguid].LastReadQuality = 192;
-                srcTags[selectedSourceIDguid].LastReadDataValue = newValue;
-                srcTags[selectedSourceIDguid].LastReadDataTimestamp = DateTime.Now;
+                srcTags[selectedSourceIDguid].LastRead.Quality = 192;
+                srcTags[selectedSourceIDguid].LastRead.Value = newValue;
+                srcTags[selectedSourceIDguid].LastRead.Timestamp = DateTime.Now;
 
                 expectedResult = 0;
                 foreach (FDADataPointDefinitionStructure sourcetag in srcTags.Values)
                 {
-                    expectedResult += sourcetag.LastReadDataValue;
+                    expectedResult += sourcetag.LastRead.Value;
                 }
 
-                Assert.AreEqual(expectedResult, testTag.LastReadDataValue);
-                Assert.AreEqual(srcTags[selectedSourceIDguid].LastReadQuality, testTag.LastReadQuality);
-                Assert.AreEqual(srcTags[selectedSourceIDguid].LastReadDataTimestamp, testTag.LastReadDataTimestamp);
+                Assert.AreEqual(expectedResult, testTag.LastRead.Value);
+                Assert.AreEqual(srcTags[selectedSourceIDguid].LastRead.Quality, testTag.LastRead.Quality);
+                Assert.AreEqual(srcTags[selectedSourceIDguid].LastRead.Timestamp, testTag.LastRead.Timestamp);
             }
         }
     */

@@ -84,6 +84,62 @@ namespace Common
 
     public class FDADataPointDefinitionStructure : SubscriptionManager.SubscribeableObject
     {
+        public class Datapoint
+        {
+            public Double Value { get => _value; }
+            public int Quality { get => _quality; }
+            public DateTime Timestamp { get => _timestamp; }
+            public string DestTable { get => _destTable; }
+            public DataTypeBase DataType { get => _dataType; }
+            public DataRequest.WriteMode WriteMode { get => _writeMode; }
+
+            private Double _value;
+            private int _quality;
+            private DateTime _timestamp;
+            private string _destTable;
+            private DataTypeBase _dataType;
+            private DataRequest.WriteMode _writeMode;
+
+            public static Datapoint Empty = new Datapoint(0, 32, Globals.FDANow(), "", Common.DataType.UNKNOWN, DataRequest.WriteMode.Insert);
+
+            public Datapoint(double value,int quality,DateTime timestamp,string destination,DataTypeBase datatype, DataRequest.WriteMode writeMode)
+            {
+                _value = value;
+                _quality = quality;
+                _timestamp = timestamp;
+                _destTable = destination;
+                _dataType = datatype;
+                _writeMode = writeMode;
+            }
+
+            public static bool operator ==(Datapoint lhs,Datapoint rhs)
+            {
+                if (object.ReferenceEquals(lhs, null))
+                    return false;
+                if (object.ReferenceEquals(rhs, null))
+                    return false;
+                if (object.ReferenceEquals(lhs, rhs))
+                    return true;
+
+                return (lhs.Timestamp == rhs.Timestamp);
+
+            }
+
+            public static bool operator !=(Datapoint lhs,Datapoint rhs)
+            {
+                if (object.ReferenceEquals(lhs, null))
+                    return true;
+                if (object.ReferenceEquals(rhs, null))
+                    return true;
+                if (object.ReferenceEquals(lhs, rhs))
+                    return false;
+
+                return lhs.Timestamp != rhs.Timestamp;
+            }
+
+        }
+
+
         /* Database table columns */
         public Guid DPDUID { get => _DPDUID; set { if (_DPDUID != value) { _DPDUID = value; base.ID = value.ToString(); NotifyPropertyChanged(); } } }
         public Boolean DPDSEnabled { get => _DPDSEnabled; set { if (_DPDSEnabled != value) { _DPDSEnabled = value; NotifyPropertyChanged(); } } }
@@ -108,23 +164,35 @@ namespace Common
         public string read_detail_01 { get => _read_detail_01; set { if (_read_detail_01 != value) { _read_detail_01 = value; NotifyPropertyChanged(); } } }
         public string physical_point { get => _physical_point; set { if (_physical_point != value) { _physical_point = value; NotifyPropertyChanged(); } } }
         
+        /* extra properties */
         public DateTime PreviousTimestamp { get => _previousTimestamp; set { if (_previousTimestamp != value) { _previousTimestamp = value; NotifyPropertyChanged(); } } }
         public String DeviceTagName { get => _deviceTagName; set => _deviceTagName = value; }
         public String DeviceTagAddress { get => _deviceTagAddress; set => _deviceTagAddress = value; }
         public bool GetBits { get => _getBits; set => _getBits = value; }
         public BitArray Bits { get => _bits; }
-        public Double LastReadDataValue { get => _lastReadDataValue; set { if (_getBits) { ExtractBits(value); }; if (_lastReadDataValue != value) { _lastReadDataValue = value; NotifyPropertyChanged("LastReadDataValue", 0, new string[] { "LastReadDataTimestamp", "LastReadQuality" }); } } }
-        public DateTime LastReadDataTimestamp { get => _lastReadDataTimestamp; set { if (_lastReadDataTimestamp != value) { _lastReadDataTimestamp = value; NotifyPropertyChanged("LastReadDataTimestamp", 0, new string[] { "LastReadDataValue", "LastReadQuality" }); } } }
-        public DataTypeBase LastReadDataType { get => _datatype; set => _datatype = value; }
-        public int LastReadQuality { get => _lastReadQuality; set { if (_lastReadQuality != value) { _lastReadQuality = value; NotifyPropertyChanged("LastReadQuality", 0, new string[] { "LastReadQuality", "LastReadDataValue" }); } } }
-        public string LastReadDestTable { get => _lastReadDestTable; set => _lastReadDestTable = value; }
-        public DataRequest.WriteMode LastReadDatabaseWriteMode { get => _lastReadDatabaseWriteMode; set { _lastReadDatabaseWriteMode = value; } }
-
-
+        //public Double LastReadDataValue { get => _lastReadDataValue; set { if (_getBits) { ExtractBits(value); }; if (_lastReadDataValue != value) { _lastReadDataValue = value; NotifyPropertyChanged("LastReadDataValue", 0, new string[] { "LastReadDataTimestamp", "LastReadQuality" }); } } }
+        //public DateTime LastReadDataTimestamp { get => _lastReadDataTimestamp; set { if (_lastReadDataTimestamp != value) { _lastReadDataTimestamp = value; NotifyPropertyChanged("LastReadDataTimestamp", 0, new string[] { "LastReadDataValue", "LastReadQuality" }); } } }
+        // DataTypeBase LastReadDataType { get => _datatype; set => _datatype = value; }
+        //public int LastReadQuality { get => _lastReadQuality; set { if (_lastReadQuality != value) { _lastReadQuality = value; NotifyPropertyChanged("LastReadQuality", 0, new string[] { "LastReadQuality", "LastReadDataValue" }); } } }
+        //public string LastReadDestTable { get => _lastReadDestTable; set => _lastReadDestTable = value; }
+        //public DataRequest.WriteMode LastReadDatabaseWriteMode { get => _lastReadDatabaseWriteMode; set { _lastReadDatabaseWriteMode = value; } }
+        public Datapoint LastRead { get => _lastread; 
+            set { 
+                if (_lastread != value) { _lastread = value; NotifyPropertyChanged("LastRead", 0); } 
+            } 
+        }
+              
         private Guid _DPDUID;
+        private Datapoint _lastread;
+
+        /*
         private double _lastReadDataValue;
         private DateTime _lastReadDataTimestamp;
         private int _lastReadQuality;
+        private string _lastReadDestTable = "";
+        private DataRequest.WriteMode _lastReadDatabaseWriteMode = DataRequest.WriteMode.Insert;
+        */
+
         private bool _DPDSEnabled;
         private string _dPSType;
         private bool _read_scaling;
@@ -150,8 +218,7 @@ namespace Common
         private bool _getBits = false;
         private BitArray _bits;
         private DataTypeBase _datatype;
-        private string _lastReadDestTable = "";
-        private DataRequest.WriteMode _lastReadDatabaseWriteMode = DataRequest.WriteMode.Insert;
+    
      
 
 
@@ -159,6 +226,7 @@ namespace Common
         {
             base.ObjectType = "Tag";
             _bits = new BitArray(0);
+            _lastread = Datapoint.Empty;
         }
 
         private void ExtractBits(Double newValue)
