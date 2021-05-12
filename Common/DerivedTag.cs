@@ -17,31 +17,29 @@ namespace Common
         // these three properties are the setup value that were passed in when the tag was created
         protected string _tagID;
         protected string _arguments;
-        protected bool _enabled;
 
         public static Dictionary<Guid, FDADataPointDefinitionStructure> Tags;
 
         public delegate void OnUpdateHandler(object sender, EventArgs e);
         public event OnUpdateHandler OnUpdate;
 
-        public static DerivedTag Create(string tagID, string tagtype, string arguments,bool enabled)
+        public static DerivedTag Create(string tagID, string tagtype, string arguments)
         {
             switch (tagtype)
             {
-                case "bitser": return new BitSeriesDerivedTag(tagID, arguments,enabled);
-                case "bitmask": return new BitmaskDerivedTag(tagID,arguments,enabled); 
-                //case "summation": return new SummationDerivedTag(tagID,arguments,enabled);   
+                case "bitser": return new BitSeriesDerivedTag(tagID, arguments);
+                case "bitmask": return new BitmaskDerivedTag(tagID,arguments); 
+                //case "summation": return new SummationDerivedTag(tagID,arguments);   
                 default: return null;
             }
         }
  
         // base class constructor
-        protected DerivedTag(string tagID, string arguments,bool enabled)
+        protected DerivedTag(string tagID, string arguments)
         {
             _tagID = tagID;
             _arguments = arguments;
             physical_point = arguments;
-            _enabled = enabled;
             
             if (IsValidGUID(_tagID))
             {
@@ -100,7 +98,7 @@ namespace Common
         private FDADataPointDefinitionStructure _sourceTag;
 
 
-        public BitSeriesDerivedTag(string tagid, string arguments, bool enabled) : base(tagid, arguments, enabled)
+        public BitSeriesDerivedTag(string tagid, string arguments) : base(tagid, arguments)
         {
             _derived_tag_type = "bitser";
             read_detail_01 = "bitser";
@@ -138,7 +136,7 @@ namespace Common
 
             DPDUID = Guid.Parse(_tagID);
             _valid = true;
-            DPDSEnabled = _enabled;
+
 
 
             // examine the arguments and make sure they're all there and valid
@@ -291,7 +289,7 @@ namespace Common
         private UInt32 _bitmask;
 
 
-        public BitmaskDerivedTag(string tagid, string arguments, bool enabled) : base(tagid, arguments, enabled)
+        public BitmaskDerivedTag(string tagid, string arguments) : base(tagid, arguments)
         {          
             _derived_tag_type = "bitmask";
             read_detail_01 = "bitmask";
@@ -445,7 +443,7 @@ namespace Common
     {
         List<FDADataPointDefinitionStructure> _sourceTags;
 
-        public SummationDerivedTag(string tagid, string arguments, bool enabled) : base(tagid, arguments, enabled)
+        public SummationDerivedTag(string tagid, string arguments, bool enabled) : base(tagid, arguments)
         {
             // if base constructor found something invalid, no need to continue
             if (!_valid) return;

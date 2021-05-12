@@ -1076,7 +1076,7 @@ namespace FDA
                         softtagtype = (string)row["read_detail_01"];
                         softtagarguments = (string)row["physical_point"];
                         softtagenabled = (bool)row["DPDSEnabled"];
-                        DerivedTag newDerivedTag = DerivedTag.Create(ID, softtagtype, softtagarguments,softtagenabled);
+                        DerivedTag newDerivedTag = DerivedTag.Create(ID, softtagtype, softtagarguments);
                         if (newDerivedTag == null)
                         {
                             Globals.SystemManager.LogApplicationEvent(this, "", "FDA Start, Config Error - DPDS ID '" + ID + "' rejected. Unrecognized soft tag type '"+ softtagtype + "'", true);
@@ -1795,8 +1795,7 @@ namespace FDA
                             // create a soft tag
                             string softtagtype = datapoint.read_detail_01;
                             string softtagarguments = datapoint.physical_point;
-                            bool softtagenabled = datapoint.DPDSEnabled;
-                            DerivedTag newTag = DerivedTag.Create(datapoint.DPDUID.ToString(), softtagtype, softtagarguments, softtagenabled);
+                            DerivedTag newTag = DerivedTag.Create(datapoint.DPDUID.ToString(), softtagtype, softtagarguments);
                             if (newTag == null)
                             {
                                 Globals.SystemManager.LogApplicationEvent(this, "", "Config Error: DPDS ID '" + datapoint.DPDUID + "' insert rejected. Unrecognized soft tag type '" + datapoint.read_detail_01 + "'", true);
