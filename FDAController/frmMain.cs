@@ -16,16 +16,15 @@ namespace FDAController
 {
     public partial class frmMain : Form
     {
-        private Color GoodColor = Color.Green;
-        private Color WarningColor = Color.Blue;
-        private Color BadColor = Color.Red;
-        private int _controllerPort = 9571;
-        private string _controllerIP = "127.0.0.1";
+        private readonly Color GoodColor = Color.Green;
+        private readonly Color WarningColor = Color.Blue;
+        private readonly Color BadColor = Color.Red;
+        private const int _controllerPort = 9571;
+        private const string _controllerIP = "127.0.0.1";
         private bool _isStopping = false;
         private bool _isStarting = false;
-        private Timer timer;
         private ServiceController FDAControllerService;
-        private BackgroundWorker bg_StatusChecker;
+        private readonly BackgroundWorker bg_StatusChecker;
 
         private delegate void SafePropertyUpdateDelgate(Control control, string property, object value);
 
@@ -148,8 +147,7 @@ namespace FDAController
 
                     // ask the FDA controller for the FDA's current queue count (serves as an 'FDA is responsive' test)
                     result = SendRequest(_controllerIP, _controllerPort, "TOTALQUEUECOUNT");
-                    int count;
-                    if (int.TryParse(result, out count))
+                    if (int.TryParse(result, out int count))
                     {
                         if (count > -1)
                         {
@@ -270,8 +268,7 @@ namespace FDAController
 
                 // ask the FDA controller for the FDA's current queue count (serves as an 'FDA is responsive' test)
                 result = SendRequest(_controllerIP, _controllerPort, "TOTALQUEUECOUNT");
-                int count;
-                if (int.TryParse(result, out count))
+                if (int.TryParse(result, out int count))
                 {
                     if (count > -1)
                     {
@@ -323,7 +320,7 @@ namespace FDAController
                     client.Connect(address, port);
                     client.GetStream().WriteTimeout = 1000;
                     client.GetStream().ReadTimeout = 1000;
-                } catch (Exception ex)
+                } catch 
                 {
                     return "";
                 }
@@ -333,7 +330,7 @@ namespace FDAController
                 {
                     byte[] requestBytes = Encoding.UTF8.GetBytes(request);
                     client.GetStream().Write(requestBytes, 0, requestBytes.Length);
-                } catch (Exception ex)
+                } catch 
                 {
                     client.Close();
                     return "";
@@ -342,7 +339,7 @@ namespace FDAController
                 try
                 {
                     bytesRead = client.GetStream().Read(buffer, 0, buffer.Length);
-                } catch (Exception ex)
+                } catch
                 {
                     client.Close();
                     return "";
@@ -358,18 +355,18 @@ namespace FDAController
             return Encoding.UTF8.GetString(response);
         }
 
-        private void btnStartConsole_Click(object sender, EventArgs e)
+        private void BtnStartConsole_Click(object sender, EventArgs e)
         {
             StartFDA("-console");
         }
 
-        private void btnStart_Click(object sender, EventArgs e)
+        private void BtnStart_Click(object sender, EventArgs e)
         {
             StartFDA("");
         }
 
 
-        private void btnFDAMonitor_Click(object sender, EventArgs e)
+        private void BtnFDAMonitor_Click(object sender, EventArgs e)
         {
             RunConsoleCommand("openFDAMonitor.bat","");
             //RunConsoleCommand("notepad.exe", "");
@@ -397,7 +394,7 @@ namespace FDAController
 
         }
 
-        private void btnStop_Click(object sender, EventArgs e)
+        private void BtnStop_Click(object sender, EventArgs e)
         {
             btnStart.Enabled = false;
             btnStartConsole.Enabled = false;
@@ -434,8 +431,7 @@ namespace FDAController
                 if (workingDir != "")
                     processStartInfo.WorkingDirectory = workingDir;
 
-                var process = new Process();
-                process.StartInfo = processStartInfo;
+                var process = new Process() { StartInfo = processStartInfo };
 
                 process.Start();
                 //string output = process.StandardOutput.ReadToEnd();

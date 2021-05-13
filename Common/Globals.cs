@@ -59,7 +59,7 @@ namespace Common
 
                 //process.WaitForExit();
             }
-            catch (Exception ex)
+            catch
             {
                 return false;
             }

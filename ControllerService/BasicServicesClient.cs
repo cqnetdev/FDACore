@@ -57,7 +57,6 @@ namespace ControllerService
             string message;
             string responseStr;
             int qCount;
-            string logmessage = "";
 
 
             stopwatch.Start();

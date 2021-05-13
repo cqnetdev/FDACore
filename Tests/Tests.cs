@@ -13,8 +13,7 @@ namespace Tests
     [TestClass]
     public class DataBaseTests
     {
-        private string connectionstring = "Server=localhost;port=5432; Database = FDA;User Id = Intricatesql; password = Intricate2790!";
-
+  
         [TestMethod]
         public void PostgresQuery()
         {
@@ -38,7 +37,7 @@ namespace Tests
         string resultOperation;
 
         bool waiting = false;
-        int waitlimitms = 3000;
+        readonly int waitlimitms = 3000;
 
         /***************************************************   RequestGroup **********************************************/
         #region RequestGroup

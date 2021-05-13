@@ -86,8 +86,8 @@ namespace FDAApp
             if (_FDAControlServer != null)
             {
                 _FDAControlServer.DataAvailable += TCPServer_DataAvailable;
-                _FDAControlServer.ClientDisconnected += _TCPServer_ClientDisconnected;
-                _FDAControlServer.ClientConnected += _TCPServer_ClientConnected;
+                _FDAControlServer.ClientDisconnected += TCPServer_ClientDisconnected;
+                _FDAControlServer.ClientConnected += TCPServer_ClientConnected;
                 _FDAControlServer.Start();
             }
             else
@@ -126,15 +126,14 @@ namespace FDAApp
                     NativeMethods.DeleteMenu(NativeMethods.GetSystemMenu(conHandle, false), NativeMethods.SC_CLOSE, NativeMethods.MF_BYCOMMAND);
 
                     // disable quick edit mode (this causes the app to pause when the user clicks in the console window)             
-                    int mode;
                     IntPtr stdHandle = NativeMethods.GetStdHandle(NativeMethods.STD_INPUT_HANDLE);
-                    if (!NativeMethods.GetConsoleMode(stdHandle, out mode))
+                    if (!NativeMethods.GetConsoleMode(stdHandle, out int mode))
                     {
                         // error getting the console mode
                         Console.WriteLine("Error retrieving console mode");
                         OperationalMessageServer.WriteLine("Error retrieving the console mode");
                     }
-                    mode = mode & ~(NativeMethods.QuickEditMode | NativeMethods.ExtendedFlags);
+                    mode &= ~(NativeMethods.QuickEditMode | NativeMethods.ExtendedFlags);
                     if (!NativeMethods.SetConsoleMode(stdHandle, mode))
                     {
                         // error setting console mode.
@@ -309,7 +308,7 @@ namespace FDAApp
                 _dataAquisitionManager = new DataAcqManager(FDAID, dbManager, ExecutionID);
 
                 // watch for changes to the MQTTEnabled option
-                _dataAquisitionManager.MQTTEnableStatusChanged += _dataAquisitionManager_MQTTEnableStatusChanged;
+                _dataAquisitionManager.MQTTEnableStatusChanged += DataAquisitionManager_MQTTEnableStatusChanged;
 
                 if (_dataAquisitionManager.TestDBConnection())
                 {
@@ -341,7 +340,7 @@ namespace FDAApp
             }
         }
 
-        private static void _dataAquisitionManager_MQTTEnableStatusChanged(object sender, BoolEventArgs e)
+        private static void DataAquisitionManager_MQTTEnableStatusChanged(object sender, BoolEventArgs e)
         {
             bool mqttEnabled = e.Value;
 
@@ -373,12 +372,12 @@ namespace FDAApp
             }
         }
 
-        private static void _TCPServer_ClientDisconnected(object sender, TCPServer.ClientEventArgs e)
+        private static void TCPServer_ClientDisconnected(object sender, TCPServer.ClientEventArgs e)
         {
             LogEvent("Client disconnected");
         }
 
-        private static void _TCPServer_ClientConnected(object sender, TCPServer.ClientEventArgs e)
+        private static void TCPServer_ClientConnected(object sender, TCPServer.ClientEventArgs e)
         {        
             LogEvent("TCP client connected on port " + _FDAControlServer.Port);
         }
@@ -537,8 +536,7 @@ namespace FDAApp
 
             if (topic[2].ToUpper() == "SETMQTTENABLED")
             {
-                Guid objectID;
-                bool validGuid = Guid.TryParse(topic[1], out objectID);
+                bool validGuid = Guid.TryParse(topic[1], out Guid objectID);
                 if (!validGuid)
                     return;
                 bool enabled = (e.Message[0] == 1);

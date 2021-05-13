@@ -54,10 +54,10 @@ namespace FDAInterface
 
         public static bool operator ==(Connection lhs, Connection rhs)
         {
-            if (object.ReferenceEquals(lhs,null) && object.ReferenceEquals(rhs,null))
+            if (lhs is null && rhs is null)
                 return true;
 
-            if (!object.ReferenceEquals(lhs, null) && object.ReferenceEquals(rhs, null))
+            if (lhs is object && rhs is null)
                 return false;
 
 
@@ -66,10 +66,10 @@ namespace FDAInterface
 
         public static bool operator !=(Connection lhs, Connection rhs)
         {
-            if (object.ReferenceEquals(lhs, null) && object.ReferenceEquals(rhs, null))
+            if (lhs is null && rhs is null)
                 return false;
 
-            if (!object.ReferenceEquals(lhs, null) && object.ReferenceEquals(rhs, null))
+            if (lhs is object && rhs is null)
                 return true;
 
             return !(lhs.Description == rhs.Description && lhs.Host == rhs.Host);
@@ -132,17 +132,8 @@ namespace FDAInterface
         internal static ConnectionHistory ConnHistory;
         private static NotifyIcon notifyIcon;     
         private static bool _paused = false;
-        private static MenuItem stopMenuItem;
-        private static MenuItem startMenuItem;
-        private static MenuItem startWithConsoleMenuItem;
-        private static MenuItem pauseMenuItem;
+        private static readonly MenuItem pauseMenuItem;
         private static MenuItem openGuiMenuItem;
-        private static byte[] ShutdownCommand;
-        private static byte[] PauseCommand;
-        private static byte[] ResumeCommand;
-        //static TcpClient _TcpClient;
-        //static NetworkStream _stream;
-        //static SslStream _sslStream;
         private static frmMain2 _mainForm;
         // private System.Threading.Timer dataReceivedCheckTimer;
         //private int dataReceivedCheckRate = 100;
@@ -161,7 +152,6 @@ namespace FDAInterface
         private static System.Threading.Timer ControllerRetryTimer;
         private static System.Threading.Timer ControllerPinger;
 
-        private static string[] PendingChangeHost;
 
         private static bool IntentionalDisconnect = false;
 
@@ -199,17 +189,12 @@ namespace FDAInterface
             FileVersionInfo versionInfo = FileVersionInfo.GetVersionInfo(exePath);
 
             MenuItem titleItem = new MenuItem("FDA Manager ver " + versionInfo.FileVersion);
-            //startMenuItem = new MenuItem("Start FDA", new EventHandler(SendStartFDACommand));
-            //stopMenuItem = new MenuItem("Shutdown FDA", new EventHandler(StopFDA));
-            //startWithConsoleMenuItem = new MenuItem("Start FDA (with console)",new EventHandler(SendStartFDAConsoleCommand));
             openGuiMenuItem = new MenuItem("Open FDA Tools", new EventHandler(OpenGui));
-            //pauseMenuItem = new MenuItem("Pause FDA", new EventHandler(PauseFDA));
             MenuItem exitMenuItem = new MenuItem("Close FDA Manager", DoExit);
 
             notifyIcon = new NotifyIcon()
             {
                 Icon = Properties.Resources.ManagerGray,
-                //ContextMenu = new ContextMenu(new MenuItem[] {titleItem,new MenuItem("-"),startMenuItem, startWithConsoleMenuItem, stopMenuItem,/*pauseMenuItem,*/openGuiMenuItem,new MenuItem("-"), exitMenuItem }),
                 ContextMenu = new ContextMenu(new MenuItem[] {titleItem,new MenuItem("-"),openGuiMenuItem,new MenuItem("-"), exitMenuItem }),
                 Visible = true
             };
@@ -226,19 +211,7 @@ namespace FDAInterface
             ControllerPinger = new System.Threading.Timer(ControllerPing);
             ControllerRetryTimer = new System.Threading.Timer(ControllerReconnectTimer_Tick);
 
-            //ShutdownCommand = Encoding.ASCII.GetBytes("Shutdown");
-            //PauseCommand = Encoding.ASCII.GetBytes("Pause");
-            //ResumeCommand = Encoding.ASCII.GetBytes("Resume");
-
-            // temporary ... connect to MQTT on linux machine
-            //ChangeHost("10.0.0.186", "DevelopmentFDA");
-
-            // if a running MQTT service is found on the local machine, automatically connect to it         
-            //if (ProcessRunning("mosquitto"))
-            //{
-            //    string localFDAID = Settings.Default.LocalFDAIdentifier;
-            //    ChangeHost("127.0.0.1", localFDAID);
-            //}
+       
 
 
             // read in the history XML (or create an empy history object if the xml doesn't exist
@@ -280,77 +253,6 @@ namespace FDAInterface
 
       
 
-
-        /*
-        private void TCPDataReceivedCheck(object o)
-        {
-            // stop the timer (prevent ticks from piling up if the system gets busy)
-            dataReceivedCheckTimer.Change(Timeout.Infinite, Timeout.Infinite);
-
-            if (_sslStream == null)
-                goto ResetTimer;
-
-            if (_sslStream == null)
-                goto ResetTimer;
-
-            if (!_TcpClient.Connected || !_sslStream.CanRead)
-                goto ResetTimer;
-
-            while (_stream.DataAvailable)
-            {
-                int readSize;
-                byte[] readBuffer;
-                byte[] header = new byte[3];
-                int dataSize;
-                byte dataType;
-
-                // first two bytes are an int indicating the length of the rest of the message
-                readSize = _sslStream.Read(header, 0, 3);
-                if (readSize < 3)
-                    return;
-                dataSize = BitConverter.ToUInt16(header,0);
-
-                // third byte indicates the type of the data
-                dataType = header[2];
-
-                // read the data portion of the message
-                readBuffer = new byte[dataSize];
-                readSize = _sslStream.Read(readBuffer, 0,dataSize);
-
-                if (readSize < dataSize)
-                    return;
-
-                HandleMessage(readBuffer, dataType);
-
-            }
-
-            // set timer to tick again in x ms
-            ResetTimer:
-            dataReceivedCheckTimer.Change(dataReceivedCheckRate, Timeout.Infinite);
-        }
-    
-        void HandleMessage(byte[] message, byte datatype)
-        {
-            if (datatype == 0) // ASCII data
-            {
-                string ASCIIMessage = Encoding.ASCII.GetString(message);
-                string[] parsed = ASCIIMessage.Split(':');
-
-                //response to elevate requests
-                if (parsed[0].ToUpper() == "ELEVATE")
-                {
-                    elevatedPermissions = (parsed[1].ToUpper() == "SUCCESS");
-                }
-                else
-                {
-                    // hand anything else off to the GUI, if it's open (disabled, GUI doesn't get data this way anymore, all goes through MQTT
-                    if (MainFormActive())
-                        _mainForm.DataReceivedFromFDA(message, datatype);
-                }
-            } 
-        }
-        */
-
         internal static void ChangeHost(string newHost,string newFDAName)
         {
             if (bg_ControllerConnect.IsBusy || bg_MQTTConnect.IsBusy)
@@ -371,14 +273,7 @@ namespace FDAInterface
                 ControllerRetryTimer.Change(Timeout.Infinite, Timeout.Infinite);
                 ControllerPinger.Change(Timeout.Infinite, Timeout.Infinite);
 
-                // connection thread(s) are busy, set the pending host change property and exit
-                // when the thread(s) finish, they'll check for a pending host change and call this function again if it isn't null
-                //if (bg_MQTTConnect.IsBusy || bg_ControllerConnect.IsBusy)
-                //{
-                //    PendingChangeHost = new string[] { newHost, newFDAName, "False" };
-                //    return;
-                //}
-
+               
               
 
                 if (bg_MQTTConnect == null)
@@ -598,31 +493,11 @@ namespace FDAInterface
 
         private static void Bg_MQTTConnect_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
         {
-            //if (PendingChangeHost != null)
-            //{
-            //    string host = PendingChangeHost[0];
-            //    string name = PendingChangeHost[1];
-            //    PendingChangeHost = null;
-                
-            //    ChangeHost(host,name);
-            //}
             // results is a four element string array {IP,name,connection result,message}
             string[] results = (string[])e.Result;
 
             if (results[2]=="success")
             {
-                //FDAName = results[1];
-                //Host = results[0];
-
-                //CurrentConnectionStatus = "Connected to MQTT broker at " + Host + " (" + _FDAName + ")";
-                //if (MainFormActive())
-                //{
-                //     _mainForm.SetConnectionStateText(CurrentConnectionStatus);
-                //}
-
-                // this is what we're replacing
-                //Properties.Settings.Default.LastConnectedFDA = Host + "|" + FDAName;
-                //Properties.Settings.Default.Save();
                 ConnHistory.LastConnection = new Connection(Host, FDAName);
 
 
@@ -663,20 +538,10 @@ namespace FDAInterface
 
                 if (MessageBox.Show(message, "Failed Connection", MessageBoxButtons.RetryCancel) == DialogResult.Retry)
                     bg_MQTTConnect.RunWorkerAsync(new string[] { results[0], results[1] });
-
-                ////CurrentConnectionStatus = "FDA Connection Status";
-                //if (MainFormActive())
-                //{                  
-                //     //_mainForm.SetConnectionStateText(CurrentConnectionStatus);
-                //    _mainForm.SetFDAStatus("Unknown");
-                //}
-
-                //MQTTReconnectTimer.Change(ReconnectRate, ReconnectRate);               
+     
             }
 
 
-            //if (MainFormActive())
-            //    _mainForm.SetConnectionMenuItems(true);
         }
 
         private static void ControllerPing(object state)
@@ -734,7 +599,7 @@ namespace FDAInterface
             {
                 bg_MQTTConnect.RunWorkerAsync(new string[] { Host, FDAName });
             }
-            //MQTTReconnectTimer.Change(ReconnectRate, ReconnectRate);
+
         }
 
         private static void ControllerReconnectTimer_Tick(object state)
@@ -805,55 +670,32 @@ namespace FDAInterface
                 // starting
                 case "Starting":
                     notifyIcon.Icon = Properties.Resources.ManagerYellow;
-                    //startMenuItem.Enabled = false;
-                    //startWithConsoleMenuItem.Enabled = false;
-                    //stopMenuItem.Enabled = false;
-                    //pauseMenuItem.Enabled = false;
                     notifyIcon.Text = "FDA Starting";
                     break;
                 // running
                 case "Normal":
                     notifyIcon.Icon = Properties.Resources.ManagerGreen;
-                    //startMenuItem.Enabled = false;
-                    //startWithConsoleMenuItem.Enabled = false;
-                    //stopMenuItem.Enabled = true;
-                    //pauseMenuItem.Enabled = true;
+
                     notifyIcon.Text = "FDA Running";
                     break;
                 // Shutting down
                 case "ShuttingDown":
                     notifyIcon.Icon = Properties.Resources.ManagerYellow;
-                    //startMenuItem.Enabled = false;
-                    //startWithConsoleMenuItem.Enabled = false;
-                    //stopMenuItem.Enabled = false;
-                    //pauseMenuItem.Enabled = false;
                     notifyIcon.Text = "FDA Shutting Down";
                     break;
                 // Pausing
                 case "Pausing":
                     notifyIcon.Icon = Properties.Resources.ManagerYellow;
-                    //startMenuItem.Enabled = false;
-                    //startWithConsoleMenuItem.Enabled = false;
-                    //stopMenuItem.Enabled = false;
-                    //pauseMenuItem.Enabled = false;
                     notifyIcon.Text = "FDA Pausing";
                     break;
                 //paused
                 case "Paused":
                     notifyIcon.Icon = Properties.Resources.ManagerYellow;
-                    //startMenuItem.Enabled = false;
-                    //startWithConsoleMenuItem.Enabled = false;
-                    //stopMenuItem.Enabled = false;
-                    //pauseMenuItem.Enabled = true;
                     notifyIcon.Text = "FDA Paused";
                     break;
                 //stopped
                 case "Stopped":
                     notifyIcon.Icon = Properties.Resources.ManagerRed;
-                    //startMenuItem.Enabled = true;
-                    //startWithConsoleMenuItem.Enabled = true;
-                    //stopMenuItem.Enabled = false;
-                    //pauseMenuItem.Enabled = false;
                     notifyIcon.Text = "FDA Stopped";
                     break;
                 case "default":
@@ -861,44 +703,7 @@ namespace FDAInterface
                     break;
             }
 
-            /*
-
-            if (connected && !_paused)
-            {
-                notifyIcon.Icon = Properties.Resources.ManagerGreen;
-                startMenuItem.Enabled = false;
-                startWithConsoleMenuItem.Enabled = false;
-                stopMenuItem.Enabled = true;
-                pauseMenuItem.Enabled = true;
-                notifyIcon.BalloonTipText = "FDA Running";
-            }
-
-            if (connected && _paused)
-            {
-                notifyIcon.Icon = Properties.Resources.ManagerYellow;
-                startMenuItem.Enabled = false;
-                startWithConsoleMenuItem.Enabled = false;
-                stopMenuItem.Enabled = true;
-                pauseMenuItem.Enabled = true;
-                notifyIcon.BalloonTipText = "FDA Paused";
-            }
-
-            if (!connected)
-            {
-                notifyIcon.Icon = Properties.Resources.ManagerRed;
-                startMenuItem.Enabled = true;
-                startWithConsoleMenuItem.Enabled = true;
-                stopMenuItem.Enabled = false;
-                pauseMenuItem.Enabled = false;
-                notifyIcon.BalloonTipText = "FDA Stopped";
-            }
-            */
-            /*
-            if (MainFormActive())
-            {
-                _mainForm.UpdateFDAConnStatus(notifyIcon.BalloonTipText);
-            }
-            */
+   
         }
 
 
@@ -907,7 +712,6 @@ namespace FDAInterface
         {
             if (!_paused)
             {
-                //SendToFDA("PAUSE");
                 if (MQTT != null)
                 {
                     if (MQTT.IsConnected)
@@ -920,7 +724,6 @@ namespace FDAInterface
             }
             else
             {
-                //SendToFDA("RESUME");
                 if (MQTT != null)
                 {
                     if (MQTT.IsConnected)
@@ -1087,7 +890,7 @@ namespace FDAInterface
                     serializer.Serialize(stream, ConnHistory);
                 }
             }
-            catch (Exception ex)
+            catch
             {
                
             }

@@ -12,8 +12,8 @@ namespace ROC
         private const ushort CRCInitial = 0x0000;
         private const ushort CRCPoly = 0xA001;
         private const bool CRCSwapOutputBytes = false;
-        private static List<string> supportedOpcodes = new List<string>(new string[] { "180", "181", "+181", "17", "120", "121", "+121", "122", "+122" });
-        private static List<string> OpcodesRequiringTagList = new List<string>(new string[] { "180", "181", "+181" });
+        private readonly static List<string> supportedOpcodes = new List<string>(new string[] { "180", "181", "+181", "17", "120", "121", "+121", "122", "+122" });
+        private readonly static List<string> OpcodesRequiringTagList = new List<string>(new string[] { "180", "181", "+181" });
         private static List<string> validationErrors;
         private class TLP
         {
@@ -157,13 +157,12 @@ namespace ROC
                 if (headerElement1.Length > 1)
                 {
                     deviceRefString = headerElement1[1];
-                    Guid deviceRefID;
 
                     // is a valid GUID
-                    if (!Guid.TryParse(deviceRefString, out deviceRefID))
+                    if (!Guid.TryParse(deviceRefString, out Guid deviceRefID))
                     {
                         //    Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with an invalid device ID '" + deviceRefString + ", the correct format is xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx.", true);
-                        RecordValidationError(obj, groupID, requestor, "contains a request with an invalid device ID '" + deviceRefString + ", the correct format is xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx."); 
+                        RecordValidationError(obj, groupID, requestor, "contains a request with an invalid device ID '" + deviceRefString + ", the correct format is xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx.");
                         valid = false;
                     }
 
@@ -181,8 +180,8 @@ namespace ROC
                 }
 
 
-                int n;
-                if (!int.TryParse(groupString, out n))
+
+                if (!int.TryParse(groupString, out _))
                 {
                     //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with an invalid element in the header (Device Group '" + header[0] + "' is not a number).", true);
                     RecordValidationError(obj,groupID,requestor,"contains a request with an invalid element in the header (Device Group '" + header[0] + "' is not a number).");
@@ -190,7 +189,7 @@ namespace ROC
                 }
 
                 // header elements 1,2,4 (if present) and 5 (if present) are numeric
-                if (!int.TryParse(header[1], out n))
+                if (!int.TryParse(header[1], out _))
                 {
                     //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with an invalid element in the header (device '" + header[1] + "' is not a number).", true);
                     RecordValidationError(obj,groupID,requestor, "contains a request with an invalid element in the header (device '" + header[1] + "' is not a number).");
@@ -200,7 +199,7 @@ namespace ROC
                 // remove the plus sign from the opcode (if present), before checking if it's a number
                 string opCodewithNoPlus = header[2].Replace("+", "");
                 bool opCodeIsNumeric = true;
-                if (!int.TryParse(opCodewithNoPlus, out n))
+                if (!int.TryParse(opCodewithNoPlus, out _))
                 {
                     opCodeIsNumeric = false;
                     // exception for 'opcode' HDR (historical data request), this is valid even though it isn't numeric
@@ -229,7 +228,7 @@ namespace ROC
                     if (header[4] != string.Empty)
                     {
                         // it's a number?
-                        if (!int.TryParse(header[4], out n))
+                        if (!int.TryParse(header[4], out int n))
                         {
                            //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with an invalid element in the header (The ROC password '" + header[4] + "' is not a number).", true);
                            RecordValidationError(obj,groupID,requestor, "contains a request with an invalid element in the header (The ROC password '" + header[4] + "' is not a number).");
@@ -250,7 +249,7 @@ namespace ROC
 
                 if (header.Length > 5)
                 {
-                    if (!int.TryParse(header[5], out n))
+                    if (!int.TryParse(header[5], out _))
                     {
                         //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with an invalid element in the header (MaxDataSize '" + header[5] + "' is not a number).", true);
                         RecordValidationError(obj,groupID,requestor,"contains a request with an invalid element in the header (MaxDataSize '" + header[5] + "' is not a number).");
@@ -299,23 +298,22 @@ namespace ROC
                     }
                     else
                     {
-                        int n;
                         // elements 0-2 are numeric
-                        if (!int.TryParse(tagInfo[0], out n))
+                        if (!int.TryParse(tagInfo[0], out _))
                         {
                             //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with  invalid tag information (point type '" + tagInfo[0] + "' is not a number).", true);
                             RecordValidationError(obj,groupID,requestor, "contains a request with  invalid tag information (point type '" + tagInfo[0] + "' is not a number).");
                             valid = false;
                         }
 
-                        if (!int.TryParse(tagInfo[1], out n))
+                        if (!int.TryParse(tagInfo[1], out _))
                         {
                             //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with  invalid tag information (logical number '" + tagInfo[1] + "' is not a number).", true);
                            RecordValidationError(obj,groupID,requestor, "contains a request with  invalid tag information (logical number '" + tagInfo[1] + "' is not a number).");
                            valid = false;
                         }
 
-                        if (!int.TryParse(tagInfo[2], out n))
+                        if (!int.TryParse(tagInfo[2], out _))
                         {
                             //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with  invalid tag information (parameter '" + tagInfo[2] + "' is not a number).", true);
                             RecordValidationError(obj,groupID,requestor, "contains a request with  invalid tag information (parameter '" + tagInfo[2] + "' is not a number).");
@@ -381,7 +379,6 @@ namespace ROC
                 string[] tagInfo;
                 string[] fromTimeStr;
                 string[] toTimeStr;
-                int n;
                 for (int i = 1; i < headerAndTagList.Length; i++)
                 {
                     
@@ -399,7 +396,7 @@ namespace ROC
                     //********************* numeric elements are numeric *********************************
 
                     // Element 0 (HPN) 
-                    if (!int.TryParse(tagInfo[0], out n))
+                    if (!int.TryParse(tagInfo[0], out _))
                     {
                         //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with  invalid information (The value for HPN of '" + tagInfo[0] + "' is not a number).", true);
                        RecordValidationError(obj,groupID,requestor, "contains a request with  invalid information (The value for HPN of '" + tagInfo[0] + "' is not a number).");
@@ -409,7 +406,7 @@ namespace ROC
                     // Element 5 (step) if present, is numeric
                     if (tagInfo.Length > 5)
                     {
-                        if (!int.TryParse(tagInfo[5],out n))
+                        if (!int.TryParse(tagInfo[5],out _))
                         {
                             //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with  invalid information (The Step value of '" + tagInfo[5] + "' is not a number).", true);
                             RecordValidationError(obj,groupID,requestor,"contains a request with  invalid information (The Step value of '" + tagInfo[5] + "' is not a number).");
@@ -418,8 +415,8 @@ namespace ROC
                     }
 
                     // HPN is in range
-                    int.TryParse(tagInfo[0], out n);
-                    if (n<1 || n > 255)
+                    int.TryParse(tagInfo[0], out int n);
+                    if (n < 1 || n > 255)
                     {
                         //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with  invalid information (The HPN value of '" + tagInfo[5] + "' is out of range, valid values are 0 - 254).", true);
                         RecordValidationError(obj,groupID,requestor, "contains a request with  invalid information (The HPN value of '" + tagInfo[5] + "' is out of range, valid values are 0 - 254).");
@@ -443,7 +440,7 @@ namespace ROC
                     // fromTime elements are numeric
                     foreach (string element in fromTimeStr)
                     {
-                        if (!int.TryParse(element, out n))
+                        if (!int.TryParse(element, out _))
                         {
                             //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with  invalid information ('" + tagInfo[3] + "' is not a valid Date/Time).", true);
                             RecordValidationError(obj,groupID,requestor,"contains a request with  invalid information ('" + tagInfo[3] + "' is not a valid Date/Time).");
@@ -588,7 +585,7 @@ namespace ROC
                     //element 5 (step)
                     if (tagInfo.Length > 5)
                     {
-                        if (!int.TryParse(tagInfo[5], out n))
+                        if (!int.TryParse(tagInfo[5], out _))
                         {
                             //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with  invalid information (the inteval value '" + tagInfo[5] + "' is not a number).", true);
                            RecordValidationError(obj,groupID,requestor, "contains a request with  invalid information (the inteval value '" + tagInfo[5] + "' is not a number).");
@@ -640,16 +637,15 @@ namespace ROC
                 }
                 else
                 {
-                    int start;
-                    int end;
-                    if (!int.TryParse(pointerInfo[0], out start))
+
+                    if (!int.TryParse(pointerInfo[0], out int start))
                     {
                         //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an Alarms/Events request with invalid pointers specified.", true);
                         RecordValidationError(obj,groupID,requestor,"contains an Alarms/Events request with invalid pointers specified.");
                         valid = false;
                     }
 
-                    if (!int.TryParse(pointerInfo[1], out end))
+                    if (!int.TryParse(pointerInfo[1], out int end))
                     {
                         //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an Alarms/Events request with invalid pointers specified.", true);
                         RecordValidationError(obj,groupID,requestor, "contains an Alarms/Events request with invalid pointers specified.");
@@ -1326,8 +1322,8 @@ namespace ROC
             byte deviceNum = byte.Parse(header[1]);
             string login = header[3];
 
-            short pwd;
-            if (!short.TryParse(header[4], out pwd))
+
+            if (!short.TryParse(header[4], out short pwd))
                 pwd = -1;
 
             if (currentPtr == -1)
@@ -1497,8 +1493,10 @@ namespace ROC
             }
 
 
-            List<DataRequest> requestList = new List<DataRequest>();
-            requestList.Add(request);
+            List<DataRequest> requestList = new List<DataRequest>
+            {
+                request
+            };
             return requestList;
         }
 
@@ -3640,23 +3638,27 @@ namespace ROC
             {
                 if (CalibrationTypes == null)
                 {
-                    CalibrationTypes = new Dictionary<byte, string>();
-                    CalibrationTypes.Add(0, "Set Zero");
-                    CalibrationTypes.Add(1, "Set Span");
-                    CalibrationTypes.Add(2, "Set Midpoint 1");
-                    CalibrationTypes.Add(3, "Set Mid-point 2");
-                    CalibrationTypes.Add(4, "Set Mid-point 3");
-                    CalibrationTypes.Add(5, "Calibration verified");
-                    CalibrationTypes.Add(10, "Set Zero Shift/Static Pressure Offset/RTD Bias");
-                    CalibrationTypes.Add(29, "Calibration Cancelled");
+                    CalibrationTypes = new Dictionary<byte, string>
+                    {
+                        { 0, "Set Zero" },
+                        { 1, "Set Span" },
+                        { 2, "Set Midpoint 1" },
+                        { 3, "Set Mid-point 2" },
+                        { 4, "Set Mid-point 3" },
+                        { 5, "Calibration verified" },
+                        { 10, "Set Zero Shift/Static Pressure Offset/RTD Bias" },
+                        { 29, "Calibration Cancelled" }
+                    };
                 }
                 if (MVSInputs == null)
                 {
-                    MVSInputs = new Dictionary<byte, string>();
-                    MVSInputs.Add(1, "Differential Pressure Input");
-                    MVSInputs.Add(2, "Static Pressure Input");
-                    MVSInputs.Add(3, "Temperature Input");
-                    MVSInputs.Add(4, "Low DP Input");
+                    MVSInputs = new Dictionary<byte, string>
+                    {
+                        { 1, "Differential Pressure Input" },
+                        { 2, "Static Pressure Input" },
+                        { 3, "Temperature Input" },
+                        { 4, "Low DP Input" }
+                    };
                 }
 
                 CalibrationType = eventData[1];
@@ -3812,76 +3814,90 @@ namespace ROC
                     // set up static lookups the first time an alarm Record is created, to be used by subsequent alarm objects
                     if (AlarmTypeHighNibbleLookup == null)
                     {
-                        AlarmTypeHighNibbleLookup = new Dictionary<byte, string>();
-                        AlarmTypeHighNibbleLookup.Add(1, "DP");
-                        AlarmTypeHighNibbleLookup.Add(2, "AP");
-                        AlarmTypeHighNibbleLookup.Add(3, "PT");
-                        AlarmTypeHighNibbleLookup.Add(5, "I/O");
-                        AlarmTypeHighNibbleLookup.Add(6, "AGA");
-                        AlarmTypeHighNibbleLookup.Add(7, "User Text");
-                        AlarmTypeHighNibbleLookup.Add(8, "User Value");
-                        AlarmTypeHighNibbleLookup.Add(9, "MVS Sensor");
-                        AlarmTypeHighNibbleLookup.Add(10, "SM");
-                        AlarmTypeHighNibbleLookup.Add(15, "FST");
+                        AlarmTypeHighNibbleLookup = new Dictionary<byte, string>
+                        {
+                            { 1, "DP" },
+                            { 2, "AP" },
+                            { 3, "PT" },
+                            { 5, "I/O" },
+                            { 6, "AGA" },
+                            { 7, "User Text" },
+                            { 8, "User Value" },
+                            { 9, "MVS Sensor" },
+                            { 10, "SM" },
+                            { 15, "FST" }
+                        };
                     }
 
                     if (AlarmTypeLowNibbleLookup == null)
                     {
-                        AlarmTypeLowNibbleLookup = new Dictionary<byte, string>();
-                        AlarmTypeLowNibbleLookup.Add(0, "Alarm Clear");
-                        AlarmTypeLowNibbleLookup.Add(1, "Alarm Set");
-                        AlarmTypeLowNibbleLookup.Add(2, "Pulse Input Alarm Clear");
-                        AlarmTypeLowNibbleLookup.Add(3, "Pulse Input Alarm Set");
-                        AlarmTypeLowNibbleLookup.Add(4, "SRBX Alarm Clear");
-                        AlarmTypeLowNibbleLookup.Add(5, "SRBX Alarm Set");
+                        AlarmTypeLowNibbleLookup = new Dictionary<byte, string>
+                        {
+                            { 0, "Alarm Clear" },
+                            { 1, "Alarm Set" },
+                            { 2, "Pulse Input Alarm Clear" },
+                            { 3, "Pulse Input Alarm Set" },
+                            { 4, "SRBX Alarm Clear" },
+                            { 5, "SRBX Alarm Set" }
+                        };
                     }
 
                     if (AlarmCodeLookup == null)
                     {
                         AlarmCodeLookup = new Dictionary<byte, Dictionary<byte, string>>();
 
-                        Dictionary<byte, string> AlarmCode = new Dictionary<byte, string>();
-                        AlarmCode.Add(0, "Low Alarm");
-                        AlarmCode.Add(1, "Lo Lo Alarm");
-                        AlarmCode.Add(2, "High Alarm");
-                        AlarmCode.Add(3, "Hi Hi Alarm");
-                        AlarmCode.Add(4, "Rate Alarm");
-                        AlarmCode.Add(5, "Status Change");
-                        AlarmCode.Add(6, "A/D Failure");
-                        AlarmCode.Add(7, "Manual Mode");
+                        Dictionary<byte, string> AlarmCode = new Dictionary<byte, string>
+                        {
+                            { 0, "Low Alarm" },
+                            { 1, "Lo Lo Alarm" },
+                            { 2, "High Alarm" },
+                            { 3, "Hi Hi Alarm" },
+                            { 4, "Rate Alarm" },
+                            { 5, "Status Change" },
+                            { 6, "A/D Failure" },
+                            { 7, "Manual Mode" }
+                        };
 
                         AlarmCodeLookup.Add(1, AlarmCode);
                         AlarmCodeLookup.Add(2, AlarmCode);
                         AlarmCodeLookup.Add(3, AlarmCode);
                         AlarmCodeLookup.Add(5, AlarmCode);
 
-                        AlarmCode = new Dictionary<byte, string>();
-                        AlarmCode.Add(0, "Low Alarm");
-                        AlarmCode.Add(2, "High Alarm");
-                        AlarmCode.Add(4, "Redundant Total Count Alarm");
-                        AlarmCode.Add(5, "Redundant Flow Alarm");
-                        AlarmCode.Add(6, "No Flow Alarm");
-                        AlarmCode.Add(7, "Manual Mode");
+                        AlarmCode = new Dictionary<byte, string>
+                        {
+                            { 0, "Low Alarm" },
+                            { 2, "High Alarm" },
+                            { 4, "Redundant Total Count Alarm" },
+                            { 5, "Redundant Flow Alarm" },
+                            { 6, "No Flow Alarm" },
+                            { 7, "Manual Mode" }
+                        };
                         AlarmCodeLookup.Add(6, AlarmCode);
 
-                        AlarmCode = new Dictionary<byte, string>();
-                        AlarmCode.Add(0, "Logic Alarm");
+                        AlarmCode = new Dictionary<byte, string>
+                        {
+                            { 0, "Logic Alarm" }
+                        };
                         AlarmCodeLookup.Add(8, AlarmCode);
 
-                        AlarmCode = new Dictionary<byte, string>();
-                        AlarmCode.Add(4, "Input Freeze Mode");
-                        AlarmCode.Add(5, "EIA-485 Fail Alarm");
-                        AlarmCode.Add(6, "Sensor Communications Fail Alarm");
-                        AlarmCode.Add(7, "Off Scan Mode");
+                        AlarmCode = new Dictionary<byte, string>
+                        {
+                            { 4, "Input Freeze Mode" },
+                            { 5, "EIA-485 Fail Alarm" },
+                            { 6, "Sensor Communications Fail Alarm" },
+                            { 7, "Off Scan Mode" }
+                        };
                         AlarmCodeLookup.Add(9, AlarmCode);
 
-                        AlarmCode = new Dictionary<byte, string>();
-                        AlarmCode.Add(0, "Sequence Out of Order Alarm");
-                        AlarmCode.Add(1, "Phase Discrepancy Detected Alarm");
-                        AlarmCode.Add(2, "Inconsistent Pulse Count Alarm");
-                        AlarmCode.Add(3, "Frequency Discrepency Alarm");
-                        AlarmCode.Add(4, "Channel A Failure Alarm");
-                        AlarmCode.Add(5, "Channel B Failure Alarm");
+                        AlarmCode = new Dictionary<byte, string>
+                        {
+                            { 0, "Sequence Out of Order Alarm" },
+                            { 1, "Phase Discrepancy Detected Alarm" },
+                            { 2, "Inconsistent Pulse Count Alarm" },
+                            { 3, "Frequency Discrepency Alarm" },
+                            { 4, "Channel A Failure Alarm" },
+                            { 5, "Channel B Failure Alarm" }
+                        };
                     }
 
                     AlarmDesc = AlarmTypeHighNibbleLookup[AlarmTypeHighNibble] + " - " + AlarmCodeLookup[AlarmTypeHighNibble][AlarmCode] + " " + AlarmTypeLowNibbleLookup[AlarmTypeLowNibble];

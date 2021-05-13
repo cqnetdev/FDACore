@@ -465,8 +465,6 @@ namespace FDA
                     Globals.SystemManager.LogApplicationEvent(this, "", "Timeout while waiting for comms thread to exit");
 
                 timeoutTimer.Stop();
-                timeoutTimer = null;
-
                 Disconnect();
             }
         }
@@ -495,7 +493,7 @@ namespace FDA
                     Globals.SystemManager.LogApplicationEvent(this, "", "Timeout while waiting for comms thread to exit");
 
                 timeoutTimer.Stop();
-                timeoutTimer = null;
+
             }
             else
             {
@@ -614,7 +612,7 @@ namespace FDA
 
         #region private helper functions
 
-        private void LogCommsEvent(DataRequest currentRequest, RequestGroup currentGroup, int attemptCount,bool isAckEvent=false)
+        private void LogCommsEvent(DataRequest currentRequest, RequestGroup currentGroup, int attemptCount)
         {
             string devaddr;
             if (currentRequest.Protocol == "BSAPUDP")
@@ -682,7 +680,7 @@ namespace FDA
         private bool IsTCPClientConnected()
         {
             bool clientConnected = true;
-
+       
             if (_tcpConnection == null)
                 clientConnected = false;
             else

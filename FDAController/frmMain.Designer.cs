@@ -47,7 +47,7 @@ namespace FDAController
             this.btnStart.TabIndex = 0;
             this.btnStart.Text = "Start FDA";
             this.btnStart.UseVisualStyleBackColor = true;
-            this.btnStart.Click += new System.EventHandler(this.btnStart_Click);
+            this.btnStart.Click += new System.EventHandler(this.BtnStart_Click);
             // 
             // btnStop
             // 
@@ -57,7 +57,7 @@ namespace FDAController
             this.btnStop.TabIndex = 1;
             this.btnStop.Text = "Stop FDA";
             this.btnStop.UseVisualStyleBackColor = true;
-            this.btnStop.Click += new System.EventHandler(this.btnStop_Click);
+            this.btnStop.Click += new System.EventHandler(this.BtnStop_Click);
             // 
             // lblLastupdate
             // 
@@ -103,7 +103,7 @@ namespace FDAController
             this.btnStartConsole.TabIndex = 6;
             this.btnStartConsole.Text = "Start FDA in console (debug) mode";
             this.btnStartConsole.UseVisualStyleBackColor = true;
-            this.btnStartConsole.Click += new System.EventHandler(this.btnStartConsole_Click);
+            this.btnStartConsole.Click += new System.EventHandler(this.BtnStartConsole_Click);
             // 
             // btnFDAMonitor
             // 
@@ -114,7 +114,7 @@ namespace FDAController
             this.btnFDAMonitor.Text = "Open FDA Monitor (doesn\'t work)";
             this.btnFDAMonitor.UseVisualStyleBackColor = true;
             this.btnFDAMonitor.Visible = false;
-            this.btnFDAMonitor.Click += new System.EventHandler(this.btnFDAMonitor_Click);
+            this.btnFDAMonitor.Click += new System.EventHandler(this.BtnFDAMonitor_Click);
             // 
             // frmMain
             // 

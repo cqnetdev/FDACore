@@ -290,7 +290,7 @@ namespace Modbus
 
                   
                     if ((opCode >= 1 && opCode <= 4) || opCode == 7)
-                        subRequestList = GenerateReadRequest(opCode, slave, startReg, numRegisters,requestIdx, tcp, enron,maxDataSize, tagConfigsList,tagList,DataRequest.RequestType.Read);
+                        subRequestList = GenerateReadRequest(opCode, slave, startReg,requestIdx, tcp, enron,maxDataSize, tagConfigsList,tagList,DataRequest.RequestType.Read);
 
                     if (opCode == 5 || opCode == 6 || opCode == 16 || opCode == 15)
                          subRequestList = GenerateWriteRequest(opCode, slave, startReg, tagConfigsList, tagList, maxDataSize, requestIdx, tcp, enron, requestGroup.writeLookup,requestGroup.ID);
@@ -311,7 +311,7 @@ namespace Modbus
                         byte readbackOpCode = 3;
                         if (opCode == 5 || opCode == 15)
                             readbackOpCode = 1;
-                        readbackSubRequestList = GenerateReadRequest(readbackOpCode, slave, startReg, numRegisters,requestIdx+1,tcp,enron,maxDataSize, tagConfigsList, tagList,DataRequest.RequestType.ReadbackAfterWrite);
+                        readbackSubRequestList = GenerateReadRequest(readbackOpCode, slave, startReg,requestIdx+1,tcp,enron,maxDataSize, tagConfigsList, tagList,DataRequest.RequestType.ReadbackAfterWrite);
 
                         foreach (DataRequest readbackSubRequest in readbackSubRequestList)
                         {
@@ -662,11 +662,10 @@ namespace Modbus
 
             // string contains at least 1 header / body
             string[] headerAndTagList = request.Split('|');
-            int n;
             if (headerAndTagList.Length < 2)
             {
-  //            Globals.SystemManager.LogApplicationEvent(obj, "", "The group " + groupID + ", reqested by " + requestor + " contains an invalid request (requires at least 1 | character)'. This request group will not be processed",true);
-                RecordValidationError(obj,groupID,requestor,"contains an invalid request (requires at least 1 | character)'");
+                //            Globals.SystemManager.LogApplicationEvent(obj, "", "The group " + groupID + ", reqested by " + requestor + " contains an invalid request (requires at least 1 | character)'. This request group will not be processed",true);
+                RecordValidationError(obj, groupID, requestor, "contains an invalid request (requires at least 1 | character)'");
                 return false;
             }
 
@@ -690,13 +689,12 @@ namespace Modbus
                 if (headerElement0.Length > 1)
                 {
                     deviceRefString = headerElement0[1];
-                    Guid deviceRefID;
 
                     // it's a valid GUID?
-                    if (!Guid.TryParse(deviceRefString, out deviceRefID))
+                    if (!Guid.TryParse(deviceRefString, out Guid deviceRefID))
                     {
                         // Globals.SystemManager.LogApplicationEvent(obj, "", "The group " + groupID + ", reqested by " + requestor + " contains an request with an invalid device ID '" + deviceRefString + ", the correct format is xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx. This request group will not be processed", true);
-                        RecordValidationError(obj,groupID,requestor,"contains a request with an invalid device ID '" + deviceRefString + ", the correct format is xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx");
+                        RecordValidationError(obj, groupID, requestor, "contains a request with an invalid device ID '" + deviceRefString + ", the correct format is xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx");
                         valid = false;
                     }
 
@@ -708,7 +706,7 @@ namespace Modbus
                 }
 
                 // header lement 0 (minus the device reference, if it was present) is numeric
-                if (!int.TryParse(headerElement0[0], out n))
+                if (!int.TryParse(headerElement0[0], out _))
                 {
                    // Globals.SystemManager.LogApplicationEvent(obj, "", "The group " + groupID + ", reqested by " + requestor + " contains an request with an invalid element in the header (SlaveAddress '" + header[0] + "' is not a number). This request group will not be processed",true);
                    RecordValidationError(obj,groupID,requestor,"contains a request with an invalid element in the header (SlaveAddress '" + header[0] + "' is not a number)");
@@ -718,7 +716,7 @@ namespace Modbus
                 // all header elements are numeric
                 string opCodewithNoPlus = header[1].Replace("+", "");
                 bool opCodeIsNumeric = true;
-                if (!int.TryParse(opCodewithNoPlus, out n))
+                if (!int.TryParse(opCodewithNoPlus, out _))
                 {
                     //Globals.SystemManager.LogApplicationEvent(obj, "", "The group " + groupID + ", reqested by " + requestor + " contains an request with an invalid element in the header (Opcode '" + header[1] + "' is not a number). This request group will not be processed",true);
                     RecordValidationError(obj,groupID,requestor,"contains a request with an invalid element in the header (Opcode '" + header[1] + "' is not a number)");
@@ -726,7 +724,7 @@ namespace Modbus
                     opCodeIsNumeric = false;
                 }
 
-                if (!int.TryParse(header[2], out n))
+                if (!int.TryParse(header[2], out _))
                 {
                     //Globals.SystemManager.LogApplicationEvent(obj, "", "The group " + groupID + ", reqested by " + requestor + " contains an request with an invalid element in the header (StartingRegister '" + header[2] + "' is not a number). This request group will not be processed",true);
                    RecordValidationError(obj,groupID,requestor,"contains an request with an invalid element in the header (StartingRegister '" + header[2] + "' is not a number)");
@@ -735,7 +733,7 @@ namespace Modbus
 
                 if (header.Length > 3)
                 {
-                    if (!int.TryParse(header[3], out n))
+                    if (!int.TryParse(header[3], out _))
                     {
                         //Globals.SystemManager.LogApplicationEvent(obj, "", "The group " + groupID + ", reqested by " + requestor + " contains an request with an invalid element in the header (MaxDataSize '" + header[3] + "' is not a number). This request group will not be processed",true);
                         RecordValidationError(obj,groupID,requestor,"contains an request with an invalid element in the header (MaxDataSize '" + header[3] + "' is not a number)");
@@ -747,7 +745,7 @@ namespace Modbus
                 // opcode is supported
                 if (opCodeIsNumeric)
                 {
-                    int.TryParse(opCodewithNoPlus, out n);
+                    int.TryParse(opCodewithNoPlus, out int n);
                     if ( n < 1 || (n > 7 && n!=15 && n!= 16))
                     {
                         //Globals.SystemManager.LogApplicationEvent(obj, "", "The group " + groupID + ", reqested by " + requestor + " contains an request with an invalid element in the header (Opcode '" + header[1] + "' is not supported). This request group will not be processed",true);
@@ -902,7 +900,7 @@ namespace Modbus
         // generate a read request (Opcodes 1,2,3,4,7)
         //       private static List<DataRequest> GenerateReadRequest(string reqID, byte group, byte unit,byte hostGroup,byte hostUnit, TLP[] TLPs,List<FDADataPointDefinitionStructure> tagsconfigList,List<Tag> tagList,int groupIdx, int maxDataSize, DataRequest.RequestType requestType)
 
-        private static List<DataRequest> GenerateReadRequest(byte opCode, ushort slave, ushort startRegister, ushort numRegisters, int groupIndex, bool tcp,bool enron, int maxDataSize, List<FDADataPointDefinitionStructure> tagconfigs, List<Tag> tagList, DataRequest.RequestType requestType)
+        private static List<DataRequest> GenerateReadRequest(byte opCode, ushort slave, ushort startRegister, int groupIndex, bool tcp,bool enron, int maxDataSize, List<FDADataPointDefinitionStructure> tagconfigs, List<Tag> tagList, DataRequest.RequestType requestType)
         {
             List<DataRequest> subRequestList = new List<DataRequest>();
             List<byte> requestBytes = new List<byte>();

@@ -18,10 +18,6 @@ namespace FDA
 {
     public class TCPServer : IDisposable
     {
-        private static X509Certificate2 _serverCertificate;
-        private static string _serverCertificatePath = "FDAApp_TempKey.pfx";
-        private static string _certificatePass = "!7\u001a\u0013_\u0017\u0005\a\u001fWz\u007f\u0004{";
-
         private readonly int _listeningPort;
 
         private readonly int _tickRate = 250; //ms
@@ -190,7 +186,6 @@ namespace FDA
             public Queue<byte[]> ReceivedQueue;
             public Queue<byte[]> SendQueue;
             private Guid _clientID;
-            private X509Certificate2 _serverCert;
 
             public TcpClient Connection { get => _connection; }
             public String Address { get => _address; }
@@ -235,40 +230,21 @@ namespace FDA
                     {
                         _connection.GetStream().ReadTimeout = 1000;
 
-                        /*
-                        if (!stream.IsAuthenticated)
-                        {
-                            try
-                            {
-                                stream.AuthenticateAsServer(_serverCert, false, SslProtocols.Tls12, false);
-                            }
-                            catch (AuthenticationException ex)
-                            {
-                                Console2.WriteLine("TCPServer Authentication failed: " + ex.Message);
-                            }
-                        }
-                        */
-
+                       
                         byte[] readBuffer = new byte[65535];
                         byte[] messageArray;
                         byte[] header = new byte[3];
                         int readSize;
-                        int dataSize;
-                        byte dataType;
+
                         while (Connected && IsConnected(_connection.Client) && !_workerThread.CancellationPending /*&& stream.IsAuthenticated*/)  //while the client is connected at both ends, we look for incoming messages or messages queued for sending
                         {
                             while (_connection.GetStream().DataAvailable)
                             {
-                                //readSize = stream.Read(header, 0, 3);
-                                //dataSize = BitConverter.ToUInt16(header, 0);
-                                //dataType = header[2];
-
-                                // read the data portion of the message
-                                //readBuffer = new byte[dataSize];
+    
                                 readSize = stream.Read(readBuffer, 0, readBuffer.Length);
                                 messageArray = new byte[readSize];
                                 Array.Copy(readBuffer, messageArray,readSize);
-                                //Array.Resize(ref readBuffer, readSize);
+
 
                                 lock (ReceivedQueue)
                                 {

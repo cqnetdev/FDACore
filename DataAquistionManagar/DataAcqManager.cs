@@ -14,9 +14,9 @@ namespace FDA
         public static Dictionary<Guid, ConnectionManager> _connectionsDictionary;
         private Dictionary<Guid,FDAScheduler> _schedulersDictionary;
         private string _dbConnectionString;
-        private DBManager _dbManager;
+        private readonly DBManager _dbManager;
 
-        private BackfillManager _backfillManager;
+        private readonly BackfillManager _backfillManager;
 
 
         public string DBConnectionString { get => _dbConnectionString; set => _dbConnectionString = value; }
@@ -118,25 +118,22 @@ namespace FDA
                                 break;
                             case "SERIAL":
                                 string comPort = connDetails[0];
-                                Parity parity;
-                                switch (connDetails[3].ToUpper())
+                                Parity parity = (connDetails[3].ToUpper()) switch
                                 {
-                                    case "N": parity = Parity.None; break;
-                                    case "E": parity = Parity.Even; break;
-                                    case "O": parity = Parity.Odd; break;
-                                    case "S": parity = Parity.Space; break;
-                                    default: throw new FormatException("unrecognized serial parity option '" + connDetails[3] + "'. Valid options are N, E, O, or S");
-                                }
-                                StopBits stopBits;
-                                switch (connDetails[4].ToUpper())
+                                    "N" => Parity.None,
+                                    "E" => Parity.Even,
+                                    "O" => Parity.Odd,
+                                    "S" => Parity.Space,
+                                    _ => throw new FormatException("unrecognized serial parity option '" + connDetails[3] + "'. Valid options are N, E, O, or S"),
+                                };
+                                StopBits stopBits = (connDetails[4].ToUpper()) switch
                                 {
-                                    case "N": stopBits = StopBits.None; break;
-                                    case "1": stopBits = StopBits.One; break;
-                                    case "1.5": stopBits = StopBits.OnePointFive; break;
-                                    case "2": stopBits = StopBits.Two; break;
-                                    default: throw new FormatException("unrecognized serial stop bits option '" + connDetails[4] + "'. Valid options are N,1,1.5, or 2");
-                                }
-
+                                    "N" => StopBits.None,
+                                    "1" => StopBits.One,
+                                    "1.5" => StopBits.OnePointFive,
+                                    "2" => StopBits.Two,
+                                    _ => throw new FormatException("unrecognized serial stop bits option '" + connDetails[4] + "'. Valid options are N,1,1.5, or 2"),
+                                };
                                 newConn = new ConnectionManager(connectionconfig.SCUID, connectionconfig.Description,
                                     comPort,                                            // COM Port
                                     int.Parse(connDetails[1]),                                 // baud
@@ -1035,7 +1032,7 @@ namespace FDA
                             DateTime toTime = Globals.FDANow();
                             DateTime fromTime = toTime.AddHours(-1 * hoursBack);
                             */
-                            string error = "";
+                            string error;
                             List<Object> commsStatsParams = _dbManager.ParseStatsCalcParams(task.task_details,out error);
                             if (error == "" && commsStatsParams != null)
                             {

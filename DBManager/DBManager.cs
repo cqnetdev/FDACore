@@ -27,9 +27,7 @@ namespace FDA
         private Queue<List<AlarmEventRecord>> _alarmEventQueue;
         private BackgroundWorker _alarmsEventsWriter;
 
-        private CacheManager _cacheManager;
-        private bool disposedValue;
-
+        private readonly CacheManager _cacheManager;
         protected DateTime _PreviousDBStartTime = DateTime.MinValue;
 
         private readonly Timer _logTrimTimer;
@@ -85,7 +83,7 @@ namespace FDA
 
 
             _dataWriter = new BackgroundWorker();
-            _dataWriter.DoWork += _dataWriter_DoWork;
+            _dataWriter.DoWork += DataWriter_DoWork;
 
             // default write batch settings
             int batchLimit = 500;
@@ -103,7 +101,7 @@ namespace FDA
                 batchLimit = 500;
 
             _cacheManager = new CacheManager(batchLimit, batchTimeout);
-            _cacheManager.CacheFlush += _cacheMananger_CacheFlush;
+            _cacheManager.CacheFlush += CacheMananger_CacheFlush;
 
             // start the log trimming timer
 
@@ -326,7 +324,7 @@ namespace FDA
         }
 
 
-        private void _dataWriter_DoWork(object sender, DoWorkEventArgs e)
+        private void DataWriter_DoWork(object sender, DoWorkEventArgs e)
         {
 
             try
@@ -505,7 +503,7 @@ namespace FDA
         }
 
 
-        private void _cacheMananger_CacheFlush(object sender, CacheManager.CacheFlushEventArgs e)
+        private void CacheMananger_CacheFlush(object sender, CacheManager.CacheFlushEventArgs e)
         {
             ExecuteNonQuery(e.Query);
         }
@@ -518,7 +516,7 @@ namespace FDA
             if (_alarmsEventsWriter == null)
             {
                 _alarmsEventsWriter = new BackgroundWorker();
-                _alarmsEventsWriter.DoWork += _alarmsEventsWriter_DoWork;
+                _alarmsEventsWriter.DoWork += AlarmsEventsWriter_DoWork;
             }
 
             lock (_alarmEventQueue)
@@ -530,9 +528,9 @@ namespace FDA
                 _alarmsEventsWriter.RunWorkerAsync();
         }
 
-        private void _alarmsEventsWriter_DoWork(object sender, DoWorkEventArgs e)
+        private void AlarmsEventsWriter_DoWork(object sender, DoWorkEventArgs e)
         {
-            string sql = "";
+            string sql;
             List<AlarmEventRecord> recordsList;
 
 
@@ -704,8 +702,6 @@ namespace FDA
         protected string[] FindNulls(object thing, List<string> exceptionList = null)
         {
             List<string> nullProperties = new List<string>();
-
-            System.Reflection.PropertyInfo[] properties = thing.GetType().GetProperties();
 
             foreach (System.Reflection.PropertyInfo property in thing.GetType().GetProperties())
             {
@@ -915,12 +911,11 @@ namespace FDA
             Guid requestGroupID;
             otherTasks = new List<FDATask>();
 
-            Guid taskID;
             foreach (string groupconfig in requestgroupconfigs)
             {
                 if (groupconfig.StartsWith("^"))
                 {
-                    if (!Guid.TryParse(groupconfig.Remove(0, 1), out taskID))
+                    if (!Guid.TryParse(groupconfig.Remove(0, 1), out Guid taskID))
                     {
                         Globals.SystemManager.LogApplicationEvent(this, "", "Invalid Task ID in schedule " + requestorID + ", the correct format is xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx", true);
                         continue;
@@ -1361,12 +1356,11 @@ namespace FDA
 
             // after loading the Schedule configs, turn the requestgroup strings in the schedulers into actual RequestGroup objects, ready to be passed to a connection manager          
             List<RequestGroup> requestGroups;
-            List<FDATask> tasks;
             lock (_schedConfig)
             {
                 foreach (FDARequestGroupScheduler sched in _schedConfig.Values)
                 {
-                    requestGroups = RequestGroupListToRequestGroups(sched.FRGSUID, sched.Priority, sched.RequestGroupList, out tasks);
+                    requestGroups = RequestGroupListToRequestGroups(sched.FRGSUID, sched.Priority, sched.RequestGroupList, out List<FDATask> tasks);
                     sched.RequestGroups.AddRange(requestGroups);
                     sched.Tasks.AddRange(tasks);
                 }
@@ -1381,17 +1375,21 @@ namespace FDA
             // the data logger requires a DataRequest object, containing a list of Tag objects with data to be written
             // we'll create one for the updated soft point
 
-            Tag softPointTag = new Tag(updatedSoftpoint.DPDUID);
-            softPointTag.Timestamp = updatedSoftpoint.LastRead.Timestamp;
-            softPointTag.Quality = updatedSoftpoint.LastRead.Quality;
-            softPointTag.Value = updatedSoftpoint.LastRead.Value;
-            softPointTag.TagID = updatedSoftpoint.DPDUID;
+            Tag softPointTag = new Tag(updatedSoftpoint.DPDUID)
+            {
+                Timestamp = updatedSoftpoint.LastRead.Timestamp,
+                Quality = updatedSoftpoint.LastRead.Quality,
+                Value = updatedSoftpoint.LastRead.Value,
+                TagID = updatedSoftpoint.DPDUID
+            };
 
-            DataRequest softTagRequestObject = new DataRequest();
-            softTagRequestObject.RequestID = Guid.NewGuid().ToString();
-            softTagRequestObject.TagList = new List<Tag> { softPointTag };
-            softTagRequestObject.Destination = updatedSoftpoint.LastRead.DestTable;
-            softTagRequestObject.DBWriteMode = updatedSoftpoint.LastRead.WriteMode;
+            DataRequest softTagRequestObject = new DataRequest()
+            {
+                RequestID = Guid.NewGuid().ToString(),
+                TagList = new List<Tag> { softPointTag },
+                Destination = updatedSoftpoint.LastRead.DestTable,
+                DBWriteMode = updatedSoftpoint.LastRead.WriteMode
+            };
 
             // and insert it into the pipeline to be written to the database
             WriteDataToDB(softTagRequestObject);
@@ -1402,7 +1400,7 @@ namespace FDA
 
         public void UpdateAlmEvtCurrentPtrs(DataRequest PtrPositionRequest)
         {
-            string sql = "";
+            string sql;
             ushort almsPtr = (ushort)PtrPositionRequest.TagList[0].Value;
             DateTime almsTimestamp = PtrPositionRequest.TagList[0].Timestamp;
             ushort evtsPtr = (ushort)PtrPositionRequest.TagList[1].Value;
@@ -1434,7 +1432,7 @@ namespace FDA
 
         public byte[] GetAlmEvtPtrs(Guid connID, string NodeID, string ptrType)
         {
-            string sql = "";
+            string sql;
             int lastRead = 0;
             int currPtr = 0;
 
@@ -1484,8 +1482,7 @@ namespace FDA
             {
                 toTime = Globals.FDANow();
 
-                uint minutesBack;
-                if (uint.TryParse(calcParams[1], out minutesBack))
+                if (uint.TryParse(calcParams[1], out uint minutesBack))
                 {
                     if (minutesBack < 1)
                     {
@@ -2131,8 +2128,7 @@ namespace FDA
                             if (groupConfig.StartsWith("^"))
                             {
                                 // task reference
-                                Guid taskID;
-                                if (!Guid.TryParse(groupConfig.Remove(0, 1), out taskID))
+                                if (!Guid.TryParse(groupConfig.Remove(0, 1), out Guid taskID))
                                 {
                                     // bad Guid
                                     Globals.SystemManager.LogApplicationEvent(this, "", "Invalid Task ID in demand " + demand.FRGDUID + ", the correct format is xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx", true);

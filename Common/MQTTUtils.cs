@@ -12,9 +12,9 @@ namespace Common
 {
     public static class MQTTUtils
     {
-        private static string serviceName = "mosquitto";
-        private static string exeRelativePath = "\\MQTT\\mosquitto.exe";
-        private static string MQTTFolderRelativePath = "\\MQTT";
+        private static readonly string serviceName = "mosquitto";
+        private static readonly string exeRelativePath = "\\MQTT\\mosquitto.exe";
+        private static readonly string MQTTFolderRelativePath = "\\MQTT";
 
 
         private static string RunCommand(string command, string args, string workingDir = "")
@@ -32,8 +32,8 @@ namespace Common
             if (workingDir != "")
                 processStartInfo.WorkingDirectory = workingDir;
 
-            var process = new Process();
-            process.StartInfo = processStartInfo;
+            Process process = new Process() { StartInfo = processStartInfo };
+
 
 
             process.Start();
@@ -87,8 +87,8 @@ namespace Common
             // check if the service is set to run automatically on startup
             if (Environment.OSVersion.Platform == PlatformID.Win32NT)
             {
-                ServiceController sc = new ServiceController();
-                sc.ServiceName = serviceName;              
+                ServiceController sc = new ServiceController() { ServiceName = serviceName };
+         
                 try
                 {
                     starttype = sc.StartType.ToString();
@@ -127,23 +127,22 @@ namespace Common
             if (Environment.OSVersion.Platform == PlatformID.Unix)
             {
                 // install mosquitto
-                string result = "";
-                result = RunCommand("wget", "http://repo.mosquitto.org/debian/mosquitto-repo.gpg.key") + Environment.NewLine;
-                result = RunCommand("apt-key", "add mosquitto-repo.gpg.key") + Environment.NewLine;
-                result = RunCommand("wget","http://repo.mosquitto.org/debian/mosquitto-buster.list", "/etc/apt/sources.list.d/");              
-                result = RunCommand("apt-get", "update");
-                result =  RunCommand("apt-get", "-y install mosquitto");
+                RunCommand("wget", "http://repo.mosquitto.org/debian/mosquitto-repo.gpg.key");
+                RunCommand("apt-key", "add mosquitto-repo.gpg.key");
+                RunCommand("wget","http://repo.mosquitto.org/debian/mosquitto-buster.list", "/etc/apt/sources.list.d/");              
+                RunCommand("apt-get", "update");
+                RunCommand("apt-get", "-y install mosquitto");
 
                 // copy configuration files
-                result =  RunCommand("cp", "users.txt /etc/mosquitto/users.txt");
-                result = RunCommand("cp", "acl.txt /etc/mosquitto/acl.txt");
-                result = RunCommand("cp", "mosquitto.conf /etc/mosquitto/mosquitto.conf");
+                RunCommand("cp", "users.txt /etc/mosquitto/users.txt");
+                RunCommand("cp", "acl.txt /etc/mosquitto/acl.txt");
+                RunCommand("cp", "mosquitto.conf /etc/mosquitto/mosquitto.conf");
 
                 // just in case the service exists from a previous installation but is masked
-                result = RunCommand("systemctl", "unmask " + serviceName); 
+                RunCommand("systemctl", "unmask " + serviceName); 
 
                 // restart the service (load the configuration)
-                result = RunCommand("systemctl", "restart " + serviceName);
+                RunCommand("systemctl", "restart " + serviceName);
             }
 
             return error;
@@ -213,9 +212,7 @@ namespace Common
             string status = "unknown";
             if (Environment.OSVersion.Platform == PlatformID.Win32NT)
             {
-                ServiceController sc = new ServiceController();
-                sc.ServiceName = serviceName;
-
+                ServiceController sc = new ServiceController() { ServiceName = serviceName };
                 try
                 {
                     status = sc.Status.ToString();
@@ -245,8 +242,7 @@ namespace Common
         {
             if (Environment.OSVersion.Platform == PlatformID.Win32NT)
             {
-                ServiceController sc = new ServiceController();
-                sc.ServiceName = serviceName;
+                ServiceController sc = new ServiceController() { ServiceName = serviceName };
                 try
                 {
                     sc.Stop();
@@ -276,8 +272,8 @@ namespace Common
         {
             if (Environment.OSVersion.Platform == PlatformID.Win32NT)
             {
-                ServiceController sc = new ServiceController();
-                sc.ServiceName = serviceName;
+                ServiceController sc = new ServiceController() { ServiceName = serviceName };
+
                 try
                 {
                     sc.Start();
@@ -316,9 +312,9 @@ namespace Common
 
             // service exists?
             bool registrationAttempted = false;
-            bool serviceExists = false;
+            bool serviceExists;
 
-            RecheckServiceExists:
+        RecheckServiceExists:
             serviceExists = MQTTUtils.ServiceInstalled();
             string error = "";
             if (!serviceExists)
@@ -328,7 +324,7 @@ namespace Common
                     // try registering the service (using the mosquitto.exe install option)
                     registrationAttempted = true;
                     Console.WriteLine("Installing mosquitto");
-                    error = MQTTUtils.InstallMosquitto();
+                    MQTTUtils.InstallMosquitto();
                     goto RecheckServiceExists;
                 }
             }
@@ -339,15 +335,13 @@ namespace Common
             if (Environment.OSVersion.Platform == PlatformID.Win32NT)
             {
                 // check that the required environment variable exists
-                string path;
                 bool repaired = false;
-
-                RecheckVar:
-                if (!MQTTUtils.EnvVarExists(out path))
+            RecheckVar:
+                if (!EnvVarExists(out _))
                 {
                     if (!repaired)
                     {
-                        MQTTUtils.SetMQTTPath();
+                        SetMQTTPath();
                         repaired = true;
                         goto RecheckVar;
                     }
@@ -360,11 +354,11 @@ namespace Common
                 // checking that MOSQUITTO_DIR is set to the correct path          
                 repaired = false;
                 RecheckPath:
-                if (!MQTTUtils.MQTTPathCorrect())
+                if (!MQTTPathCorrect())
                 {
                     if (!repaired)
                     {
-                        MQTTUtils.SetMQTTPath();
+                        SetMQTTPath();
                         repaired = true;
                         goto RecheckPath;
                     }
@@ -377,13 +371,13 @@ namespace Common
 
             // service is set to run automatically?
             string result = "";
-            if (MQTTUtils.GetMQTTStartMode() != "Automatic")
+            if (GetMQTTStartMode() != "Automatic")
             {
                 if (Environment.OSVersion.Platform == PlatformID.Win32NT)
                 {
                     // no way to just change the start mode, uninstall it and re-install it and the intaller will set it to automatic
-                    MQTTUtils.UnInstallMosquitto();
-                    result = MQTTUtils.InstallMosquitto();
+                    UnInstallMosquitto();
+                    result = InstallMosquitto();
                 }
 
                 if (Environment.OSVersion.Platform == PlatformID.Unix)
@@ -399,9 +393,9 @@ namespace Common
             }
 
             // service is running
-            if (MQTTUtils.GetMQTTStatus() != "Running")
+            if (GetMQTTStatus() != "Running")
             {
-                result = MQTTUtils.StartMosquittoService();
+                result = StartMosquittoService();
                 if (result != "")
                     return "Error while attempting to start the MQTT service: " + result;
             }
@@ -414,9 +408,9 @@ namespace Common
         private static string RunMosquittoExecutable(string argument)
         {
             string error = "";
-            System.Diagnostics.Process process = new System.Diagnostics.Process();
-            System.Diagnostics.ProcessStartInfo startInfo = new System.Diagnostics.ProcessStartInfo();
-            startInfo.WindowStyle = System.Diagnostics.ProcessWindowStyle.Normal;
+            Process process = new Process();
+            ProcessStartInfo startInfo = new ProcessStartInfo() { WindowStyle = ProcessWindowStyle.Normal };
+
             string path = System.IO.Path.GetDirectoryName(Assembly.GetEntryAssembly().Location) + exeRelativePath;
 
             startInfo.FileName = path;

@@ -55,7 +55,7 @@ namespace FDAInterface
 
             public static bool operator ==(FDAConnection a,FDAConnection b)
             {
-                if ((object)a == null || (object)b == null)
+                if (a is null || b is null)
                     return false;
 
                 return (a.FDAName == b.FDAName && a.Host == b.Host);
@@ -63,7 +63,7 @@ namespace FDAInterface
 
             public static bool operator !=(FDAConnection a, FDAConnection b)
             {
-                if ((object)a == null || (object)b == null)
+                if (a is null || b is null)
                     return true;
 
                 return !(a.FDAName == b.FDAName && a.Host == b.Host);
@@ -72,7 +72,9 @@ namespace FDAInterface
             public override bool Equals(object obj)
             {
                 if (obj == null || GetType() != obj.GetType())
+                {
                     return false;
+                }
 
                 FDAConnection other = (FDAConnection)obj;
                 return (this.FDAName == other.FDAName && this.Host == other.Host);
@@ -88,9 +90,9 @@ namespace FDAInterface
         private string SelectedConnID = "";
         private MqttClient _mqtt;
         private string DBType = "";
-        private string[] FDAState;
+        private readonly string[] FDAState;
 
-        private Dictionary<Guid, ConnectionNode> _connOverviewDict;        
+        private readonly Dictionary<Guid, ConnectionNode> _connOverviewDict;        
 
         private delegate void DataReceivedHandler(byte[] data,byte dataType);
         private delegate void SafeCallStatusUpdate(object sender,FDAManagerContext.StatusUpdateArgs e);
@@ -101,9 +103,7 @@ namespace FDAInterface
         private delegate void SafeCall1BoolParam(bool param1);
         private delegate void SafeMQQTEventHandler(object sender, uPLibrary.Networking.M2Mqtt.Messages.MqttMsgPublishEventArgs e);
 
-        //private frmDBVal _dbValidationForm = null;
-        private bool FDAConnected = false;
-        private System.Threading.Timer elevationWaitTimer;
+        private readonly System.Threading.Timer elevationWaitTimer;
         private TimeSpan UpTimespan;
         private enum DetailsType { Queue, Connection, None };
         internal MqttClient MQTT { get => _mqtt; set { _mqtt = value; 
@@ -884,7 +884,7 @@ namespace FDAInterface
             private bool _communicationsEnabled;
             private string _description;
             private ushort[] _qCounts = new ushort[0];
-            private TreeNode _node;
+            private readonly TreeNode _node;
 
             public readonly Guid ID;
             public string Description { get => _description; set { _description = value; _node.Text = Description; UpdateIcon(); } }

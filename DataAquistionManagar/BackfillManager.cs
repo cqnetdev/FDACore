@@ -10,9 +10,9 @@ namespace FDA
 {
     class BackfillManager
     {
-        private Queue<BackfillItem> _incomingQueue;
-        private BackgroundWorker _backfillProcessor;
-        private DBManager _dbManager;
+        private readonly Queue<BackfillItem> _incomingQueue;
+        private readonly BackgroundWorker _backfillProcessor;
+        private readonly DBManager _dbManager;
 
         public class BackfillEventArgs : EventArgs
         {
@@ -34,7 +34,7 @@ namespace FDA
         {
             _incomingQueue = new Queue<BackfillItem>();
             _backfillProcessor = new BackgroundWorker();
-            _backfillProcessor.DoWork += _backfillProcessor_DoWork;
+            _backfillProcessor.DoWork += BackfillProcessor_DoWork;
             _dbManager = dBManager;
         }
 
@@ -138,7 +138,7 @@ namespace FDA
             }
         }
 
-        private void _backfillProcessor_DoWork(object sender, DoWorkEventArgs e)
+        private void BackfillProcessor_DoWork(object sender, DoWorkEventArgs e)
         {
             while (_incomingQueue.Count > 0)
             {

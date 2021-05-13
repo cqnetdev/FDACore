@@ -25,13 +25,13 @@ namespace Common
 
         public static DerivedTag Create(string tagID, string tagtype, string arguments)
         {
-            switch (tagtype)
+            return tagtype switch
             {
-                case "bitser": return new BitSeriesDerivedTag(tagID, arguments);
-                case "bitmask": return new BitmaskDerivedTag(tagID,arguments); 
+                "bitser" => new BitSeriesDerivedTag(tagID, arguments),
+                "bitmask" => new BitmaskDerivedTag(tagID, arguments),
                 //case "summation": return new SummationDerivedTag(tagID,arguments);   
-                default: return null;
-            }
+                _ => null,
+            };
         }
  
         // base class constructor
@@ -58,10 +58,9 @@ namespace Common
         }
 
         // helper classes
-        protected static bool IsIntegerInRange(string testVal, UInt32 min, UInt32 max)
+        protected static bool IsIntegerInRange(string testVal, uint min, uint max)
         {
-            UInt32 testInt;
-            if (!UInt32.TryParse(testVal, out testInt))
+            if (!uint.TryParse(testVal, out uint testInt))
                 return false;
 
             if (testInt >= min && testInt <= max)
@@ -72,8 +71,7 @@ namespace Common
 
         protected static bool IsValidGUID(string testval)
         {
-            Guid testGUID;
-            return Guid.TryParse(testval, out testGUID);
+            return Guid.TryParse(testval, out _);
         }
 
         protected static UInt32 UInt32FromByteArray(BitArray bitArray)

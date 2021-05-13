@@ -16,7 +16,7 @@ namespace ControllerService
         TcpClient OMClient;
         int _fdaPort;
         int _clientPort;
-        string _FDAAddress = "127.0.0.1";
+        readonly string _FDAAddress = "127.0.0.1";
 
         TCPServer OMServer;
         BackgroundWorker worker;
@@ -119,7 +119,7 @@ namespace ControllerService
                             try
                             {
                                 logmessage = "Attempting to connect to FDA on port " + _fdaPort + "...";
-                                OMClient.Connect("127.0.0.1", _fdaPort);
+                                OMClient.Connect(_FDAAddress, _fdaPort);
                             }
                             catch
                             {

@@ -10,11 +10,6 @@ using System.Threading.Tasks;
 namespace Common
 {
 
-    public class TableAlias
-    {
-        string DefaultTableName { get; set; }
-        string Alias { get; set; }
-    }
 
     public class FDADataBlockRequestGroup : ICloneable
     {
@@ -93,12 +88,12 @@ namespace Common
             public DataTypeBase DataType { get => _dataType; }
             public DataRequest.WriteMode WriteMode { get => _writeMode; }
 
-            private Double _value;
-            private int _quality;
-            private DateTime _timestamp;
-            private string _destTable;
-            private DataTypeBase _dataType;
-            private DataRequest.WriteMode _writeMode;
+            private readonly Double _value;
+            private readonly int _quality;
+            private readonly DateTime _timestamp;
+            private readonly string _destTable;
+            private readonly DataTypeBase _dataType;
+            private readonly DataRequest.WriteMode _writeMode;
 
             public static Datapoint Empty = new Datapoint(0, 32, Globals.FDANow(), "", Common.DataType.UNKNOWN, DataRequest.WriteMode.Insert);
 
@@ -114,9 +109,9 @@ namespace Common
 
             public static bool operator ==(Datapoint lhs,Datapoint rhs)
             {
-                if (object.ReferenceEquals(lhs, null))
+                if (lhs is null)
                     return false;
-                if (object.ReferenceEquals(rhs, null))
+                if (rhs is null)
                     return false;
                 if (object.ReferenceEquals(lhs, rhs))
                     return true;
@@ -127,16 +122,31 @@ namespace Common
 
             public static bool operator !=(Datapoint lhs,Datapoint rhs)
             {
-                if (object.ReferenceEquals(lhs, null))
+                if (lhs is null)
                     return true;
-                if (object.ReferenceEquals(rhs, null))
+
+                if (rhs is null)
                     return true;
+
                 if (object.ReferenceEquals(lhs, rhs))
                     return false;
 
                 return lhs.Timestamp != rhs.Timestamp;
             }
 
+            public override bool Equals(object o)
+            {
+                if (o is null)
+                    return false;
+                Datapoint other = o as Datapoint;
+
+                return Timestamp == other.Timestamp;
+            }
+
+            public override int GetHashCode()
+            {
+                return base.GetHashCode();
+            }
         }
 
 
@@ -168,14 +178,7 @@ namespace Common
         public DateTime PreviousTimestamp { get => _previousTimestamp; set { if (_previousTimestamp != value) { _previousTimestamp = value; NotifyPropertyChanged(); } } }
         public String DeviceTagName { get => _deviceTagName; set => _deviceTagName = value; }
         public String DeviceTagAddress { get => _deviceTagAddress; set => _deviceTagAddress = value; }
-        public bool GetBits { get => _getBits; set => _getBits = value; }
-        public BitArray Bits { get => _bits; }
-        //public Double LastReadDataValue { get => _lastReadDataValue; set { if (_getBits) { ExtractBits(value); }; if (_lastReadDataValue != value) { _lastReadDataValue = value; NotifyPropertyChanged("LastReadDataValue", 0, new string[] { "LastReadDataTimestamp", "LastReadQuality" }); } } }
-        //public DateTime LastReadDataTimestamp { get => _lastReadDataTimestamp; set { if (_lastReadDataTimestamp != value) { _lastReadDataTimestamp = value; NotifyPropertyChanged("LastReadDataTimestamp", 0, new string[] { "LastReadDataValue", "LastReadQuality" }); } } }
-        // DataTypeBase LastReadDataType { get => _datatype; set => _datatype = value; }
-        //public int LastReadQuality { get => _lastReadQuality; set { if (_lastReadQuality != value) { _lastReadQuality = value; NotifyPropertyChanged("LastReadQuality", 0, new string[] { "LastReadQuality", "LastReadDataValue" }); } } }
-        //public string LastReadDestTable { get => _lastReadDestTable; set => _lastReadDestTable = value; }
-        //public DataRequest.WriteMode LastReadDatabaseWriteMode { get => _lastReadDatabaseWriteMode; set { _lastReadDatabaseWriteMode = value; } }
+
         public Datapoint LastRead { get => _lastread; 
             set { 
                 if (_lastread != value) { _lastread = value; NotifyPropertyChanged("LastRead", 0); } 
@@ -184,14 +187,6 @@ namespace Common
               
         private Guid _DPDUID;
         private Datapoint _lastread;
-
-        /*
-        private double _lastReadDataValue;
-        private DateTime _lastReadDataTimestamp;
-        private int _lastReadQuality;
-        private string _lastReadDestTable = "";
-        private DataRequest.WriteMode _lastReadDatabaseWriteMode = DataRequest.WriteMode.Insert;
-        */
 
         private bool _DPDSEnabled;
         private string _dPSType;
@@ -215,60 +210,15 @@ namespace Common
         private DateTime _previousTimestamp;
         private string _deviceTagName = "";
         private string _deviceTagAddress = "-1";
-        private bool _getBits = false;
-        private BitArray _bits;
-        private DataTypeBase _datatype;
-    
-     
-
 
         public FDADataPointDefinitionStructure()
         {
             base.ObjectType = "Tag";
-            _bits = new BitArray(0);
+         
             _lastread = Datapoint.Empty;
         }
 
-        private void ExtractBits(Double newValue)
-        {
-            // break out the bits (if the value is a positive integer in the unsigned Int32 range)  
-            // store in BitArray _bits
-
-            bool isValidForBits = true;
-            UInt32 intValue = 0;
-
-            // convert to uint32
-            try
-            {
-                intValue = Convert.ToUInt32(newValue);
-            }
-            catch
-            {
-                // out of uint32 range
-                isValidForBits = false;
-            }
-
-            // it's in range, does it have a fractional part?
-            if (isValidForBits)
-                if (HasFraction(newValue))
-                    isValidForBits = false;
-
-            // if it's an in-range integer value, go ahead and extract the bits
-            if (isValidForBits)
-            {
-                _bits = new BitArray(BitConverter.GetBytes(intValue));
-            }
-            else
-                _bits = new BitArray(0);
-        }
-
-        private bool HasFraction(Double value)
-        {
-            double intPart = Math.Truncate(value);
-            double fractionalPart = value - intPart;
-
-            return fractionalPart != 0;
-        }
+   
     }
 
     public class FDASourceConnection

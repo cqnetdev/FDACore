@@ -34,40 +34,47 @@ namespace Tests
         {
             // set up a source tag, put it in a dictionary (like in the FDA), and make the dictionary available to the derived tags class
             Dictionary<Guid, FDADataPointDefinitionStructure> srcTags = new Dictionary<Guid, FDADataPointDefinitionStructure>();
-            FDADataPointDefinitionStructure srcTag = new FDADataPointDefinitionStructure();
-            srcTag.DPDUID = Guid.NewGuid();
+            FDADataPointDefinitionStructure srcTag = new FDADataPointDefinitionStructure
+            {
+                DPDUID = Guid.NewGuid()
+            };
+
             srcTags.Add(srcTag.DPDUID, srcTag);
             DerivedTag.Tags = srcTags;
 
             // good arguments, should all produce a valid and enabled derived tag
-            List<string> goodArgs = new List<string>();
-            goodArgs.Add(srcTag.DPDUID.ToString() + ":0:2");
-            goodArgs.Add(srcTag.DPDUID.ToString() + ":10:4");
-            goodArgs.Add(srcTag.DPDUID.ToString() + ":0:32");
-            goodArgs.Add(srcTag.DPDUID.ToString() + ":31:1");
+            List<string> goodArgs = new List<string>
+            {
+                srcTag.DPDUID.ToString() + ":0:2",
+                srcTag.DPDUID.ToString() + ":10:4",
+                srcTag.DPDUID.ToString() + ":0:32",
+                srcTag.DPDUID.ToString() + ":31:1"
+            };
 
             // bad arguments, should all produce an invalid and disabled derived tag
-            List<string> badArgs = new List<string>();
-            badArgs.Add(null);                                 // null argument
-            badArgs.Add("");                                   // empty argument string
-            badArgs.Add(Guid.NewGuid().ToString());            // not enough args (1)
-            badArgs.Add(Guid.NewGuid().ToString()+":0");       // not enough args (2)
+            List<string> badArgs = new List<string>
+            {
+                null,                                 // null argument
+                "",                                   // empty argument string
+                Guid.NewGuid().ToString(),            // not enough args (1)
+                Guid.NewGuid().ToString() + ":0",       // not enough args (2)
 
-            badArgs.Add("123456-789:0:2");                     // invalid SrcID
-            badArgs.Add(Guid.NewGuid().ToString() + ":0:2");   // SrcID not found 
+                "123456-789:0:2",                     // invalid SrcID
+                Guid.NewGuid().ToString() + ":0:2",   // SrcID not found 
 
-            badArgs.Add(srcTag.DPDUID.ToString() + ":a:2");     // start bit not a number
-            badArgs.Add(srcTag.DPDUID.ToString() + ":1.2:2");   // start bit not an integer
-            badArgs.Add(srcTag.DPDUID.ToString() + ":50:2");    // start bit too high
-            badArgs.Add(srcTag.DPDUID.ToString() + ":-2:2");    // start bit too low
+                srcTag.DPDUID.ToString() + ":a:2",     // start bit not a number
+                srcTag.DPDUID.ToString() + ":1.2:2",   // start bit not an integer
+                srcTag.DPDUID.ToString() + ":50:2",    // start bit too high
+                srcTag.DPDUID.ToString() + ":-2:2",    // start bit too low
 
-            badArgs.Add(srcTag.DPDUID.ToString() + ":0:a");     // bit count not a number
-            badArgs.Add(srcTag.DPDUID.ToString() + ":32:-5");   // negative bit count
-            badArgs.Add(srcTag.DPDUID.ToString() + ":32:5.5");  // bit count not an integer
-            badArgs.Add(srcTag.DPDUID.ToString() + ":0:33");    // bit count too high
-            badArgs.Add(srcTag.DPDUID.ToString() + ":1:32");    // start bit + bit count too high;
-            badArgs.Add(srcTag.DPDUID.ToString() + ":10:25");   // start bit + bit count too high;
-            badArgs.Add(srcTag.DPDUID.ToString() + ":31:2");    // start bit + bit count too high;
+                srcTag.DPDUID.ToString() + ":0:a",     // bit count not a number
+                srcTag.DPDUID.ToString() + ":32:-5",   // negative bit count
+                srcTag.DPDUID.ToString() + ":32:5.5",  // bit count not an integer
+                srcTag.DPDUID.ToString() + ":0:33",    // bit count too high
+                srcTag.DPDUID.ToString() + ":1:32",    // start bit + bit count too high;
+                srcTag.DPDUID.ToString() + ":10:25",   // start bit + bit count too high;
+                srcTag.DPDUID.ToString() + ":31:2"    // start bit + bit count too high;
+            };
 
 
             // check that bad softtag id is detected
@@ -101,9 +108,11 @@ namespace Tests
         {
             // set up a source tag, put it in a dictionary (like in the FDA), and make the dictionary available to the derived tags class
             Dictionary<Guid, FDADataPointDefinitionStructure> srcTags = new Dictionary<Guid, FDADataPointDefinitionStructure>();
-            FDADataPointDefinitionStructure srcTag = new FDADataPointDefinitionStructure();
-            srcTag.DPDUID = Guid.NewGuid();
-            srcTag.DPDSEnabled = true;
+            FDADataPointDefinitionStructure srcTag = new FDADataPointDefinitionStructure
+            {
+                DPDUID = Guid.NewGuid(),
+                DPDSEnabled = true
+            };
             srcTags.Add(srcTag.DPDUID, srcTag);
             DerivedTag.Tags = srcTags;
 
@@ -312,36 +321,42 @@ namespace Tests
         {
             // set up a source tag, put it in a dictionary (like in the FDA), and make the dictionary available to the derived tags class
             Dictionary<Guid, FDADataPointDefinitionStructure> srcTags = new Dictionary<Guid, FDADataPointDefinitionStructure>();
-            FDADataPointDefinitionStructure srcTag = new FDADataPointDefinitionStructure();
-            srcTag.DPDSEnabled = true;
-            srcTag.DPDUID = Guid.NewGuid();
+            FDADataPointDefinitionStructure srcTag = new FDADataPointDefinitionStructure()
+            {
+                DPDSEnabled = true,
+                DPDUID = Guid.NewGuid()
+            };
             srcTags.Add(srcTag.DPDUID, srcTag);
             DerivedTag.Tags = srcTags;
 
             // good arguments, should all produce a valid and enabled derived tag
-            List<string> goodArgs = new List<string>();
-            goodArgs.Add(srcTag.DPDUID.ToString() + ":1"); // 0000
-            goodArgs.Add(srcTag.DPDUID.ToString() + ":2"); // 0010
-            goodArgs.Add(srcTag.DPDUID.ToString() + ":4"); // 0100
-            goodArgs.Add(srcTag.DPDUID.ToString() + ":8"); // 1000
-            goodArgs.Add(srcTag.DPDUID.ToString() + ":12");// 1100
-            goodArgs.Add(srcTag.DPDUID.ToString() + ":2147483648"); // 1000 0000 0000 0000 0000 0000 0000 0000
-            goodArgs.Add(srcTag.DPDUID.ToString() + ":2147483649"); // 1000 0000 0000 0000 0000 0000 0000 0001
+            List<string> goodArgs = new List<string>
+            {
+                srcTag.DPDUID.ToString() + ":1", // 0000
+                srcTag.DPDUID.ToString() + ":2", // 0010
+                srcTag.DPDUID.ToString() + ":4", // 0100
+                srcTag.DPDUID.ToString() + ":8", // 1000
+                srcTag.DPDUID.ToString() + ":12",// 1100
+                srcTag.DPDUID.ToString() + ":2147483648", // 1000 0000 0000 0000 0000 0000 0000 0000
+                srcTag.DPDUID.ToString() + ":2147483649" // 1000 0000 0000 0000 0000 0000 0000 0001
+            };
 
 
             // bad arguments, should all produce an invalid and disabled derived tag
-            List<string> badArgs = new List<string>();
-            badArgs.Add(null);                                 // null argument
-            badArgs.Add("");                                   // empty argument string
-            badArgs.Add(Guid.NewGuid().ToString());            // not enough args (1)
+            List<string> badArgs = new List<string>
+            {
+                null,                                 // null argument
+                "",                                   // empty argument string
+                Guid.NewGuid().ToString(),            // not enough args (1)
 
-            badArgs.Add("123456-789:0:2");                     // invalid SrcID
-            badArgs.Add(Guid.NewGuid().ToString() + ":0:2");   // SrcID not found 
+                "123456-789:0:2",                     // invalid SrcID
+                Guid.NewGuid().ToString() + ":0:2",   // SrcID not found 
 
-            badArgs.Add(srcTag.DPDUID.ToString() + ":a");       // bit mask not a number
-            badArgs.Add(srcTag.DPDUID.ToString() + ":1.2");     // bit mask not an integer
-            badArgs.Add(srcTag.DPDUID.ToString() + ":4294967296");    // bit mask too high
-            badArgs.Add(srcTag.DPDUID.ToString() + ":-2");    // bit mask too low
+                srcTag.DPDUID.ToString() + ":a",       // bit mask not a number
+                srcTag.DPDUID.ToString() + ":1.2",     // bit mask not an integer
+                srcTag.DPDUID.ToString() + ":4294967296",    // bit mask too high
+                srcTag.DPDUID.ToString() + ":-2"    // bit mask too low
+            };
 
 
             // check that bad softtag id is detected
@@ -367,16 +382,19 @@ namespace Tests
             }
         }
 
-     
+
 
         [TestMethod]
         public void BitmaskFunctionalTest()
         {
             // set up a source tag, put it in a dictionary (like in the FDA), and make the dictionary available to the derived tags class
             Dictionary<Guid, FDADataPointDefinitionStructure> srcTags = new Dictionary<Guid, FDADataPointDefinitionStructure>();
-            FDADataPointDefinitionStructure srcTag = new FDADataPointDefinitionStructure();
-            srcTag.DPDUID = Guid.NewGuid();
-            srcTag.DPDSEnabled = true;
+            FDADataPointDefinitionStructure srcTag = new FDADataPointDefinitionStructure()
+            {
+                DPDUID = Guid.NewGuid(),
+                DPDSEnabled = true
+            };
+           
             srcTags.Add(srcTag.DPDUID, srcTag);
             DerivedTag.Tags = srcTags;
            
