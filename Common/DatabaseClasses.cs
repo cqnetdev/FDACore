@@ -97,7 +97,7 @@ namespace Common
 
             public static Datapoint Empty = new Datapoint(0, 32, Globals.FDANow(), "", Common.DataType.UNKNOWN, DataRequest.WriteMode.Insert);
 
-            public Datapoint(double value,int quality,DateTime timestamp,string destination,DataTypeBase datatype, DataRequest.WriteMode writeMode)
+            public Datapoint(double value, int quality, DateTime timestamp, string destination, DataTypeBase datatype, DataRequest.WriteMode writeMode)
             {
                 _value = value;
                 _quality = quality;
@@ -107,7 +107,7 @@ namespace Common
                 _writeMode = writeMode;
             }
 
-            public static bool operator ==(Datapoint lhs,Datapoint rhs)
+            public static bool operator ==(Datapoint lhs, Datapoint rhs)
             {
                 if (lhs is null)
                     return false;
@@ -120,7 +120,7 @@ namespace Common
 
             }
 
-            public static bool operator !=(Datapoint lhs,Datapoint rhs)
+            public static bool operator !=(Datapoint lhs, Datapoint rhs)
             {
                 if (lhs is null)
                     return true;
@@ -173,18 +173,18 @@ namespace Common
         public double backfill_data_interval { get => _backfill_data_interval; set { if (_backfill_data_interval != value) { _backfill_data_interval = value; NotifyPropertyChanged(); } } }
         public string read_detail_01 { get => _read_detail_01; set { if (_read_detail_01 != value) { _read_detail_01 = value; NotifyPropertyChanged(); } } }
         public string physical_point { get => _physical_point; set { if (_physical_point != value) { _physical_point = value; NotifyPropertyChanged(); } } }
-        
+
         /* extra properties */
         public DateTime PreviousTimestamp { get => _previousTimestamp; set { if (_previousTimestamp != value) { _previousTimestamp = value; NotifyPropertyChanged(); } } }
         public String DeviceTagName { get => _deviceTagName; set => _deviceTagName = value; }
         public String DeviceTagAddress { get => _deviceTagAddress; set => _deviceTagAddress = value; }
 
-        public Datapoint LastRead { get => _lastread; 
-            set { 
-                if (_lastread != value) { _lastread = value; NotifyPropertyChanged("LastRead", 0); } 
-            } 
+        public Datapoint LastRead { get => _lastread;
+            set {
+                if (_lastread != value) { _lastread = value; NotifyPropertyChanged("LastRead", 0); }
+            }
         }
-              
+
         private Guid _DPDUID;
         private Datapoint _lastread;
 
@@ -214,11 +214,11 @@ namespace Common
         public FDADataPointDefinitionStructure()
         {
             base.ObjectType = "Tag";
-         
+
             _lastread = Datapoint.Empty;
         }
 
-   
+
     }
 
     public class FDASourceConnection
@@ -282,6 +282,13 @@ namespace Common
         public int FORMAT { get; set; }
         public string DescShort { get; set; }
         public string DescLong { get; set; }
+    }
+
+    public class UserScriptModule
+    {
+        public string module_name { get; set; }
+        public string script { get; set; }
+        public string run_spec { get; set; }
     }
 
 

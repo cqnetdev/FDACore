@@ -8,6 +8,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using Common;
+using DynamicCode;
 
 namespace FDA
 {
@@ -16,7 +17,6 @@ namespace FDA
         protected Dictionary<Guid, FDARequestGroupScheduler> _schedConfig;
         protected Dictionary<Guid, FDADataBlockRequestGroup> _requestgroupConfig;
         protected Dictionary<Guid, FDADataPointDefinitionStructure> _dataPointConfig;
-        //protected Dictionary<Guid, DerivedTag> _derivedTagConfig;
         protected Dictionary<Guid, FDASourceConnection> _connectionsConfig;
         protected Dictionary<Guid, FDADevice> _deviceConfig;
         protected Dictionary<Guid, FDATask> _taskConfig;
@@ -57,6 +57,7 @@ namespace FDA
 
         protected bool _devicesTableExists = false;
         protected bool _tasksTableExists;
+        protected bool _scriptsTableExists = false;
 
 
         protected Timer _keepAliveTimer;
@@ -120,6 +121,10 @@ namespace FDA
             // check if tasks table exists
             _tasksTableExists = ((int)ExecuteScalar("SELECT cast(count(1) as integer) from information_schema.tables where table_name = '" + Globals.SystemManager.GetTableName("fdatasks") + "';") > 0);
 
+            // check if scripts table exists
+            _scriptsTableExists = ((int)ExecuteScalar("SELECT cast(count(1) as integer) from information_schema.tables where table_name = '" + Globals.SystemManager.GetTableName("fda_scripts") + "';") > 0);
+
+ 
             _writeQueue = new Queue<DataRequest>();
 
             _keepAliveTimer = new Timer(DBCheckTimerTick, this, Timeout.Infinite, Timeout.Infinite);
@@ -1628,6 +1633,27 @@ namespace FDA
             Globals.SystemManager.LogApplicationEvent(this, "", "task_id  " + task.TASK_ID + " " + action);
 
             RaiseConfigChangeEvent(changeType.ToString(), Globals.SystemManager.GetTableName("FDATasks"), task.TASK_ID);
+        }
+
+        protected void UserScriptNotification(string changeType, UserScriptModule scriptModule)
+        {
+            // check for nulls
+            if (changeType == "INSERT" || changeType == "UPDATE")
+            {
+                string[] nulls = FindNulls(scriptModule);
+                if (nulls.Length > 0)
+                {
+                    Globals.SystemManager.LogApplicationEvent(this, "", "script module " + scriptModule.module_name + " " + changeType.ToString().ToLower() + " rejected, null values in field(s) " + string.Join(",", nulls));
+                    return;
+                }
+            }
+
+            if (changeType == "INSERT")
+            {
+                DynamicCodeManager.LoadModule(scriptModule.module_name, scriptModule.script);
+            }
+            
+
         }
 
         protected void DeviceMonitorNotification(string changeType, FDADevice device)

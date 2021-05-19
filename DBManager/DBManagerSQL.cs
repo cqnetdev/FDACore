@@ -21,6 +21,7 @@ namespace FDA
         SqlTableDependency<FDASourceConnection> _connectionDefMonitor;
         SqlTableDependency<FDADevice> _deviceDefMonitor;
         SqlTableDependency<FDATask> _taskDefMonitor;
+        SqlTableDependency<UserScriptModule> _scriptMonitor;
 
         public DBManagerSQL(string connString) : base(connString)
         {
@@ -40,12 +41,15 @@ namespace FDA
                 _requestGroupDefMonitor = new SqlTableDependency<FDADataBlockRequestGroup>(ConnectionString, Globals.SystemManager.GetTableName("FDADataBlockRequestGroup"));
                 _dataPointDefMonitor = new SqlTableDependency<FDADataPointDefinitionStructure>(ConnectionString, Globals.SystemManager.GetTableName("DataPointDefinitionStructures"));
                 _connectionDefMonitor = new SqlTableDependency<FDASourceConnection>(ConnectionString, Globals.SystemManager.GetTableName("FDASourceConnections"));
+                
                 if (_devicesTableExists)
                     _deviceDefMonitor = new SqlTableDependency<FDADevice>(ConnectionString, Globals.SystemManager.GetTableName("FDADevices"));
 
                 if (_tasksTableExists)
                     _taskDefMonitor = new SqlTableDependency<FDATask>(ConnectionString, Globals.SystemManager.GetTableName("FDATasks"));
 
+                if (_scriptsTableExists)
+                    _scriptMonitor = new SqlTableDependency<UserScriptModule>(ConnectionString, Globals.SystemManager.GetTableName("fda_scripts"));
 
                 //----------------------verbose messaging for the SQLTableDependency Objects------------------------------------------
                 //_schedMonitor.TraceLevel = System.Diagnostics.TraceLevel.Verbose;
@@ -74,7 +78,8 @@ namespace FDA
                        Globals.SystemManager.GetTableName("DataPointDefinitionStructures") + ", or " +
                        Globals.SystemManager.GetTableName("FDASourceConnections") + ", or " +
                        Globals.SystemManager.GetTableName("FDADevices") + ", or " +
-                       Globals.SystemManager.GetTableName("FDATasks") + ".");
+                       Globals.SystemManager.GetTableName("FDATasks") + ", or " +
+                       Globals.SystemManager.GetTableName("fda_scripts."));
 
                 if (_schedMonitor != null)
                 {
@@ -130,6 +135,13 @@ namespace FDA
                     _taskDefMonitor = null;
                 }
 
+                if (_scriptMonitor != null)
+                {
+                    _scriptMonitor.Stop();
+                    _scriptMonitor.Dispose();
+                    _scriptMonitor = null;
+                }
+
                 return;
             }
 
@@ -143,7 +155,9 @@ namespace FDA
             if (_deviceDefMonitor != null)
                 _deviceDefMonitor.OnChanged += _deviceDefMonitor_OnChanged;
             if (_taskDefMonitor != null)
-                _taskDefMonitor.OnChanged += _taskDefMonitor_OnChanged;
+                _taskDefMonitor.OnChanged += _taskDefMonitor_OnChanged; 
+            if (_scriptMonitor != null)
+                _scriptMonitor.OnChanged += _scriptMonitor_OnChanged;
 
             _schedMonitor.OnStatusChanged += SchedMonitor_OnStatusChanged;
             _demandMonitor.OnStatusChanged += DemandMonitor_OnStatusChanged;
@@ -152,6 +166,7 @@ namespace FDA
             _dataPointDefMonitor.OnStatusChanged += DataPointDefMonitor_OnStatusChanged;
             if (_deviceDefMonitor != null) _deviceDefMonitor.OnStatusChanged += _deviceDefMonitor_OnStatusChanged;
             if (_taskDefMonitor != null) _taskDefMonitor.OnStatusChanged += _taskDefMonitor_OnStatusChanged;
+            if (_scriptMonitor != null) _scriptMonitor.OnStatusChanged += _scriptMonitor_OnStatusChanged;
 
             _schedMonitor.OnError += SchedMonitor_OnError;
             _demandMonitor.OnError += DemandMonitor_OnError; ;
@@ -160,9 +175,11 @@ namespace FDA
             _dataPointDefMonitor.OnError += DataPointDefMonitor_OnError;
             if (_deviceDefMonitor != null) _deviceDefMonitor.OnError += _deviceDefMonitor_OnError;
             if (_taskDefMonitor != null) _taskDefMonitor.OnError += _taskDefMonitor_OnError;
-
+            if (_scriptMonitor != null) _scriptMonitor.OnError += _scriptMonitor_OnError;
             StartChangeMonitoring();
         }
+
+   
 
         protected new bool PreReqCheck()
         {
@@ -207,14 +224,14 @@ namespace FDA
 
         public override void StartChangeMonitoring()
         {
-            _schedMonitor.Start();
-            _demandMonitor.Start();
-            _requestGroupDefMonitor.Start();
-            _dataPointDefMonitor.Start();
-            _connectionDefMonitor.Start();
-            _deviceDefMonitor.Start();
-            _taskDefMonitor.Start();
-
+            _schedMonitor?.Start();
+            _demandMonitor?.Start();
+            _requestGroupDefMonitor?.Start();
+            _dataPointDefMonitor?.Start();
+            _connectionDefMonitor?.Start();
+            _deviceDefMonitor?.Start();
+            _taskDefMonitor?.Start();
+            _scriptMonitor?.Start();
             Globals.SystemManager.LogApplicationEvent(this, "", "Database change monitoring started");
         }
 
@@ -404,6 +421,12 @@ namespace FDA
         {
             Globals.SystemManager.LogApplicationError(Globals.FDANow(),e.Error, "Error reported by SQLTableDependency : " + e.Message);
         }
+        private void _scriptMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<UserScriptModule> e)
+        {
+            string changeType = e.ChangeType.ToString().ToUpper();
+            UserScriptModule task = e.Entity;
+            base.UserScriptNotification(changeType, task);
+        }
 
         private void _taskDefMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<FDATask> e)
         {
@@ -480,7 +503,19 @@ namespace FDA
             HandleTableMonitorError("DataPointDefMonitor", e);
         }
 
+        private void _scriptMonitor_OnError(object sender, TableDependency.SqlClient.Base.EventArgs.ErrorEventArgs e)
+        {
+            if (_scriptMonitor != null)
+            {
+                _scriptMonitor.OnChanged -= _scriptMonitor_OnChanged;
+                _scriptMonitor.OnStatusChanged -= _scriptMonitor_OnStatusChanged;
+                _scriptMonitor.OnError -= _scriptMonitor_OnError;
+                _scriptMonitor = null;
+            }
+            HandleTableMonitorError("ScriptMonitor", e);
+        }
 
+      
 
         private void RequestGroupDefMonitor_OnError(object sender, TableDependency.SqlClient.Base.EventArgs.ErrorEventArgs e)
         {
@@ -571,7 +606,12 @@ namespace FDA
             LogMonitorStatusChangeEvent("RequestGroupDefMonitor", e);
         }
 
+        private void _scriptMonitor_OnStatusChanged(object sender, TableDependency.SqlClient.Base.EventArgs.StatusChangedEventArgs e)
+        {
+            LogMonitorStatusChangeEvent("UserScriptMonitor", e);
+        }
 
+     
         private void SchedMonitor_OnStatusChanged(object sender, TableDependency.SqlClient.Base.EventArgs.StatusChangedEventArgs e)
         {
             LogMonitorStatusChangeEvent("ScheduleMonitor", e);
@@ -624,21 +664,23 @@ namespace FDA
         public override void Dispose()
         {
 
-                    // postgreSQL specific disposal
-                    _demandMonitor?.Stop();
-                    _schedMonitor?.Stop();
-                    _dataPointDefMonitor?.Stop();
-                    _requestGroupDefMonitor?.Stop();
-                    _connectionDefMonitor?.Stop();
+            // sql server specific disposal
+            _demandMonitor?.Stop();
+            _schedMonitor?.Stop();
+            _dataPointDefMonitor?.Stop();
+            _requestGroupDefMonitor?.Stop();
+            _connectionDefMonitor?.Stop();
+            _scriptMonitor?.Stop();
 
-                    _demandMonitor?.Dispose();
-                    _schedMonitor?.Dispose();
-                    _dataPointDefMonitor?.Dispose();
-                    _requestGroupDefMonitor?.Dispose();
-                    _connectionDefMonitor?.Dispose();
+            _demandMonitor?.Dispose();
+            _schedMonitor?.Dispose();
+            _dataPointDefMonitor?.Dispose();
+            _requestGroupDefMonitor?.Dispose();
+            _connectionDefMonitor?.Dispose();
+            _scriptMonitor?.Dispose();
 
-                    // general disposal
-                    base.Dispose();
+            // general disposal
+            base.Dispose();
         }
 
    
