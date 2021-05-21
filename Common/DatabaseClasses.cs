@@ -149,6 +149,7 @@ namespace Common
             }
         }
 
+       
 
         /* Database table columns */
         public Guid DPDUID { get => _DPDUID; set { if (_DPDUID != value) { _DPDUID = value; base.ID = value.ToString(); NotifyPropertyChanged(); } } }
@@ -216,6 +217,11 @@ namespace Common
             base.ObjectType = "Tag";
 
             _lastread = Datapoint.Empty;
+        }
+
+        public void SetValue(Double value, int quality, DateTime timestamp,string destination="")
+        {
+            LastRead = new Datapoint(value, quality, timestamp,destination, DataType.UNKNOWN, DataRequest.WriteMode.Insert);
         }
 
 
@@ -289,6 +295,7 @@ namespace Common
         public string module_name { get; set; }
         public string script { get; set; }
         public string run_spec { get; set; }
+        public bool enabled { get; set; }
     }
 
 

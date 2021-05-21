@@ -128,6 +128,19 @@ namespace FDA
             _writeQueue = new Queue<DataRequest>();
 
             _keepAliveTimer = new Timer(DBCheckTimerTick, this, Timeout.Infinite, Timeout.Infinite);
+
+            DynamicCodeManager.UserMethodExecuted += DynamicCodeManager_UserMethodExecuted;
+            DynamicCodeManager.UserMethodRuntimeError += DynamicCodeManager_UserMethodRuntimeError;
+        }
+
+        private void DynamicCodeManager_UserMethodRuntimeError(string methodName, string errorMsg)
+        {
+            Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "DynamicCodeManager", "", "User script " + methodName + "() failed with error: " + errorMsg);
+        }
+
+        private void DynamicCodeManager_UserMethodExecuted(string methodName)
+        {
+            Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "DynamicCodeManager","", "User script " + methodName + "() executed");
         }
 
         public virtual void Initialize()
@@ -396,53 +409,56 @@ namespace FDA
 
                         foreach (string dest in destList)
                         {
-                            if (transactionToLog.DBWriteMode == DataRequest.WriteMode.Insert || !firstDest) // always do an insert on additional destination tables (even if the writemode is set to update)
+                            if (dest != "")
                             {
+                                if (transactionToLog.DBWriteMode == DataRequest.WriteMode.Insert || !firstDest) // always do an insert on additional destination tables (even if the writemode is set to update)
+                                {
 
-                                // Globals.SystemManager.LogApplicationEvent(this, "","Caching " + transactionToLog.TagList.Count(p => p.TagID != Guid.Empty) + " data points to be written to the table '" + dest + "'");
+                                    // Globals.SystemManager.LogApplicationEvent(this, "","Caching " + transactionToLog.TagList.Count(p => p.TagID != Guid.Empty) + " data points to be written to the table '" + dest + "'");
 
 
-                                // cache inserts instead of writing them out right now
-                                _cacheManager.CacheDataPoint(dest, tag);
+                                    // cache inserts instead of writing them out right now
+                                    _cacheManager.CacheDataPoint(dest, tag);
+                                }
+
+                                // do an update on the first destination table, if write mode is update (if the tag isn't found in the table, do an insert instead)
+                                if (transactionToLog.DBWriteMode == DataRequest.WriteMode.Update && firstDest)
+                                {
+                                    batch.Append("if (select count(1) from ");
+                                    batch.Append(dest);
+                                    batch.Append(" where DPDUID = '");
+                                    batch.Append(tag.TagID.ToString());
+                                    batch.Append("')>0 ");
+                                    batch.Append("update ");
+                                    batch.Append(dest);
+                                    batch.Append(" set Value = ");
+                                    batch.Append(value);
+                                    batch.Append(", Timestamp = '");
+                                    batch.Append(Helpers.FormatDateTime(tag.Timestamp));
+                                    batch.Append("',Quality = ");
+                                    batch.Append(tag.Quality);
+                                    batch.Append(" where DPDUID = '");
+                                    batch.Append(tag.TagID);
+                                    batch.Append("' and Timestamp = (select MAX(Timestamp) from ");
+                                    batch.Append(dest);
+                                    batch.Append(" where DPDUID = '");
+                                    batch.Append(tag.TagID);
+                                    batch.Append("') else insert into ");
+                                    batch.Append(dest);
+                                    batch.Append(" (DPDUID, Timestamp, Value, Quality) values('");
+                                    batch.Append(tag.TagID);
+                                    batch.Append("','");
+                                    batch.Append(Helpers.FormatDateTime(tag.Timestamp));
+                                    batch.Append("',");
+                                    batch.Append(value);
+                                    batch.Append(",");
+                                    batch.Append(tag.Quality);
+                                    batch.Append(");");
+
+                                    querycount++;
+                                }
+                                firstDest = false;
                             }
-
-                            // do an update on the first destination table, if write mode is update (if the tag isn't found in the table, do an insert instead)
-                            if (transactionToLog.DBWriteMode == DataRequest.WriteMode.Update && firstDest)
-                            {
-                                batch.Append("if (select count(1) from ");
-                                batch.Append(dest);
-                                batch.Append(" where DPDUID = '");
-                                batch.Append(tag.TagID.ToString());
-                                batch.Append("')>0 ");
-                                batch.Append("update ");
-                                batch.Append(dest);
-                                batch.Append(" set Value = ");
-                                batch.Append(value);
-                                batch.Append(", Timestamp = '");
-                                batch.Append(Helpers.FormatDateTime(tag.Timestamp));
-                                batch.Append("',Quality = ");
-                                batch.Append(tag.Quality);
-                                batch.Append(" where DPDUID = '");
-                                batch.Append(tag.TagID);
-                                batch.Append("' and Timestamp = (select MAX(Timestamp) from ");
-                                batch.Append(dest);
-                                batch.Append(" where DPDUID = '");
-                                batch.Append(tag.TagID);
-                                batch.Append("') else insert into ");
-                                batch.Append(dest);
-                                batch.Append(" (DPDUID, Timestamp, Value, Quality) values('");
-                                batch.Append(tag.TagID);
-                                batch.Append("','");
-                                batch.Append(Helpers.FormatDateTime(tag.Timestamp));
-                                batch.Append("',");
-                                batch.Append(value);
-                                batch.Append(",");
-                                batch.Append(tag.Quality);
-                                batch.Append(");");
-
-                                querycount++;
-                            }
-                            firstDest = false;
                         }
 
                         // if this isn't a backfill request, update the last read value and timestamp in the DataPointDefinitions table
@@ -1370,6 +1386,57 @@ namespace FDA
                     sched.Tasks.AddRange(tasks);
                 }
             }
+
+
+
+            // load user scripts
+
+            // set up Dynamic Code Manager
+            Globals.SystemManager.LogApplicationEvent(this,"","Loading User Scripts");
+            DynamicCodeManager.NameSpaces = new string[] { "Common"};
+            DynamicCodeManager.Tags = _dataPointConfig;
+
+            if (_scriptsTableExists)
+            {
+                tableName = Globals.SystemManager.GetTableName("fda_scripts");
+                query = "SELECT module_name,script,run_spec,enabled from " + tableName + ";";
+
+                table = ExecuteQuery(query);
+
+                List<string> scripts;
+
+                foreach (DataRow row in table.Rows)
+                {
+                    // skip any disabled modules
+                    if (!(bool)row["enabled"])
+                        continue; 
+
+                    Globals.SystemManager.LogApplicationEvent(Globals.FDANow(),"DynamicCodeManager","Loading user script module '" + row["module_name"].ToString() + "'");
+                    try
+                    {
+                        scripts = DynamicCodeManager.LoadModule(row["module_name"].ToString(), row["script"].ToString(),row["run_spec"].ToString());
+                        Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "DynamicCodeManager", "Loaded user script(s) " + String.Join("() ", scripts.ToArray()));
+                    }
+                    catch (Exception ex)
+                    {
+                        if (ex.GetType() == typeof(DynamicCode.CompileException))
+                        {
+                            string errormsg = "Failed to load user script module, because of error(s) in code: " + Environment.NewLine;
+                            foreach (var diagnostic in ((DynamicCode.CompileException)ex).CompileResult)
+                            {
+                                errormsg += diagnostic.GetMessage() + Environment.NewLine;
+                            }
+                            Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "DynamicCodeManager", errormsg);
+                        }
+                        else
+                            Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "DynamicCodeManager", "Failed to load user script module '" + row["module_name"].ToString() + ": " + ex.Message);
+                    }
+                }
+                table.Clear();
+            }
+
+
+
             return true;
         }
 
@@ -1377,7 +1444,7 @@ namespace FDA
         {
             DerivedTag updatedSoftpoint = (DerivedTag)sender;
 
-            // the data logger requires a DataRequest object, containing a list of Tag objects with data to be written
+            // the data logger requires a DataRequest object containing a list of Tag objects with data to be written
             // we'll create one for the updated soft point
 
             Tag softPointTag = new Tag(updatedSoftpoint.DPDUID)
@@ -1400,7 +1467,7 @@ namespace FDA
             WriteDataToDB(softTagRequestObject);
 
             // and log a message about the update 
-            Globals.SystemManager.LogApplicationEvent(this, "", "Soft tag " + updatedSoftpoint.DPDUID.ToString() + " re-calculated",false,true);
+            Globals.SystemManager.LogApplicationEvent(this, "", "Soft tag " + updatedSoftpoint.DPDUID.ToString() + " updated",false,true);
         }
 
         public void UpdateAlmEvtCurrentPtrs(DataRequest PtrPositionRequest)
@@ -1637,29 +1704,68 @@ namespace FDA
 
         protected void UserScriptNotification(string changeType, UserScriptModule scriptModule)
         {
+            string action;
+            switch (changeType)
+            {
+                case "INSERT": action = "inserted"; break;
+                case "UPDATE": action = "updated"; break;
+                case "DELEETE": action = "deleted"; break;
+                default: action = "<action>"; break;
+            }
+
+            Globals.SystemManager.LogApplicationEvent(this, "", "User script module '" + scriptModule.module_name + "' was " + action);
+
+
             // check for nulls
             if (changeType == "INSERT" || changeType == "UPDATE")
             {
-                string[] nulls = FindNulls(scriptModule);
+                  string[] nulls = FindNulls(scriptModule);
                 if (nulls.Length > 0)
                 {
                     Globals.SystemManager.LogApplicationEvent(this, "", "script module " + scriptModule.module_name + " " + changeType.ToString().ToLower() + " rejected, null values in field(s) " + string.Join(",", nulls));
                     return;
                 }
             }
-
-            if (changeType == "INSERT")
+   
+            if ((changeType == "INSERT" || changeType == "UPDATE")  && scriptModule.enabled)
             {
-                DynamicCodeManager.LoadModule(scriptModule.module_name, scriptModule.script);
+              
+                try
+                {
+                    // if a module with this name already exists, DynamicCodeManager will unload the existing module before loading the new one
+                    DynamicCodeManager.LoadModule(scriptModule.module_name, scriptModule.script, scriptModule.run_spec);
+                } catch (Exception ex)
+                {
+
+                    if (ex.GetType() == typeof(DynamicCode.CompileException))
+                    {
+                        string errormsg = "Failed to load user script module, because of error(s) in code): " + Environment.NewLine;
+                        foreach (var diagnostic in ((DynamicCode.CompileException)ex).CompileResult)
+                        {
+                            errormsg += diagnostic.GetMessage() + Environment.NewLine;
+                        }
+                        Globals.SystemManager.LogApplicationEvent(this, "", errormsg);
+                    }
+                    else
+                        Globals.SystemManager.LogApplicationEvent(this, "", "Failed to load user script module '" + scriptModule.module_name + ": " + ex.Message);
+                }
+                    
             }
             
-
+            if (changeType == "DELETE" || !scriptModule.enabled)
+            {
+                try
+                {
+                    DynamicCodeManager.UnloadModule(scriptModule.module_name);
+                } catch (Exception ex)
+                {
+                    Globals.SystemManager.LogApplicationEvent(this, "", "Failed to unload user script module '" + scriptModule.module_name + ": " + ex.Message);
+                }
+            } 
         }
 
         protected void DeviceMonitorNotification(string changeType, FDADevice device)
         {
-
-
             // check for nulls
             if (changeType == "INSERT" || changeType == "UPDATE")
             {
@@ -1832,6 +1938,21 @@ namespace FDA
                     case "UPDATE":
                         if (_dataPointConfig.ContainsKey(datapoint.DPDUID))
                         {
+                            FDADataPointDefinitionStructure oldTag = _dataPointConfig[datapoint.DPDUID];
+                            oldTag.DPDSEnabled = datapoint.DPDSEnabled;
+                            oldTag.DPSType = datapoint.DPSType;
+                            oldTag.read_scaling = datapoint.read_scaling;
+                            oldTag.read_scale_raw_low = datapoint.read_scale_raw_low;
+                            oldTag.read_scale_raw_high = datapoint.read_scale_raw_high;
+                            oldTag.read_scale_eu_low = datapoint.read_scale_eu_low;
+                            oldTag.read_scale_eu_high = datapoint.read_scale_eu_high;
+                            oldTag.write_scaling = datapoint.write_scaling;
+                            oldTag.write_scale_raw_low = datapoint.write_scale_raw_low;
+                            oldTag.write_scale_raw_high = datapoint.write_scale_raw_high;
+                            oldTag.write_scale_eu_low = datapoint.write_scale_eu_low;
+                            oldTag.write_scale_eu_high = datapoint.write_scale_eu_high;
+                       
+
                             if (_dataPointConfig[datapoint.DPDUID].DPSType.ToLower() == "softtag")
                             {
                                 DerivedTag tagToChange = (DerivedTag)_dataPointConfig[datapoint.DPDUID];
@@ -1847,7 +1968,7 @@ namespace FDA
                                 }
 
                                 // same derived tag type, we can just change its arguments
-                                tagToChange.Alter(datapoint.physical_point);
+                                tagToChange.AlterArguments(datapoint.physical_point);
                                 if (!tagToChange.IsValid)
                                 {
                                     Globals.SystemManager.LogApplicationEvent(this, "", "Config Error: DPDS ID '" + datapoint.DPDUID + "' update invalid. " + tagToChange.ErrorMessage, true);
@@ -1855,7 +1976,12 @@ namespace FDA
                             }
                             else
                             {
-                                _dataPointConfig[datapoint.DPDUID] = datapoint;
+
+                                oldTag.backfill_enabled = datapoint.backfill_enabled;
+                                oldTag.backfill_data_ID = datapoint.backfill_data_ID;
+                                oldTag.backfill_data_structure_type = datapoint.backfill_data_structure_type;
+                                oldTag.backfill_data_lapse_limit = datapoint.backfill_data_lapse_limit;
+                                oldTag.backfill_data_interval = datapoint.backfill_data_interval;
                             }
                             action = "updated";
                         }

@@ -5,11 +5,11 @@ using System.Text;
 
 namespace Common
 {
-    public abstract class DerivedTag : FDADataPointDefinitionStructure, IDisposable
+    public class DerivedTag : FDADataPointDefinitionStructure, IDisposable
     {
         public bool IsValid { get => _valid; }
         public string ErrorMessage { get => _errorMessage; }
-     
+
         protected string _errorMessage = "";
         protected bool _valid = false;
         protected string _derived_tag_type;
@@ -29,33 +29,58 @@ namespace Common
             {
                 "bitser" => new BitSeriesDerivedTag(tagID, arguments),
                 "bitmask" => new BitmaskDerivedTag(tagID, arguments),
-                //case "summation": return new SummationDerivedTag(tagID,arguments);   
-                _ => null,
+                "" => new DerivedTag(tagID,""), // no derived tag type specified, create a basic derived tag that doesn't use any other tag as a source, can only be updated by a script
+                _ => null   // unrecognized derived  tag type
             };
+
         }
- 
+
         // base class constructor
         protected DerivedTag(string tagID, string arguments)
         {
             _tagID = tagID;
             _arguments = arguments;
             physical_point = arguments;
-            
+
             if (IsValidGUID(_tagID))
             {
                 DPDUID = Guid.Parse(tagID);
             }
+
+            this.PropertyChanged += DerivedTag_PropertyChanged;
         }
 
-        public abstract void Initialize();
-
-        public abstract void Alter(string arguments);
- 
-
-        protected void RaiseOnUpdateEvent()
+        private void DerivedTag_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
-            OnUpdate?.Invoke(this, new EventArgs());
+            if (e.PropertyName=="LastRead")
+            {
+                OnUpdate?.Invoke(this, new EventArgs());
+            }
         }
+
+        public virtual void Initialize()
+        {
+            // tag id is valid
+            if (!IsValidGUID(_tagID))
+            {
+                DPDSEnabled = false;
+                _valid = false;
+                _errorMessage = "Invalid Tag ID '" + _tagID + "', must be a valid UID in the format xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx";
+                return;
+            }
+            DPDUID = Guid.Parse(_tagID);
+            _valid = true;
+        }
+
+        public virtual void AlterArguments(string arguments)
+        {
+
+        }
+
+        //protected void RaiseOnUpdateEvent()
+        //{
+        //    OnUpdate?.Invoke(this, new EventArgs());
+        //}
 
         // helper classes
         protected static bool IsIntegerInRange(string testVal, uint min, uint max)
@@ -81,7 +106,10 @@ namespace Common
             return BitConverter.ToUInt32(array);
         }
 
-        public abstract void Dispose();
+        public virtual void Dispose()
+        {
+
+        }
 
     }
 
@@ -104,15 +132,7 @@ namespace Common
 
         public override void Initialize()
         {
-            // tag id is valid
-            if (!IsValidGUID(_tagID))
-            {
-                DPDSEnabled = false;
-                _valid = false;
-                _errorMessage = "Invalid Tag ID '" + _tagID + "', must be a valid UID in the format xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx";
-                return;
-            }
-            
+            base.Initialize();
 
             // arguments string is not null
             if (_arguments == null)
@@ -132,7 +152,6 @@ namespace Common
                 return;
             }
 
-            DPDUID = Guid.Parse(_tagID);
             _valid = true;
 
 
@@ -261,7 +280,7 @@ namespace Common
             LastReadDataTimestamp = _sourceTag.LastReadDataTimestamp;
             */
 
-            RaiseOnUpdateEvent(); // let anyone who's listening know that this derived tag has been updated
+            //RaiseOnUpdateEvent(); // let anyone who's listening know that this derived tag has been updated
         }
 
         public override void Dispose()
@@ -272,7 +291,7 @@ namespace Common
             }
         }
 
-        public override void Alter(string newArguments)
+        public override void AlterArguments(string newArguments)
         {
             _valid = false;
             if (_sourceTag != null)
@@ -304,14 +323,7 @@ namespace Common
 
         public override void Initialize()
         {
-            // tag id is valid
-            if (!IsValidGUID(_tagID))
-            {
-                DPDSEnabled = false;
-                _valid = false;
-                _errorMessage = "Invalid Tag ID '" + _tagID + "', must be a valid UID in the format xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx";
-                return;
-            }
+            base.Initialize();
 
             // arguments string is not null
             if (_arguments == null)
@@ -330,8 +342,6 @@ namespace Common
                 _errorMessage = "Invalid Argument ''";
                 return;
             }
-
-            DPDUID = Guid.Parse(_tagID);
             _valid = true;
 
             // examine the arguments and make sure they're all there and valid
@@ -426,7 +436,7 @@ namespace Common
                 );
 
 
-            RaiseOnUpdateEvent(); // let anyone who's listening know that this derived tag has been updated 
+            //RaiseOnUpdateEvent(); // let anyone who's listening know that this derived tag has been updated 
         }
 
         public override void Dispose()
@@ -435,7 +445,7 @@ namespace Common
                 _sourceTag.PropertyChanged -= SourceTag_PropertyChanged;
         }
 
-        public override void Alter(string newArguments)
+        public override void AlterArguments(string newArguments)
         {
             _valid = false;
             if (_sourceTag != null)

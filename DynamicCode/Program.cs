@@ -38,7 +38,7 @@ namespace sandbox
 
         static void Main(string[] args)
         {
-            tags = new Dictionary<string, SubscribeableObject>();
+            tags = new Dictionary<string, Tag>();
             tags.Add("tag1", new Tag("tag1", 0, DateTime.Now, 192));
             tags.Add("tag2", new Tag("tag2", 0, DateTime.Now, 192)); // updates with random value every 20 seconds
             tags.Add("tag3", new Tag("tag3", 0, DateTime.Now, 192)); // updates with random value every 6 seconds
@@ -140,11 +140,11 @@ namespace sandbox
 
             try
             {
-                List<Tuple<string,string>> loadedMethods = DynamicCodeManager.LoadModule(filename, userCode);
+                List<string> loadedMethods = DynamicCodeManager.LoadModule(filename, userCode,"OnSchedule 10 seconds");
                 Console.WriteLine("Compilation successful");
-                foreach (Tuple<string, string> method in loadedMethods)
+                foreach (string method in loadedMethods)
                 {
-                    Console.WriteLine("User Method '" + filename + "." + method.Item1 + "' loaded (" + method.Item2 + ")");
+                    Console.WriteLine("User Method " + method + "() loaded");
                 }
                 LoadedCodeFiles.Add(filename, new usercodeFile(filename, ComputeHash(filename)));
             }

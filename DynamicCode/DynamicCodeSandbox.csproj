@@ -1,0 +1,19 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="Compiler.cs" />
+    <Compile Remove="DynamicCodeManager.cs" />
+    <Compile Remove="Module.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Common\Common.csproj" />
+    <ProjectReference Include="DynamicCode.csproj" />
+  </ItemGroup>
+
+</Project>
