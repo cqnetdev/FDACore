@@ -418,7 +418,8 @@ namespace FDA
                 case "CommunicationsEnabled": HandleCommsEnabledStatusChange(CommunicationsEnabled);break;
                 case "RemoteIPAddress": ResetConnection(); break;
                 case "PortNumber": ResetConnection(); break;
-                //case "ConnectionStatus": LogCommsEvent(Globals.GetOffsetUTC(),"Connection " + Description + ": source connection status = " + ConnectionStatus); break;
+                case "ConnectionStatus": Globals.SystemManager.LogApplicationEvent(this, Description," connection status : " + ConnectionStatus.ToString()); break;
+                    //case "ConnectionStatus": LogCommsEvent(Globals.GetOffsetUTC(),"Connection " + Description + ": source connection status = " + ConnectionStatus); break;
             }
             if (propertyName.StartsWith("Serial"))
                 ResetConnection();
@@ -750,7 +751,7 @@ namespace FDA
                             if (TCPLocalConnected && TCPRemoteConnected)
                             {
                                 result = true;
-                                Globals.SystemManager.LogApplicationEvent(this, Description, " connected");
+                                //Globals.SystemManager.LogApplicationEvent(this, Description, " connected");
                             }
                         }
                         else
@@ -764,7 +765,7 @@ namespace FDA
                             {
                                 if (_stream.Connected)
                                 {
-                                    Globals.SystemManager.LogApplicationEvent(this, Description, " connected");
+                                    //Globals.SystemManager.LogApplicationEvent(this, Description, " connected");
                                     result = true;
                                 }
                             }
@@ -776,7 +777,7 @@ namespace FDA
                                 UDPConnect();
                                 if (_stream.Connected)
                                 {
-                                    Globals.SystemManager.LogApplicationEvent(this, Description, " connected");
+                                    //Globals.SystemManager.LogApplicationEvent(this, Description, " connected");
                                     result = true;
                                 }
                             }

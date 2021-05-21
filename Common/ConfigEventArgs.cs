@@ -9,15 +9,15 @@ namespace Common
     public class ConfigEventArgs : EventArgs
     {
         public string TableName { get; }
-        public Guid ID { get; }
+        public object ID { get; }
         public string ChangeType { get; }
 
 
-        public ConfigEventArgs(string changetype, string table, Guid item)
+        public ConfigEventArgs(string changetype, string table, object itemref)
         {
             ChangeType = changetype;
             TableName = table;
-            ID = item;
+            ID = itemref;
         }
     }
 

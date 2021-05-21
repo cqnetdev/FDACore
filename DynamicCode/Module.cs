@@ -5,7 +5,7 @@ using System.Reflection;
 using System.Text;
 using System.Threading;
 using Common;
-
+using FDA;
 
 namespace DynamicCode
 {
@@ -15,7 +15,9 @@ namespace DynamicCode
     internal class Module : IDisposable
     {
         /****************** public ************************/
-        public static Dictionary<Guid, FDADataPointDefinitionStructure> Tags;  
+        public static Dictionary<Guid, FDADataPointDefinitionStructure> Tags;
+        public static Dictionary<Guid, ConnectionManager> ConnMgrs;
+
         //public static Dictionary<Guid, ConnectionManager> ConnMgrs; 
         public string Name { get => _moduleName; }  // the name of the module
         public List<string> Methods
@@ -85,7 +87,7 @@ namespace DynamicCode
             }
 
             if (Tags != null)
-                _userCodeObject = Activator.CreateInstance(userclass, new object[] { Tags });
+                _userCodeObject = Activator.CreateInstance(userclass, new object[] { Tags,ConnMgrs });
             else
                 _userCodeObject = Activator.CreateInstance(userclass);
 

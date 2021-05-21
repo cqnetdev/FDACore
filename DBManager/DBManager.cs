@@ -8,7 +8,6 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using Common;
-using DynamicCode;
 
 namespace FDA
 {
@@ -20,6 +19,7 @@ namespace FDA
         protected Dictionary<Guid, FDASourceConnection> _connectionsConfig;
         protected Dictionary<Guid, FDADevice> _deviceConfig;
         protected Dictionary<Guid, FDATask> _taskConfig;
+        protected Dictionary<string, UserScriptModule> _scriptsConfig;
 
         protected Queue<DataRequest> _writeQueue;
         protected BackgroundWorker _dataWriter;
@@ -42,18 +42,18 @@ namespace FDA
         public event ForceScheduleHandler ForceScheduleExecution;
 
         protected bool _DBStatus = false;
-        protected bool DBStatus 
-              { get { return _DBStatus; } 
-                set { _DBStatus = value;
-                      if (Globals.MQTTEnabled && Globals.MQTT != null)
-                      {
-                        if (Globals.MQTT.IsConnected)
-                        {
-                            Globals.MQTT.Publish("FDA/DBConnStatus",Encoding.UTF8.GetBytes(value.ToString()),1,true);   
-                        }
-                      }
+        protected bool DBStatus
+        { get { return _DBStatus; }
+            set { _DBStatus = value;
+                if (Globals.MQTTEnabled && Globals.MQTT != null)
+                {
+                    if (Globals.MQTT.IsConnected)
+                    {
+                        Globals.MQTT.Publish("FDA/DBConnStatus", Encoding.UTF8.GetBytes(value.ToString()), 1, true);
                     }
-               }
+                }
+            }
+        }
 
         protected bool _devicesTableExists = false;
         protected bool _tasksTableExists;
@@ -80,6 +80,8 @@ namespace FDA
             _connectionsConfig = new Dictionary<Guid, FDASourceConnection>();
             _deviceConfig = new Dictionary<Guid, FDADevice>();
             _taskConfig = new Dictionary<Guid, FDATask>();
+            _scriptsConfig = new Dictionary<string, UserScriptModule>();
+
             //_derivedTagConfig = new Dictionary<Guid, DerivedTag>();
 
 
@@ -124,24 +126,13 @@ namespace FDA
             // check if scripts table exists
             _scriptsTableExists = ((int)ExecuteScalar("SELECT cast(count(1) as integer) from information_schema.tables where table_name = '" + Globals.SystemManager.GetTableName("fda_scripts") + "';") > 0);
 
- 
+
             _writeQueue = new Queue<DataRequest>();
 
             _keepAliveTimer = new Timer(DBCheckTimerTick, this, Timeout.Infinite, Timeout.Infinite);
 
-            DynamicCodeManager.UserMethodExecuted += DynamicCodeManager_UserMethodExecuted;
-            DynamicCodeManager.UserMethodRuntimeError += DynamicCodeManager_UserMethodRuntimeError;
         }
 
-        private void DynamicCodeManager_UserMethodRuntimeError(string methodName, string errorMsg)
-        {
-            Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "DynamicCodeManager", "", "User script " + methodName + "() failed with error: " + errorMsg);
-        }
-
-        private void DynamicCodeManager_UserMethodExecuted(string methodName)
-        {
-            Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "DynamicCodeManager","", "User script " + methodName + "() executed");
-        }
 
         public virtual void Initialize()
         {
@@ -194,7 +185,7 @@ namespace FDA
 
         public abstract void PauseChangeMonitoring();
 
-        
+
         protected abstract bool TestConnection();
 
         protected abstract bool BuildAppLogTable(string tableName);
@@ -210,6 +201,21 @@ namespace FDA
         {
             if (_deviceConfig.ContainsKey(ID))
                 return _deviceConfig[ID];
+            else
+                return null;
+        }
+
+        public Dictionary<string, UserScriptModule> GetUserScripts()
+        {
+            return _scriptsConfig;
+        }
+
+        public UserScriptModule GetUserScript(string name)
+        {
+            if (_scriptsConfig.ContainsKey(name))
+            {
+                return _scriptsConfig[name];
+            }
             else
                 return null;
         }
@@ -864,10 +870,10 @@ namespace FDA
         }
 
 
-        protected void RaiseConfigChangeEvent(string type, string table, Guid item)
+        protected void RaiseConfigChangeEvent(string type, string table, object itemref)
         {
             //Globals.SystemManager.LogApplicationEvent(this, "", table + " table changed (" + type + "), ID = " + item.ToString());
-            ConfigChange?.Invoke(this, new ConfigEventArgs(type, table, item));
+            ConfigChange?.Invoke(this, new ConfigEventArgs(type, table, itemref));
         }
 
 
@@ -994,6 +1000,7 @@ namespace FDA
             lock (_connectionsConfig) { _connectionsConfig.Clear(); }
             lock (_taskConfig) { _taskConfig.Clear(); }
             lock (_deviceConfig) { _deviceConfig.Clear(); }
+            lock (_scriptsConfig) { _scriptsConfig.Clear(); }
             //lock (_derivedTagConfig) { _derivedTagConfig.Clear(); }
 
 
@@ -1390,12 +1397,6 @@ namespace FDA
 
 
             // load user scripts
-
-            // set up Dynamic Code Manager
-            Globals.SystemManager.LogApplicationEvent(this,"","Loading User Scripts");
-            DynamicCodeManager.NameSpaces = new string[] { "Common"};
-            DynamicCodeManager.Tags = _dataPointConfig;
-
             if (_scriptsTableExists)
             {
                 tableName = Globals.SystemManager.GetTableName("fda_scripts");
@@ -1404,33 +1405,20 @@ namespace FDA
                 table = ExecuteQuery(query);
 
                 List<string> scripts;
-
+                UserScriptModule newModule;
                 foreach (DataRow row in table.Rows)
                 {
-                    // skip any disabled modules
-                    if (!(bool)row["enabled"])
-                        continue; 
+                    newModule = new UserScriptModule()
+                    {
+                        module_name = row["module_name"].ToString(),
+                        script = row["script"].ToString(),
+                        enabled = (bool)row["enabled"],
+                        run_spec = row["run_spec"].ToString()
+                    };
 
-                    Globals.SystemManager.LogApplicationEvent(Globals.FDANow(),"DynamicCodeManager","Loading user script module '" + row["module_name"].ToString() + "'");
-                    try
-                    {
-                        scripts = DynamicCodeManager.LoadModule(row["module_name"].ToString(), row["script"].ToString(),row["run_spec"].ToString());
-                        Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "DynamicCodeManager", "Loaded user script(s) " + String.Join("() ", scripts.ToArray()));
-                    }
-                    catch (Exception ex)
-                    {
-                        if (ex.GetType() == typeof(DynamicCode.CompileException))
-                        {
-                            string errormsg = "Failed to load user script module, because of error(s) in code: " + Environment.NewLine;
-                            foreach (var diagnostic in ((DynamicCode.CompileException)ex).CompileResult)
-                            {
-                                errormsg += diagnostic.GetMessage() + Environment.NewLine;
-                            }
-                            Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "DynamicCodeManager", errormsg);
-                        }
-                        else
-                            Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "DynamicCodeManager", "Failed to load user script module '" + row["module_name"].ToString() + ": " + ex.Message);
-                    }
+                    _scriptsConfig.Add(newModule.module_name,newModule);
+
+ 
                 }
                 table.Clear();
             }
@@ -1704,64 +1692,60 @@ namespace FDA
 
         protected void UserScriptNotification(string changeType, UserScriptModule scriptModule)
         {
-            string action;
-            switch (changeType)
-            {
-                case "INSERT": action = "inserted"; break;
-                case "UPDATE": action = "updated"; break;
-                case "DELEETE": action = "deleted"; break;
-                default: action = "<action>"; break;
-            }
-
-            Globals.SystemManager.LogApplicationEvent(this, "", "User script module '" + scriptModule.module_name + "' was " + action);
-
 
             // check for nulls
             if (changeType == "INSERT" || changeType == "UPDATE")
             {
-                  string[] nulls = FindNulls(scriptModule);
+                string[] nulls = FindNulls(scriptModule);
                 if (nulls.Length > 0)
                 {
                     Globals.SystemManager.LogApplicationEvent(this, "", "script module " + scriptModule.module_name + " " + changeType.ToString().ToLower() + " rejected, null values in field(s) " + string.Join(",", nulls));
                     return;
                 }
             }
-   
-            if ((changeType == "INSERT" || changeType == "UPDATE")  && scriptModule.enabled)
-            {
-              
-                try
-                {
-                    // if a module with this name already exists, DynamicCodeManager will unload the existing module before loading the new one
-                    DynamicCodeManager.LoadModule(scriptModule.module_name, scriptModule.script, scriptModule.run_spec);
-                } catch (Exception ex)
-                {
 
-                    if (ex.GetType() == typeof(DynamicCode.CompileException))
+            string action;
+            switch (changeType)
+            {
+                case "INSERT":
+                        _scriptsConfig.Add(scriptModule.module_name, scriptModule);
+                        action = "inserted";
+                    break;
+
+                case "DELETE":
+                    if (_scriptsConfig.ContainsKey(scriptModule.module_name))
                     {
-                        string errormsg = "Failed to load user script module, because of error(s) in code): " + Environment.NewLine;
-                        foreach (var diagnostic in ((DynamicCode.CompileException)ex).CompileResult)
-                        {
-                            errormsg += diagnostic.GetMessage() + Environment.NewLine;
-                        }
-                        Globals.SystemManager.LogApplicationEvent(this, "", errormsg);
+                        _scriptsConfig.Remove(scriptModule.module_name);
+                        action = "deleted";
                     }
                     else
-                        Globals.SystemManager.LogApplicationEvent(this, "", "Failed to load user script module '" + scriptModule.module_name + ": " + ex.Message);
-                }
-                    
+                    {
+                        action = "deleted from the database but was not found in the FDA, so no action was taken";
+                    }
+                    action = "deleted"; 
+                    break;
+                case "UPDATE":
+                    if (_scriptsConfig.ContainsKey(scriptModule.module_name))
+                    {
+                        action = "updated";
+                        _scriptsConfig[scriptModule.module_name] = scriptModule;
+                    }
+                    else
+                    {
+                        _scriptsConfig.Add(scriptModule.module_name, scriptModule);
+                        action = "not found, adding it as a new Module";
+                        changeType = "INSERT";
+                        action = "updated";
+                    }
+                    break;
+                default: action = "<action>"; break;
             }
-            
-            if (changeType == "DELETE" || !scriptModule.enabled)
-            {
-                try
-                {
-                    DynamicCodeManager.UnloadModule(scriptModule.module_name);
-                } catch (Exception ex)
-                {
-                    Globals.SystemManager.LogApplicationEvent(this, "", "Failed to unload user script module '" + scriptModule.module_name + ": " + ex.Message);
-                }
-            } 
+
+            Globals.SystemManager.LogApplicationEvent(this, "", "User script module '" + scriptModule.module_name + "' was " + action);
+
+            RaiseConfigChangeEvent(changeType, "fda_scripts", scriptModule.module_name);
+   
+  
         }
 
         protected void DeviceMonitorNotification(string changeType, FDADevice device)

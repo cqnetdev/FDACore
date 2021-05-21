@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using Common;
+using FDA;
 
 namespace DynamicCode
 {
@@ -12,10 +13,11 @@ namespace DynamicCode
     {
         /********************* public ****************************/
         public static Dictionary<Guid, FDADataPointDefinitionStructure> Tags { get => _tags; set { _tags = value; Module.Tags = value; } }
+        public static Dictionary<Guid, ConnectionManager> ConnMgrs { get => _connMgrs; set { _connMgrs = value; Module.ConnMgrs = value; } }
         public static string[] NameSpaces { 
             set {
                   string temp = "";
-                  foreach (string ns in value) temp += "using " + ns + ";";
+                   foreach (string ns in value) temp += "using " + ns + ";";
                   _namespaces = temp;
                 } 
             }
@@ -28,17 +30,15 @@ namespace DynamicCode
         public static event UserMethodRuntimeErrorHandler UserMethodRuntimeError;
 
         /******************** private *****************************/
-        private static string UserCodeWrapper = @"using System;
-                                                  using System.Collections.Generic;
-                                                  <TYPES NAMESPACE>
-                                                  public class UserCode
+        private static string UserCodeWrapper = @"public class UserCode
                                                   {
                                                     private static Dictionary<Guid, FDADataPointDefinitionStructure> _tagsref;
                                                     private static Dictionary<Guid, ConnectionManager> _connectionsref;
 
-                                                    public UserCode(Dictionary<Guid, FDADataPointDefinitionStructure> tags,Dictionary<Guid, ConnectionManager>)
+                                                    public UserCode(Dictionary<Guid, FDADataPointDefinitionStructure> tags,Dictionary<Guid, ConnectionManager> connMgrs)
                                                     {
                                                        _tagsref = tags;
+                                                       _connectionsref = connMgrs;  
                                                     }
 
                                                     private FDADataPointDefinitionStructure DPDS(string tagid)
@@ -47,9 +47,9 @@ namespace DynamicCode
                                                         try
                                                         {
                                                            return _tagsref[tagGuid];
-                                                        } catch (exception ex)
+                                                        } catch (Exception ex)
                                                         {
-                                                            throw new Exception(""DPDS with ID "" + tagid + "" not found"");
+                                                            throw new Exception(""DPDS with ID "" + tagid + "" not found"",ex);
                                                         }
                                                     }
 
@@ -58,16 +58,17 @@ namespace DynamicCode
                                                         Guid connuid = Guid.Parse(connid);
                                                         try
                                                         {
-                                                           return _connectionsref [connuid];
-                                                        } catch (exception ex)
+                                                           return _connectionsref[connuid];
+                                                        } catch (Exception ex)
                                                         {
-                                                            throw new Exception(""Connection with ID "" + connid + "" not found"");
+                                                            throw new Exception(""Connection with ID "" + connid + "" not found"",ex);
                                                         }
                                                     }
                                                     <USERCODE>
                                                   }";
 
         private static Dictionary<Guid,FDADataPointDefinitionStructure> _tags;
+        private static Dictionary<Guid, ConnectionManager> _connMgrs;
 
         private static string _namespaces = "";
         private static readonly Dictionary<string, Module> UserCodeModules = new Dictionary<string, Module>();
@@ -87,12 +88,12 @@ namespace DynamicCode
             //List<Tuple<string, string>> runspecs = GetRunSpecs(userCode, ref userCodeMinusRunSpecs);
 
             // put the user defined functions inside a class called "UserCode", with a constructor that accepts a structure containing data from the main program that the user code will have access to
-            string fullUserCode = UserCodeWrapper.Replace("<TYPES NAMESPACE>", _namespaces).Replace("<USERCODE>", userCode);
+            string completeCode = _namespaces + UserCodeWrapper.Replace("<USERCODE>", userCode);
 
             // compile that
             byte[] compiledAssembly = null;
 
-            compiledAssembly = Compiler.Compile(fullUserCode);
+            compiledAssembly = Compiler.Compile(completeCode);
 
             if (compiledAssembly != null)
             {

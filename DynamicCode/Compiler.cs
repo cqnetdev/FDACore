@@ -50,7 +50,8 @@ namespace DynamicCode
                 MetadataReference.CreateFromFile(typeof(Console).Assembly.Location),
                 MetadataReference.CreateFromFile(typeof(System.Runtime.AssemblyTargetedPatchBandAttribute).Assembly.Location),
                 MetadataReference.CreateFromFile(typeof(Microsoft.CSharp.RuntimeBinder.CSharpArgumentInfo).Assembly.Location),
-                MetadataReference.CreateFromFile(typeof(Tag).Assembly.Location)
+                MetadataReference.CreateFromFile(typeof(Tag).Assembly.Location),
+                MetadataReference.CreateFromFile(typeof(FDA.ConnectionManager).Assembly.Location)
             };
 
             return CSharpCompilation.Create("UserCode.dll",
