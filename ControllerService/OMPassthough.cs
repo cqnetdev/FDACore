@@ -76,19 +76,12 @@ namespace ControllerService
                 // if the FDA has been quiet for too long, check if its still there
                 if (OMClient.Connected && quietTimer.Elapsed > quietLimit)
                 {
+
                     try
                     {
                         _logger.LogInformation("FDA has been quiet for a while, checking to see if it's still alive");
                         OMClient.GetStream().Write(Encoding.UTF8.GetBytes("hey you there?"));
                         int respSize = OMClient.GetStream().Read(buffer, 0, 10);
-                        /*
-                        byte[] response = new byte[respSize];
-                        Array.Copy(buffer, response, respSize);
-                        if (Encoding.UTF8.GetString(response) != "yes")
-                        {
-                            FDAConnectionHalfOpen = true;
-                        }
-                        */
                     } catch
                     {
                         FDAConnectionHalfOpen = true;

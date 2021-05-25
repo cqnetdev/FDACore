@@ -95,7 +95,7 @@ namespace Common
             private readonly DataTypeBase _dataType;
             private readonly DataRequest.WriteMode _writeMode;
 
-            public static Datapoint Empty = new Datapoint(0, 32, Globals.FDANow(), "", Common.DataType.UNKNOWN, DataRequest.WriteMode.Insert);
+            public readonly static Datapoint Empty = new Datapoint(0, 32, Globals.FDANow(), "", Common.DataType.UNKNOWN, DataRequest.WriteMode.Insert);
 
             public Datapoint(double value, int quality, DateTime timestamp, string destination, DataTypeBase datatype, DataRequest.WriteMode writeMode)
             {
@@ -219,10 +219,7 @@ namespace Common
             _lastread = Datapoint.Empty;
         }
 
-        public void SetValue(Double value, int quality, DateTime timestamp,string destination="")
-        {
-            LastRead = new Datapoint(value, quality, timestamp,destination, DataType.UNKNOWN, DataRequest.WriteMode.Insert);
-        }
+        
 
 
     }

@@ -107,7 +107,7 @@ namespace FDA
                 LoadUserScripts();
 
                 // apply any app configuration options
-                ApplyConfigOptions();
+                HandleAppConfigChanges();
 
                 // subscribe to configuration change events from the DBManager
                 _dbManager.ConfigChange += ConfigChangeHandler;
@@ -482,481 +482,511 @@ namespace FDA
             }
         }
 
-
-
-        private void ConfigChangeHandler(object sender, ConfigEventArgs e)
+        private void HandleSchedulerChanges(ConfigEventArgs e)
         {
-
-            try
-            {
-
-                // handle scheduler changes
-                if (e.TableName == Globals.SystemManager.GetTableName("FDARequestGroupScheduler"))
+                FDARequestGroupScheduler SchedulerConfig = _dbManager.GetSched((Guid)e.ID);
+                switch (e.ChangeType)
                 {
-                    FDARequestGroupScheduler SchedulerConfig = _dbManager.GetSched((Guid)e.ID);
-                    switch (e.ChangeType)
+                    case "UPDATE":
+                        // find the existing schedule
+                        FDAScheduler oldScheduler = null;
+                        if (_schedulersDictionary.ContainsKey((Guid)e.ID))
+                        {
+                            oldScheduler = _schedulersDictionary[(Guid)e.ID];
+                        }
+                        else
+                        {
+                            Globals.SystemManager.LogApplicationEvent(this, "", "Schedule ID " + e.ID + " was updated in the database, but was not found in the FDA. Creating a new schedule with this ID");
+                        }
 
-                    {
-                        case "UPDATE":
-                            // find the existing schedule
-                            FDAScheduler oldScheduler = null;
+                        // build a new one
+                        FDAScheduler newScheduler = null;
+                        TimeSpan delayTime = TimeSpan.Zero;
+                        switch (SchedulerConfig.FRGSType.ToUpper())
+                        {
+                            case "REALTIME":
+                                if (oldScheduler != null)
+                                {
+                                    if (oldScheduler.GetType().ToString() == "FDA.FDASchedulerRealtime")
+                                    {
+                                        DateTime nexttick = ((FDASchedulerRealtime)oldScheduler).NextTick;
+                                        delayTime = nexttick.Subtract(Globals.FDANow());
+                                    }
+                                }
+                                newScheduler = new FDASchedulerRealtime(SchedulerConfig.FRGSUID, SchedulerConfig.Description, SchedulerConfig.RequestGroups, SchedulerConfig.Tasks, SchedulerConfig.RealTimeRate, delayTime);
+                                break;
+                            case "DAILY": newScheduler = new FDASchedulerDaily(SchedulerConfig.FRGSUID, SchedulerConfig.Description, SchedulerConfig.RequestGroups, SchedulerConfig.Tasks, new DateTime(SchedulerConfig.Year, SchedulerConfig.Month, SchedulerConfig.Day, SchedulerConfig.Hour, SchedulerConfig.Minute, SchedulerConfig.Second)); break;
+                            case "HOURLY": newScheduler = new FDASchedulerHourly(SchedulerConfig.FRGSUID, SchedulerConfig.Description, SchedulerConfig.RequestGroups, SchedulerConfig.Tasks, new DateTime(SchedulerConfig.Year, SchedulerConfig.Month, SchedulerConfig.Day, SchedulerConfig.Hour, SchedulerConfig.Minute, SchedulerConfig.Second)); break;
+                            case "MONTHLY": newScheduler = new FDASchedulerMonthly(SchedulerConfig.FRGSUID, SchedulerConfig.Description, SchedulerConfig.RequestGroups, SchedulerConfig.Tasks, new DateTime(SchedulerConfig.Year, SchedulerConfig.Month, SchedulerConfig.Day, SchedulerConfig.Hour, SchedulerConfig.Minute, SchedulerConfig.Second)); break;
+                            case "ONSTARTUP": newScheduler = new FDASchedulerOnshot(SchedulerConfig.FRGSUID, SchedulerConfig.Description, SchedulerConfig.RequestGroups, SchedulerConfig.Tasks, true); break;
+                            default:
+                                Globals.SystemManager.LogApplicationEvent(this, "", "Schedule ID " + e.ID + " has unrecognized schedule type '" + SchedulerConfig.FRGSType.ToString() + "'");
+                                break;
+                        }
+
+                        if (newScheduler == null)
+                            return;
+
+
+
+                        // delete the existing (if present)
+                        if (oldScheduler != null)
+                        {
+                            oldScheduler.Enabled = false;
+                            oldScheduler.TimerElapsed -= ScheduleTickHandler;
                             if (_schedulersDictionary.ContainsKey((Guid)e.ID))
                             {
-                                oldScheduler = _schedulersDictionary[(Guid)e.ID];
-                            }
-                            else
-                            {
-                                Globals.SystemManager.LogApplicationEvent(this, "", "Schedule ID " + e.ID + " was updated in the database, but was not found in the FDA. Creating a new schedule with this ID");
-                            }
+                                lock (_schedulersDictionary)
+                                {
 
-                            // build a new one
-                            FDAScheduler newScheduler = null;
-                            TimeSpan delayTime = TimeSpan.Zero;
+                                    _schedulersDictionary.Remove((Guid)e.ID);
+                                }
+                            }
+                            oldScheduler = null;
+                        }
+
+                        // insert the new (updated) schedule
+                        newScheduler.TimerElapsed += ScheduleTickHandler;
+                        lock (_schedulersDictionary)
+                        {
+                            _schedulersDictionary.Add(newScheduler.ID, newScheduler);
+                        }
+                        newScheduler.Enabled = SchedulerConfig.FRGSEnabled;
+
+                        break;
+
+                    case "DELETE":
+                        _schedulersDictionary[(Guid)e.ID].Enabled = false;
+                        _schedulersDictionary[(Guid)e.ID].TimerElapsed -= ScheduleTickHandler;
+                        lock (_schedulersDictionary) { _schedulersDictionary.Remove((Guid)e.ID); }
+                        break;
+
+                    case "INSERT":
+                        lock (_schedulersDictionary)
+                        {
                             switch (SchedulerConfig.FRGSType.ToUpper())
                             {
-                                case "REALTIME":
-                                    if (oldScheduler != null)
-                                    {
-                                        if (oldScheduler.GetType().ToString() == "FDA.FDASchedulerRealtime")
-                                        {
-                                            DateTime nexttick = ((FDASchedulerRealtime)oldScheduler).NextTick;
-                                            delayTime = nexttick.Subtract(Globals.FDANow());
-                                        }
-                                    }
-                                    newScheduler = new FDASchedulerRealtime(SchedulerConfig.FRGSUID, SchedulerConfig.Description, SchedulerConfig.RequestGroups, SchedulerConfig.Tasks, SchedulerConfig.RealTimeRate, delayTime);
-                                    break;
-                                case "DAILY": newScheduler = new FDASchedulerDaily(SchedulerConfig.FRGSUID, SchedulerConfig.Description, SchedulerConfig.RequestGroups, SchedulerConfig.Tasks, new DateTime(SchedulerConfig.Year, SchedulerConfig.Month, SchedulerConfig.Day, SchedulerConfig.Hour, SchedulerConfig.Minute, SchedulerConfig.Second)); break;
-                                case "HOURLY": newScheduler = new FDASchedulerHourly(SchedulerConfig.FRGSUID, SchedulerConfig.Description, SchedulerConfig.RequestGroups, SchedulerConfig.Tasks, new DateTime(SchedulerConfig.Year, SchedulerConfig.Month, SchedulerConfig.Day, SchedulerConfig.Hour, SchedulerConfig.Minute, SchedulerConfig.Second)); break;
-                                case "MONTHLY": newScheduler = new FDASchedulerMonthly(SchedulerConfig.FRGSUID, SchedulerConfig.Description, SchedulerConfig.RequestGroups, SchedulerConfig.Tasks, new DateTime(SchedulerConfig.Year, SchedulerConfig.Month, SchedulerConfig.Day, SchedulerConfig.Hour, SchedulerConfig.Minute, SchedulerConfig.Second)); break;
-                                case "ONSTARTUP": newScheduler = new FDASchedulerOnshot(SchedulerConfig.FRGSUID, SchedulerConfig.Description, SchedulerConfig.RequestGroups, SchedulerConfig.Tasks, true); break;
+                                case "REALTIME": _schedulersDictionary.Add(SchedulerConfig.FRGSUID, new FDASchedulerRealtime(SchedulerConfig.FRGSUID, SchedulerConfig.Description, SchedulerConfig.RequestGroups, SchedulerConfig.Tasks, SchedulerConfig.RealTimeRate, TimeSpan.Zero)); break;
+                                case "DAILY": _schedulersDictionary.Add(SchedulerConfig.FRGSUID, new FDASchedulerDaily(SchedulerConfig.FRGSUID, SchedulerConfig.Description, SchedulerConfig.RequestGroups, SchedulerConfig.Tasks, new DateTime(SchedulerConfig.Year, SchedulerConfig.Month, SchedulerConfig.Day, SchedulerConfig.Hour, SchedulerConfig.Minute, SchedulerConfig.Second))); break;
+                                case "HOURLY": _schedulersDictionary.Add(SchedulerConfig.FRGSUID, new FDASchedulerHourly(SchedulerConfig.FRGSUID, SchedulerConfig.Description, SchedulerConfig.RequestGroups, SchedulerConfig.Tasks, new DateTime(SchedulerConfig.Year, SchedulerConfig.Month, SchedulerConfig.Day, SchedulerConfig.Hour, SchedulerConfig.Minute, SchedulerConfig.Second))); break;
+                                case "MONTHLY": _schedulersDictionary.Add(SchedulerConfig.FRGSUID, new FDASchedulerMonthly(SchedulerConfig.FRGSUID, SchedulerConfig.Description, SchedulerConfig.RequestGroups, SchedulerConfig.Tasks, new DateTime(SchedulerConfig.Year, SchedulerConfig.Month, SchedulerConfig.Day, SchedulerConfig.Hour, SchedulerConfig.Minute, SchedulerConfig.Second))); break;
+                                case "ONSTARTUP": _schedulersDictionary.Add(SchedulerConfig.FRGSUID, new FDASchedulerOnshot(SchedulerConfig.FRGSUID, SchedulerConfig.Description, SchedulerConfig.RequestGroups, SchedulerConfig.Tasks, true)); break;
                                 default:
                                     Globals.SystemManager.LogApplicationEvent(this, "", "Schedule ID " + e.ID + " has unrecognized schedule type '" + SchedulerConfig.FRGSType.ToString() + "'");
                                     break;
                             }
+                        }
+                        _schedulersDictionary[SchedulerConfig.FRGSUID].TimerElapsed += ScheduleTickHandler;
+                        break;
+                } 
+        }
 
-                            if (newScheduler == null)
-                                return;
-
-
-
-                            // delete the existing (if present)
-                            if (oldScheduler != null)
-                            {
-                                oldScheduler.Enabled = false;
-                                oldScheduler.TimerElapsed -= ScheduleTickHandler;
-                                if (_schedulersDictionary.ContainsKey((Guid)e.ID))
-                                {
-                                    lock (_schedulersDictionary)
-                                    {
-
-                                        _schedulersDictionary.Remove((Guid)e.ID);
-                                    }
-                                }
-                                oldScheduler = null;
-                            }
-
-                            // insert the new (updated) schedule
-                            newScheduler.TimerElapsed += ScheduleTickHandler;
-                            lock (_schedulersDictionary)
-                            {
-                                _schedulersDictionary.Add(newScheduler.ID, newScheduler);
-                            }
-                            newScheduler.Enabled = SchedulerConfig.FRGSEnabled;
-
-                            break;
-
-                        case "DELETE":
-                            _schedulersDictionary[(Guid)e.ID].Enabled = false;
-                            _schedulersDictionary[(Guid)e.ID].TimerElapsed -= ScheduleTickHandler;
-                            lock (_schedulersDictionary) { _schedulersDictionary.Remove((Guid)e.ID); }
-                            break;
-
-                        case "INSERT":
-                            lock (_schedulersDictionary)
-                            {
-                                switch (SchedulerConfig.FRGSType.ToUpper())
-                                {
-                                    case "REALTIME": _schedulersDictionary.Add(SchedulerConfig.FRGSUID, new FDASchedulerRealtime(SchedulerConfig.FRGSUID, SchedulerConfig.Description, SchedulerConfig.RequestGroups, SchedulerConfig.Tasks, SchedulerConfig.RealTimeRate, TimeSpan.Zero)); break;
-                                    case "DAILY": _schedulersDictionary.Add(SchedulerConfig.FRGSUID, new FDASchedulerDaily(SchedulerConfig.FRGSUID, SchedulerConfig.Description, SchedulerConfig.RequestGroups, SchedulerConfig.Tasks, new DateTime(SchedulerConfig.Year, SchedulerConfig.Month, SchedulerConfig.Day, SchedulerConfig.Hour, SchedulerConfig.Minute, SchedulerConfig.Second))); break;
-                                    case "HOURLY": _schedulersDictionary.Add(SchedulerConfig.FRGSUID, new FDASchedulerHourly(SchedulerConfig.FRGSUID, SchedulerConfig.Description, SchedulerConfig.RequestGroups, SchedulerConfig.Tasks, new DateTime(SchedulerConfig.Year, SchedulerConfig.Month, SchedulerConfig.Day, SchedulerConfig.Hour, SchedulerConfig.Minute, SchedulerConfig.Second))); break;
-                                    case "MONTHLY": _schedulersDictionary.Add(SchedulerConfig.FRGSUID, new FDASchedulerMonthly(SchedulerConfig.FRGSUID, SchedulerConfig.Description, SchedulerConfig.RequestGroups, SchedulerConfig.Tasks, new DateTime(SchedulerConfig.Year, SchedulerConfig.Month, SchedulerConfig.Day, SchedulerConfig.Hour, SchedulerConfig.Minute, SchedulerConfig.Second))); break;
-                                    case "ONSTARTUP": _schedulersDictionary.Add(SchedulerConfig.FRGSUID, new FDASchedulerOnshot(SchedulerConfig.FRGSUID, SchedulerConfig.Description, SchedulerConfig.RequestGroups, SchedulerConfig.Tasks, true)); break;
-                                    default:
-                                        Globals.SystemManager.LogApplicationEvent(this, "", "Schedule ID " + e.ID + " has unrecognized schedule type '" + SchedulerConfig.FRGSType.ToString() + "'");
-                                        break;
-                                }
-                            }
-                            _schedulersDictionary[SchedulerConfig.FRGSUID].TimerElapsed += ScheduleTickHandler;
-                            break;
-
-                    }
-                }
-
-                // handle connection details changes
-                if (e.TableName == Globals.SystemManager.GetTableName("FDASourceConnections"))
+        private void HandleConnectionChanges(ConfigEventArgs e)
+        {
+ 
+                string changeType = e.ChangeType;
+                if (changeType == "UPDATE")
                 {
-                    string changeType = e.ChangeType;
-                    if (changeType == "UPDATE")
+                    // get the connection object from the dictionary
+                    if (_connectionsDictionary == null)
+                        return;
+                    if (_connectionsDictionary.ContainsKey((Guid)e.ID))
                     {
-                        // get the connection object from the dictionary
-                        if (_connectionsDictionary == null)
-                            return;
-                        if (_connectionsDictionary.ContainsKey((Guid)e.ID))
-                        {
-                            ConnectionManager conn = _connectionsDictionary[(Guid)e.ID];
+                        ConnectionManager conn = _connectionsDictionary[(Guid)e.ID];
 
-                            // get the connection configuration object that was updated from the database manager
-                            FDASourceConnection updatedConfig = _dbManager.GetConnectionConfig((Guid)e.ID);
+                        // get the connection configuration object that was updated from the database manager
+                        FDASourceConnection updatedConfig = _dbManager.GetConnectionConfig((Guid)e.ID);
 
-                            if (conn.ConnectionType.ToString().ToUpper() != updatedConfig.SCType.ToUpper())
-                            {
-                                try
-                                {
-                                    conn.ConnectionType = (ConnectionManager.ConnType)Enum.Parse(typeof(ConnectionManager.ConnType), updatedConfig.SCType);
-                                }
-                                catch (Exception ex)
-                                {
-                                    Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "unrecognized connection type '" + updatedConfig.SCType.ToString() + "' in connection " + updatedConfig.SCUID.ToString());
-                                }
-                            }
-
-                            conn.ConnDetails = updatedConfig.SCDetail01;
-                            string[] connParams = updatedConfig.SCDetail01.Split(':');
-
-
-                            switch (conn.ConnectionType)
-                            {
-                                // Ethernet specific configuration
-                                case ConnectionManager.ConnType.Ethernet:
-                                    if (conn.RemoteIPAddress != connParams[0]) conn.RemoteIPAddress = connParams[0];
-                                    int newPort;
-                                    newPort = int.Parse(connParams[1]);
-                                    if (conn.PortNumber != newPort) conn.PortNumber = newPort;
-                                    break;
-                                case ConnectionManager.ConnType.EthernetUDP:
-                                    newPort = int.Parse(connParams[0]);
-                                    if (conn.PortNumber != newPort) conn.PortNumber = newPort;
-                                    break;
-                                case ConnectionManager.ConnType.Serial:
-                                    // Serial specific configuration
-                                    Parity parity = Parity.None;
-                                    switch (connParams[3])
-                                    {
-                                        case "N": parity = Parity.None; break;
-                                        case "E": parity = Parity.Even; break;
-                                        case "M": parity = Parity.Mark; break;
-                                        case "O": parity = Parity.Odd; break;
-                                        case "S": parity = Parity.Space; break;
-                                    }
-
-                                    StopBits stopBits = StopBits.None;
-                                    switch (connParams[4])
-                                    {
-                                        case "N": stopBits = StopBits.None; break;
-                                        case "1": stopBits = StopBits.One; break;
-                                        case "1.5": stopBits = StopBits.OnePointFive; break;
-                                        case "2": stopBits = StopBits.Two; break;
-                                    }
-
-
-                                    if (conn.SerialPortName != connParams[0]) conn.SerialPortName = "COM" + connParams[0];
-                                    if (conn.SerialBaudRate != int.Parse(connParams[1])) conn.SerialBaudRate = int.Parse(connParams[1]);
-                                    if (conn.SerialDataBits != int.Parse(connParams[2])) conn.SerialDataBits = int.Parse(connParams[2]);
-                                    if (conn.SerialParity != parity) conn.SerialParity = parity;
-                                    if (conn.SerialStopBits != stopBits) conn.SerialStopBits = stopBits;
-                                    break;
-                            }
-
-                            if (conn.Description != updatedConfig.Description) conn.Description = updatedConfig.Description;
-                            if (conn.MaxRequestAttempts != updatedConfig.MaxRequestAttempts) conn.MaxRequestAttempts = updatedConfig.MaxRequestAttempts;
-                            if (conn.MaxSocketConnectionAttempts != updatedConfig.MaxSocketConnectionAttempts) conn.MaxSocketConnectionAttempts = updatedConfig.MaxSocketConnectionAttempts;
-                            if (conn.PostConnectionCommsDelay != updatedConfig.PostConnectionCommsDelay) conn.PostConnectionCommsDelay = updatedConfig.PostConnectionCommsDelay;
-                            if (conn.RequestResponseTimeout != updatedConfig.RequestResponseTimeout) conn.RequestResponseTimeout = updatedConfig.RequestResponseTimeout;
-                            if (conn.RequestRetryDelay != updatedConfig.RequestRetryDelay) conn.RequestRetryDelay = updatedConfig.RequestRetryDelay;
-                            if (conn.SocketConnectionAttemptTimeout != updatedConfig.SocketConnectionAttemptTimeout) conn.SocketConnectionAttemptTimeout = updatedConfig.SocketConnectionAttemptTimeout;
-                            if (conn.SocketConnectionRetryDelay != updatedConfig.SocketConnectionRetryDelay) conn.SocketConnectionRetryDelay = updatedConfig.SocketConnectionRetryDelay;
-                            if (conn.CommunicationsEnabled != updatedConfig.CommunicationsEnabled) conn.CommunicationsEnabled = updatedConfig.CommunicationsEnabled;
-                            if (conn.ConnectionEnabled != updatedConfig.ConnectionEnabled) conn.ConnectionEnabled = updatedConfig.ConnectionEnabled;
-                            if (conn.CommsLogEnabled != updatedConfig.CommsLogEnabled) conn.CommsLogEnabled = updatedConfig.CommsLogEnabled;
-                            if (conn.InterRequestDelay != updatedConfig.InterRequestDelay) conn.InterRequestDelay = updatedConfig.InterRequestDelay;
-                            //if (conn.MQTTEnabled != connConfig.MQTTEnabled) conn.MQTTEnabled = connConfig.MQTTEnabled;
-                        }
-                        else
-                            changeType = "Insert"; // this was an update but no connection object with this ID was found, change it to an insert instead (will be processed as an insert below)
-
-                    }
-
-                    if (changeType == "DELETE")
-                    {
-                        if (_connectionsDictionary.ContainsKey((Guid)e.ID))
-                        {
-                            ConnectionManager connToDelete = _connectionsDictionary[(Guid)e.ID];
-                            connToDelete.TransactionComplete -= TransactionCompleteHandler;
-
-                            // remove the doomed connection object from the dictionary
-                            _connectionsDictionary.Remove((Guid)e.ID);
-
-                            // disable it, and dispose of it
-                            connToDelete.CommunicationsEnabled = false;
-                            connToDelete.ConnectionEnabled = false;
-                            connToDelete.Dispose();
-                            connToDelete = null;
-
-                            //PublishUpdatedConnectionsList();
-                        }
-
-                        // connection deletion may cause previously valid request groups to become invalid, mark all valid groups for re-validation
-                        RevalidateRequestGroups(1);
-                    }
-
-                    if (changeType == "INSERT")
-                    {
-                        FDASourceConnection connConfig = _dbManager.GetConnectionConfig((Guid)e.ID);
-
-                        // separate the hostname from the port
-                        string[] connDetails = connConfig.SCDetail01.Split(':');
-
-                        // create the new connection
-                        ConnectionManager newConn = null;
-                        bool success = true;
-                        try
-                        {
-                            newConn = new ConnectionManager(connConfig.SCUID, connConfig.Description, connDetails[0], int.Parse(connDetails[1]))
-                            {
-                                RequestRetryDelay = (short)connConfig.RequestRetryDelay,
-                                SocketConnectionAttemptTimeout = connConfig.SocketConnectionAttemptTimeout,
-                                MaxSocketConnectionAttempts = connConfig.MaxSocketConnectionAttempts,
-                                SocketConnectionRetryDelay = connConfig.SocketConnectionRetryDelay,
-                                PostConnectionCommsDelay = connConfig.PostConnectionCommsDelay,
-                                InterRequestDelay = connConfig.InterRequestDelay,
-                                MaxRequestAttempts = connConfig.MaxRequestAttempts,
-                                RequestResponseTimeout = connConfig.RequestResponseTimeout,
-                                CommsLogEnabled = connConfig.CommsLogEnabled
-                            };
-                        }
-                        catch (Exception ex)
-                        {
-                            Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Error occurred while creating connection object " + connConfig.SCUID);
-                            success = false;
-                        }
-
-                        if (success)
+                        if (conn.ConnectionType.ToString().ToUpper() != updatedConfig.SCType.ToUpper())
                         {
                             try
                             {
-                                newConn.ConnectionType = (ConnectionManager.ConnType)Enum.Parse(typeof(ConnectionManager.ConnType), connConfig.SCType);
-                                newConn.TransactionComplete += TransactionCompleteHandler;
-                                // add it to our dictionary
-                                _connectionsDictionary.Add((Guid)e.ID, newConn);
-
-                                // enable it (if configured to be enabled)
-                                newConn.CommunicationsEnabled = connConfig.CommunicationsEnabled;
-                                newConn.ConnectionEnabled = connConfig.ConnectionEnabled;
-
-                                //PublishUpdatedConnectionsList();
+                                conn.ConnectionType = (ConnectionManager.ConnType)Enum.Parse(typeof(ConnectionManager.ConnType), updatedConfig.SCType);
                             }
                             catch (Exception ex)
                             {
-                                Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "unrecognized connection type '" + connConfig.SCType.ToString() + "' in connection " + connConfig.SCUID.ToString());
-                                newConn.ConnectionEnabled = false;
-                                newConn.Dispose();
-                                newConn = null;
+                                Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "unrecognized connection type '" + updatedConfig.SCType.ToString() + "' in connection " + updatedConfig.SCUID.ToString());
                             }
                         }
 
-                        // adding a new connection may cause previously invalid groups to become valid, mark all invalid groups for revalidation
-                        RevalidateRequestGroups(2);
+                        conn.ConnDetails = updatedConfig.SCDetail01;
+                        string[] connParams = updatedConfig.SCDetail01.Split(':');
+
+
+                        switch (conn.ConnectionType)
+                        {
+                            // Ethernet specific configuration
+                            case ConnectionManager.ConnType.Ethernet:
+                                if (conn.RemoteIPAddress != connParams[0]) conn.RemoteIPAddress = connParams[0];
+                                int newPort;
+                                newPort = int.Parse(connParams[1]);
+                                if (conn.PortNumber != newPort) conn.PortNumber = newPort;
+                                break;
+                            case ConnectionManager.ConnType.EthernetUDP:
+                                newPort = int.Parse(connParams[0]);
+                                if (conn.PortNumber != newPort) conn.PortNumber = newPort;
+                                break;
+                            case ConnectionManager.ConnType.Serial:
+                                // Serial specific configuration
+                                Parity parity = Parity.None;
+                                switch (connParams[3])
+                                {
+                                    case "N": parity = Parity.None; break;
+                                    case "E": parity = Parity.Even; break;
+                                    case "M": parity = Parity.Mark; break;
+                                    case "O": parity = Parity.Odd; break;
+                                    case "S": parity = Parity.Space; break;
+                                }
+
+                                StopBits stopBits = StopBits.None;
+                                switch (connParams[4])
+                                {
+                                    case "N": stopBits = StopBits.None; break;
+                                    case "1": stopBits = StopBits.One; break;
+                                    case "1.5": stopBits = StopBits.OnePointFive; break;
+                                    case "2": stopBits = StopBits.Two; break;
+                                }
+
+
+                                if (conn.SerialPortName != connParams[0]) conn.SerialPortName = "COM" + connParams[0];
+                                if (conn.SerialBaudRate != int.Parse(connParams[1])) conn.SerialBaudRate = int.Parse(connParams[1]);
+                                if (conn.SerialDataBits != int.Parse(connParams[2])) conn.SerialDataBits = int.Parse(connParams[2]);
+                                if (conn.SerialParity != parity) conn.SerialParity = parity;
+                                if (conn.SerialStopBits != stopBits) conn.SerialStopBits = stopBits;
+                                break;
+                        }
+
+                        if (conn.Description != updatedConfig.Description) conn.Description = updatedConfig.Description;
+                        if (conn.MaxRequestAttempts != updatedConfig.MaxRequestAttempts) conn.MaxRequestAttempts = updatedConfig.MaxRequestAttempts;
+                        if (conn.MaxSocketConnectionAttempts != updatedConfig.MaxSocketConnectionAttempts) conn.MaxSocketConnectionAttempts = updatedConfig.MaxSocketConnectionAttempts;
+                        if (conn.PostConnectionCommsDelay != updatedConfig.PostConnectionCommsDelay) conn.PostConnectionCommsDelay = updatedConfig.PostConnectionCommsDelay;
+                        if (conn.RequestResponseTimeout != updatedConfig.RequestResponseTimeout) conn.RequestResponseTimeout = updatedConfig.RequestResponseTimeout;
+                        if (conn.RequestRetryDelay != updatedConfig.RequestRetryDelay) conn.RequestRetryDelay = updatedConfig.RequestRetryDelay;
+                        if (conn.SocketConnectionAttemptTimeout != updatedConfig.SocketConnectionAttemptTimeout) conn.SocketConnectionAttemptTimeout = updatedConfig.SocketConnectionAttemptTimeout;
+                        if (conn.SocketConnectionRetryDelay != updatedConfig.SocketConnectionRetryDelay) conn.SocketConnectionRetryDelay = updatedConfig.SocketConnectionRetryDelay;
+                        if (conn.CommunicationsEnabled != updatedConfig.CommunicationsEnabled) conn.CommunicationsEnabled = updatedConfig.CommunicationsEnabled;
+                        if (conn.ConnectionEnabled != updatedConfig.ConnectionEnabled) conn.ConnectionEnabled = updatedConfig.ConnectionEnabled;
+                        if (conn.CommsLogEnabled != updatedConfig.CommsLogEnabled) conn.CommsLogEnabled = updatedConfig.CommsLogEnabled;
+                        if (conn.InterRequestDelay != updatedConfig.InterRequestDelay) conn.InterRequestDelay = updatedConfig.InterRequestDelay;
+                        //if (conn.MQTTEnabled != connConfig.MQTTEnabled) conn.MQTTEnabled = connConfig.MQTTEnabled;
+                    }
+                    else
+                        changeType = "Insert"; // this was an update but no connection object with this ID was found, change it to an insert instead (will be processed as an insert below)
+
+                }
+
+                if (changeType == "DELETE")
+                {
+                    if (_connectionsDictionary.ContainsKey((Guid)e.ID))
+                    {
+                        ConnectionManager connToDelete = _connectionsDictionary[(Guid)e.ID];
+                        connToDelete.TransactionComplete -= TransactionCompleteHandler;
+
+                        // remove the doomed connection object from the dictionary
+                        _connectionsDictionary.Remove((Guid)e.ID);
+
+                        // disable it, and dispose of it
+                        connToDelete.CommunicationsEnabled = false;
+                        connToDelete.ConnectionEnabled = false;
+                        connToDelete.Dispose();
+                        connToDelete = null;
+
+                        //PublishUpdatedConnectionsList();
                     }
 
-                    if (Globals.MQTTEnabled)
+                    // connection deletion may cause previously valid request groups to become invalid, mark all valid groups for re-validation
+                    RevalidateRequestGroups(1);
+                }
+
+                if (changeType == "INSERT")
+                {
+                    FDASourceConnection connConfig = _dbManager.GetConnectionConfig((Guid)e.ID);
+
+                    // separate the hostname from the port
+                    string[] connDetails = connConfig.SCDetail01.Split(':');
+
+                    // create the new connection
+                    ConnectionManager newConn = null;
+                    bool success = true;
+                    try
                     {
-                        PublishUpdatedConnectionsList();
+                        newConn = new ConnectionManager(connConfig.SCUID, connConfig.Description, connDetails[0], int.Parse(connDetails[1]))
+                        {
+                            RequestRetryDelay = (short)connConfig.RequestRetryDelay,
+                            SocketConnectionAttemptTimeout = connConfig.SocketConnectionAttemptTimeout,
+                            MaxSocketConnectionAttempts = connConfig.MaxSocketConnectionAttempts,
+                            SocketConnectionRetryDelay = connConfig.SocketConnectionRetryDelay,
+                            PostConnectionCommsDelay = connConfig.PostConnectionCommsDelay,
+                            InterRequestDelay = connConfig.InterRequestDelay,
+                            MaxRequestAttempts = connConfig.MaxRequestAttempts,
+                            RequestResponseTimeout = connConfig.RequestResponseTimeout,
+                            CommsLogEnabled = connConfig.CommsLogEnabled
+                        };
+                    }
+                    catch (Exception ex)
+                    {
+                        Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Error occurred while creating connection object " + connConfig.SCUID);
+                        success = false;
+                    }
+
+                    if (success)
+                    {
+                        try
+                        {
+                            newConn.ConnectionType = (ConnectionManager.ConnType)Enum.Parse(typeof(ConnectionManager.ConnType), connConfig.SCType);
+                            newConn.TransactionComplete += TransactionCompleteHandler;
+                            // add it to our dictionary
+                            _connectionsDictionary.Add((Guid)e.ID, newConn);
+
+                            // enable it (if configured to be enabled)
+                            newConn.CommunicationsEnabled = connConfig.CommunicationsEnabled;
+                            newConn.ConnectionEnabled = connConfig.ConnectionEnabled;
+
+                            //PublishUpdatedConnectionsList();
+                        }
+                        catch (Exception ex)
+                        {
+                            Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "unrecognized connection type '" + connConfig.SCType.ToString() + "' in connection " + connConfig.SCUID.ToString());
+                            newConn.ConnectionEnabled = false;
+                            newConn.Dispose();
+                            newConn = null;
+                        }
+                    }
+
+                    // adding a new connection may cause previously invalid groups to become valid, mark all invalid groups for revalidation
+                    RevalidateRequestGroups(2);
+                }
+
+                if (Globals.MQTTEnabled)
+                {
+                    PublishUpdatedConnectionsList();
+                }
+            
+        }
+
+        private void HandleRequestGroupChanges(ConfigEventArgs e)
+        {
+            // handle request group config changes 
+                if (e.ChangeType == "UPDATE")
+                {
+                    // get the updated group config from the database
+                    FDADataBlockRequestGroup updatedGroupConfig = _dbManager.GetRequestGroup((Guid)e.ID);
+
+                    // find any schedulers that reference this group
+                    foreach (FDAScheduler scheduler in _schedulersDictionary.Values)
+                    {
+                        RequestGroup groupToUpdate = scheduler.RequestGroupList.Find(group => group.ID == updatedGroupConfig.DRGUID);
+
+                        // update the group properties
+                        if (groupToUpdate != null)
+                        {
+                            groupToUpdate.DBGroupRequestConfig.DataPointBlockRequestListVals = updatedGroupConfig.DataPointBlockRequestListVals;
+
+                            groupToUpdate.Description = updatedGroupConfig.Description;
+
+                            groupToUpdate.Enabled = updatedGroupConfig.DRGEnabled;
+
+                            groupToUpdate.CommsLogEnabled = updatedGroupConfig.CommsLogEnabled;
+
+                            groupToUpdate.Protocol = updatedGroupConfig.DPSType;
+
+                            groupToUpdate.Validation = RequestGroup.ValidationState.Unvalidated;
+                        }
                     }
                 }
 
-                // handle request group config changes 
+                if (e.ChangeType == "DELETE")
+                {
+                    foreach (FDAScheduler scheduler in _schedulersDictionary.Values)
+                    {
+                        RequestGroup deletedGroup = scheduler.RequestGroupList.Find(group => group.ID == (Guid)e.ID);
+                        while (deletedGroup != null)
+                        {
+                            scheduler.RequestGroupList.Remove(deletedGroup);
+                            deletedGroup = scheduler.RequestGroupList.Find(group => group.ID == (Guid)e.ID);
+                        }
+                    }
+                }
+
+                if (e.ChangeType == "Insert")
+                {
+                    // check if the new group is referenced by any scheduler configs
+                    List<FDARequestGroupScheduler> schedConfigList = _dbManager.GetAllSched();
+                    FDADataBlockRequestGroup groupConfig = _dbManager.GetRequestGroup((Guid)e.ID);
+                    int idx = -1;
+                    int separatorIdx;
+                    int length;
+                    string requestConfig;
+
+                    foreach (FDARequestGroupScheduler sched in schedConfigList)
+                    {
+
+                        idx = sched.RequestGroupList.IndexOf(e.ID.ToString().ToUpper());
+                        if (idx > -1)  // the group ID was found in the scheduler's configured RequestGroupList
+                        {
+                            separatorIdx = sched.RequestGroupList.IndexOf('|', idx);
+
+                            // if there was no separator found after the index of the group id, it's the last group in the list
+                            if (separatorIdx == -1)
+                                separatorIdx = sched.RequestGroupList.Length;
+
+                            length = separatorIdx - idx;
+                            requestConfig = sched.RequestGroupList.Substring(idx, length);
+
+                            if (_schedulersDictionary.ContainsKey(sched.FRGSUID))
+                            {
+                                RequestGroup newGroup = _dbManager.RequestGroupFromConfigString("Schedule " + sched.FRGSUID.ToString(), requestConfig, sched.Priority);
+                                newGroup.Protocol = groupConfig.DPSType.ToUpper();
+                                // add the new group the schedule
+                                lock (_schedulersDictionary[sched.FRGSUID].RequestGroupList)
+                                {
+                                    _schedulersDictionary[sched.FRGSUID].RequestGroupList.Add(newGroup);
+                                }
+                            }
+                        }
+                    }
+
+                }
+            
+
+        }
+    
+        private void HandleFDATasksChanges(ConfigEventArgs e)
+        {
+            if (e.ChangeType == "UPDATE")
+            {
+                // get the updated task definition from the database manager
+                FDATask updatedTask = _dbManager.GetTask((Guid)e.ID);
+
+                // find any schedulers that reference this group
+                foreach (FDAScheduler scheduler in _schedulersDictionary.Values)
+                {
+                    FDATask taskToUpdate = scheduler.TasksList.Find(task => task.TASK_ID == updatedTask.TASK_ID);
+                    if (taskToUpdate != null)
+                    {
+                        taskToUpdate.task_type = updatedTask.task_type;
+                        taskToUpdate.task_details = updatedTask.task_details;
+                    }
+                }
+            }
+
+            if (e.ChangeType == "DELETE")
+            {
+                foreach (FDAScheduler scheduler in _schedulersDictionary.Values)
+                {
+                    FDATask deletedTask = scheduler.TasksList.Find(task => task.TASK_ID == (Guid)e.ID);
+                    while (deletedTask != null)
+                    {
+                        scheduler.TasksList.Remove(deletedTask);
+                        deletedTask = scheduler.TasksList.Find(task => task.TASK_ID == (Guid)e.ID);
+                    }
+                }
+            }
+        }
+
+        private void HandleDataPointDefinitionChanges(ConfigEventArgs e)
+        {
+
+            // mark request groups for revalidation
+            if (e.ChangeType == "INSERT")
+                RevalidateRequestGroups(2);
+
+            if (e.ChangeType == "DELETE")
+                RevalidateRequestGroups(1);
+
+        }
+
+       
+        private void HandleScriptChanges(ConfigEventArgs e)
+        {  
+            UserScriptModule module = _dbManager.GetUserScript((string)e.ID);
+
+            if ((e.ChangeType == "INSERT" || e.ChangeType == "UPDATE") && module.enabled)
+            {
+
+                try
+                {
+                    // if a module with this name already exists, DynamicCodeManager will unload the existing module before loading the new one
+                    List<string> loaded = DynamicCodeManager.LoadModule(module.module_name, module.script, module.run_spec);
+                    Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "DynamicCodeManager", "Loaded user script(s) " + String.Join("() ", loaded.ToArray()));
+                }
+                catch (Exception ex)
+                {
+
+                    if (ex.GetType() == typeof(DynamicCode.CompileException))
+                    {
+                        string errormsg = "Failed to load user script module, because of error(s) in code): " + Environment.NewLine;
+                        foreach (var diagnostic in ((DynamicCode.CompileException)ex).CompileResult)
+                        {
+                            errormsg += diagnostic.GetMessage() + Environment.NewLine;
+                        }
+                        Globals.SystemManager.LogApplicationEvent(this, "", errormsg);
+                    }
+                    else
+                        Globals.SystemManager.LogApplicationEvent(this, "", "Failed to load user script module '" + module.module_name + ": " + ex.Message);
+                }
+
+            }
+
+            if (e.ChangeType == "DELETE" || !module.enabled)
+            {
+                try
+                {
+                    DynamicCodeManager.UnloadModule(module.module_name);
+                }
+                catch (Exception ex)
+                {
+                    Globals.SystemManager.LogApplicationEvent(this, "", "Failed to unload user script module '" + module.module_name + ": " + ex.Message);
+                }
+            }
+
+            
+        }
+    
+        private void ConfigChangeHandler(object sender, ConfigEventArgs e)
+        {
+            try
+            {
+                if (e.TableName == Globals.SystemManager.GetTableName("FDARequestGroupScheduler"))
+                {
+                    HandleSchedulerChanges(e);
+                    return;
+                }
+
+                if (e.TableName == Globals.SystemManager.GetTableName("FDASourceConnections"))
+                {
+                    HandleConnectionChanges(e);
+                    return;
+                }
+
                 if (e.TableName == Globals.SystemManager.GetTableName("FDADataBlockRequestGroup"))
                 {
-                    if (e.ChangeType == "UPDATE")
-                    {
-                        // get the updated group config from the database
-                        FDADataBlockRequestGroup updatedGroupConfig = _dbManager.GetRequestGroup((Guid)e.ID);
-
-                        // find any schedulers that reference this group
-                        foreach (FDAScheduler scheduler in _schedulersDictionary.Values)
-                        {
-                            RequestGroup groupToUpdate = scheduler.RequestGroupList.Find(group => group.ID == updatedGroupConfig.DRGUID);
-
-                            // update the group properties
-                            if (groupToUpdate != null)
-                            {
-                                groupToUpdate.DBGroupRequestConfig.DataPointBlockRequestListVals = updatedGroupConfig.DataPointBlockRequestListVals;
-
-                                groupToUpdate.Description = updatedGroupConfig.Description;
-
-                                groupToUpdate.Enabled = updatedGroupConfig.DRGEnabled;
-
-                                groupToUpdate.CommsLogEnabled = updatedGroupConfig.CommsLogEnabled;
-
-                                groupToUpdate.Protocol = updatedGroupConfig.DPSType;
-
-                                groupToUpdate.Validation = RequestGroup.ValidationState.Unvalidated;
-                            }
-                        }
-                    }
-
-                    if (e.ChangeType == "DELETE")
-                    {
-                        foreach (FDAScheduler scheduler in _schedulersDictionary.Values)
-                        {
-                            RequestGroup deletedGroup = scheduler.RequestGroupList.Find(group => group.ID == (Guid)e.ID);
-                            while (deletedGroup != null)
-                            {
-                                scheduler.RequestGroupList.Remove(deletedGroup);
-                                deletedGroup = scheduler.RequestGroupList.Find(group => group.ID == (Guid)e.ID);
-                            }
-                        }
-                    }
-
-                    if (e.ChangeType == "Insert")
-                    {
-                        // check if the new group is referenced by any scheduler configs
-                        List<FDARequestGroupScheduler> schedConfigList = _dbManager.GetAllSched();
-                        FDADataBlockRequestGroup groupConfig = _dbManager.GetRequestGroup((Guid)e.ID);
-                        int idx = -1;
-                        int separatorIdx;
-                        int length;
-                        string requestConfig;
-
-                        foreach (FDARequestGroupScheduler sched in schedConfigList)
-                        {
-
-                            idx = sched.RequestGroupList.IndexOf(e.ID.ToString().ToUpper());
-                            if (idx > -1)  // the group ID was found in the scheduler's configured RequestGroupList
-                            {
-                                separatorIdx = sched.RequestGroupList.IndexOf('|', idx);
-
-                                // if there was no separator found after the index of the group id, it's the last group in the list
-                                if (separatorIdx == -1)
-                                    separatorIdx = sched.RequestGroupList.Length;
-
-                                length = separatorIdx - idx;
-                                requestConfig = sched.RequestGroupList.Substring(idx, length);
-
-                                if (_schedulersDictionary.ContainsKey(sched.FRGSUID))
-                                {
-                                    RequestGroup newGroup = _dbManager.RequestGroupFromConfigString("Schedule " + sched.FRGSUID.ToString(), requestConfig, sched.Priority);
-                                    newGroup.Protocol = groupConfig.DPSType.ToUpper();
-                                    // add the new group the schedule
-                                    lock (_schedulersDictionary[sched.FRGSUID].RequestGroupList)
-                                    {
-                                        _schedulersDictionary[sched.FRGSUID].RequestGroupList.Add(newGroup);
-                                    }
-                                }
-                            }
-                        }
-
-                    }
+                    HandleRequestGroupChanges(e);
+                    return;
                 }
-
-                // handle task changes
+                    
                 if (e.TableName == Globals.SystemManager.GetTableName("FDATasks"))
                 {
-                    if (e.ChangeType == "UPDATE")
-                    {
-                        // get the updated task definition from the database manager
-                        FDATask updatedTask = _dbManager.GetTask((Guid)e.ID);
-
-                        // find any schedulers that reference this group
-                        foreach (FDAScheduler scheduler in _schedulersDictionary.Values)
-                        {
-                            FDATask taskToUpdate = scheduler.TasksList.Find(task => task.TASK_ID == updatedTask.TASK_ID);
-                            if (taskToUpdate != null)
-                            {
-                                taskToUpdate.task_type = updatedTask.task_type;
-                                taskToUpdate.task_details = updatedTask.task_details;
-                            }
-                        }
-                    }
-
-                    if (e.ChangeType == "DELETE")
-                    {
-                        foreach (FDAScheduler scheduler in _schedulersDictionary.Values)
-                        {
-                            FDATask deletedTask = scheduler.TasksList.Find(task => task.TASK_ID == (Guid)e.ID);
-                            while (deletedTask != null)
-                            {
-                                scheduler.TasksList.Remove(deletedTask);
-                                deletedTask = scheduler.TasksList.Find(task => task.TASK_ID == (Guid)e.ID);
-                            }
-                        }
-                    }
+                    HandleFDATasksChanges(e);
+                    return;
                 }
 
-
-                // handle data point definition changes 
                 if (e.TableName == Globals.SystemManager.GetTableName("DataPointDefinitionStructures"))
                 {
-
-                    // mark request groups for revalidation
-                    if (e.ChangeType == "INSERT")
-                        RevalidateRequestGroups(2);
-
-                    if (e.ChangeType == "DELETE")
-                        RevalidateRequestGroups(1);
-
+                    HandleDataPointDefinitionChanges(e);
+                    return;
                 }
 
-                // handle user script changes
                 if (e.TableName == Globals.SystemManager.GetTableName("fda_scripts"))
                 {
-                    UserScriptModule module = _dbManager.GetUserScript((string)e.ID);
-  
-                    if ((e.ChangeType == "INSERT" || e.ChangeType == "UPDATE") && module.enabled)
-                    {
-
-                        try
-                        {
-                            // if a module with this name already exists, DynamicCodeManager will unload the existing module before loading the new one
-                            List<string> loaded = DynamicCodeManager.LoadModule(module.module_name, module.script, module.run_spec);
-                            Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "DynamicCodeManager", "Loaded user script(s) " + String.Join("() ", loaded.ToArray()));
-                        }
-                        catch (Exception ex)
-                        {
-
-                            if (ex.GetType() == typeof(DynamicCode.CompileException))
-                            {
-                                string errormsg = "Failed to load user script module, because of error(s) in code): " + Environment.NewLine;
-                                foreach (var diagnostic in ((DynamicCode.CompileException)ex).CompileResult)
-                                {
-                                    errormsg += diagnostic.GetMessage() + Environment.NewLine;
-                                }
-                                Globals.SystemManager.LogApplicationEvent(this, "", errormsg);
-                            }
-                            else
-                                Globals.SystemManager.LogApplicationEvent(this, "", "Failed to load user script module '" + module.module_name + ": " + ex.Message);
-                        }
-
-                    }
-
-                    if (e.ChangeType == "DELETE" || !module.enabled)
-                    {
-                        try
-                        {
-                            DynamicCodeManager.UnloadModule(module.module_name);
-                        }
-                        catch (Exception ex)
-                        {
-                            Globals.SystemManager.LogApplicationEvent(this, "", "Failed to unload user script module '" + module.module_name + ": " + ex.Message);
-                        }
-                    }
-
+                    HandleScriptChanges(e);
+                    return;
                 }
 
-                // handle system options changes
                 if (e.TableName == "FDAConfig")
                 {
-                    ApplyConfigOptions();
+                    HandleAppConfigChanges();
+                    return;
                 }
                 
             } catch (Exception ex)
@@ -969,7 +999,7 @@ namespace FDA
         
         
 
-        private void ApplyConfigOptions()
+        private void HandleAppConfigChanges()
         {
             Dictionary<string, FDAConfig> configs = Globals.SystemManager.GetAppConfig();
 
@@ -1466,7 +1496,9 @@ namespace FDA
 
         public void Dispose()
         {
-            
+            // stop and unload all user scripts
+            Globals.SystemManager.LogApplicationEvent(this, "", "Unloading user scripts");
+            DynamicCodeManager.UnloadAllUserModules();
 
             if (_schedulersDictionary != null)
             {

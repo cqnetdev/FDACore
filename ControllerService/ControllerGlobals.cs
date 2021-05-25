@@ -6,7 +6,7 @@ using System.Net.Sockets;
 
 namespace ControllerService
 {
-    class Globals
+    class ControllerGlobals
     {
         public static BasicServicesServer BasicServicesServer;
         public static BasicServicesClient BasicServicesClient;

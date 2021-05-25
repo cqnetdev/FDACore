@@ -418,7 +418,7 @@ namespace FDA
                 case "CommunicationsEnabled": HandleCommsEnabledStatusChange(CommunicationsEnabled);break;
                 case "RemoteIPAddress": ResetConnection(); break;
                 case "PortNumber": ResetConnection(); break;
-                case "ConnectionStatus": Globals.SystemManager.LogApplicationEvent(this, Description," connection status : " + ConnectionStatus.ToString()); break;
+                case "ConnectionStatus": Globals.SystemManager.LogApplicationEvent(this, Description," Connection status : " + ConnectionStatus.ToString()); break;
                     //case "ConnectionStatus": LogCommsEvent(Globals.GetOffsetUTC(),"Connection " + Description + ": source connection status = " + ConnectionStatus); break;
             }
             if (propertyName.StartsWith("Serial"))

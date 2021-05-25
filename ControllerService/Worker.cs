@@ -39,16 +39,16 @@ namespace ControllerService
             
 
             // listens for basic services requests (start/stop FDA, etc)
-            Globals.BasicServicesServer = new BasicServicesServer(9571,_logger);
-            Globals.BasicServicesServer.Start();
+            ControllerGlobals.BasicServicesServer = new BasicServicesServer(9571,_logger);
+            ControllerGlobals.BasicServicesServer.Start();
 
             // connects to the FDA on the control port
-            Globals.BasicServicesClient = new BasicServicesClient(9572,_logger);
-            Globals.BasicServicesClient.Start();
+            ControllerGlobals.BasicServicesClient = new BasicServicesClient(9572,_logger);
+            ControllerGlobals.BasicServicesClient.Start();
 
             // connects to the FDA on the operational messages port, receives any messages that the FDA posts, and forwards them to clients on operational messages passthrough port
-            Globals.OMPassthrough = new OMPassthough(9573, 9570, _logger);
-            Globals.OMPassthrough.Start();
+            ControllerGlobals.OMPassthrough = new OMPassthough(9573, 9570, _logger);
+            ControllerGlobals.OMPassthrough.Start();
 
             while (!stoppingToken.IsCancellationRequested)
             {               

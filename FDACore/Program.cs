@@ -102,11 +102,6 @@ namespace FDAApp
 
             Thread.Sleep(5000);
 
-
-    
-
-
-
             // hiding the console, disabling the x button, disabling quick edit mode are windows only functions
             if (Environment.OSVersion.Platform == PlatformID.Win32NT)
             {
@@ -390,10 +385,9 @@ namespace FDAApp
                 if (Globals.MQTT == null)
                 {
                     Globals.MQTT = new MqttClient(o.ToString());
-
                 }
-                //string pass = Common.Encrypt.DecryptString(Properties.Settings.Default.MQTT, "KrdXI6HhS3B8C0CulLtB");
-                var appConfig = configuration.GetSection(nameof(AppSettings));
+  
+                IConfigurationSection appConfig = configuration.GetSection(nameof(AppSettings));
                 string pass = Common.Encrypt.DecryptString(appConfig["MQTT"], "KrdXI6HhS3B8C0CulLtB");
 
                 if (Globals.MQTT.IsConnected)
@@ -412,78 +406,7 @@ namespace FDAApp
 
             if (success)
             {
-                // cancel the retry timer (if it's running)
-                if (MqttRetryTimer != null)
-                {
-                    MqttRetryTimer.Change(0, 0);
-                    MqttRetryTimer.Dispose();
-                    MqttRetryTimer = null;
-                }
-
-                Globals.MQTT.ConnectionClosed += MQTT_ConnectionClosed;
-                Globals.MQTT.MqttMsgPublishReceived += MQTT_MqttMsgPublishReceived;
-                Globals.SystemManager.LogApplicationEvent(null, "", "Connected to MQTT broker");
-
-                // publish FDA version number (with retain)
-                Globals.MQTT.Publish("FDA/version", Encoding.UTF8.GetBytes(Globals.FDAVersion), 0, true);
-
-                // publish the FDA execution ID (with retain)
-                Globals.MQTT.Publish("FDA/executionid", Encoding.UTF8.GetBytes(ExecutionID.ToString()), 0, true);
-
-                // publish the DB connection string (with retain)
-                //Globals.MQTT.Publish("FDA/dbconnstring", Encoding.UTF8.GetBytes(Globals.SystemManager.GetAppDBConnectionString()), 0, true);
-
-                // publish the run status
-                Globals.MQTT.Publish("FDA/runstatus", new byte[] { (byte)Globals.AppState.Normal }, 0, true);
-
-                // publish the FDA identifier
-                //Globals.MQTT.Publish("FDA/identifier", Encoding.UTF8.GetBytes(FDAidentifier), 0, true);
-
-                // publish the DB type;
-                Globals.MQTT?.Publish("FDA/DBType", Encoding.UTF8.GetBytes(DBType.ToUpper()), 0, true);
-
-
-                // subscribe to FDAManager commands
-                Globals.MQTT.Subscribe(new string[] { "FDAManager/command" }, new byte[] { 0 });
-
-                // subscribe to changes to MQTTenabled status of connections and tags
-                Globals.MQTT.Subscribe(new string[] { "connection/+/setmqttenabled", "tag/+/setmqttenabled" }, new byte[] { 0, 0 });
-
-                // start uptime reporting
-                upTimeReporterTmr = new System.Threading.Timer(ReportUptime, null, 0, 60000);
-
-                // publish the current connection list
-                if (_dataAquisitionManager != null)
-                    _dataAquisitionManager.PublishUpdatedConnectionsList();
-
-
-                // publish any Subscribeable Objects that have MQTT enabled (PublishAll checks if the MQTT enabled flag is set)
-                if (_dataAquisitionManager != null)
-                {
-                    if (DataAcqManager._connectionsDictionary != null)
-                    {
-                        foreach (SubscriptionManager.SubscribeableObject connection in DataAcqManager._connectionsDictionary.Values)
-                        {
-                            if (connection.MQTTEnabled)
-                                connection.PublishAll();
-                        }
-                    }
-                }
-
-                if (Globals.DBManager != null)
-                {
-                    Dictionary<Guid, FDADataPointDefinitionStructure> tags = ((DBManager)Globals.DBManager).GetAllTagDefs();
-                    if (tags != null)
-                    {
-                        foreach (SubscriptionManager.SubscribeableObject tag in tags.Values)
-                        {
-                            if (tag.MQTTEnabled)
-                                tag.PublishAll();
-                        }
-                    }
-                }
-
-               
+                HandleMQTTConnected();  
             }
             else
             {
@@ -493,11 +416,95 @@ namespace FDAApp
                 
                 // start a 5 second timer for re-attempting the connection
                 if (MqttRetryTimer == null)
-                    MqttRetryTimer = new System.Threading.Timer(MQTTConnect, o, 30000, 30000);
-                
+                    MqttRetryTimer = new System.Threading.Timer(MQTTConnect, o, 30000, 30000);              
             }
         }
 
+        private static void HandleMQTTConnected()
+        {
+            // cancel the retry timer (if it's running)
+            if (MqttRetryTimer != null)
+            {
+                MqttRetryTimer.Change(0, 0);
+                MqttRetryTimer.Dispose();
+                MqttRetryTimer = null;
+            }
+
+            Globals.MQTT.ConnectionClosed += MQTT_ConnectionClosed;
+            Globals.MQTT.MqttMsgPublishReceived += MQTT_MqttMsgPublishReceived;
+            Globals.SystemManager.LogApplicationEvent(null, "", "Connected to MQTT broker");
+
+            PublishFDAInfo();
+
+            // subscribe to FDAManager commands
+            Globals.MQTT.Subscribe(new string[] { "FDAManager/command" }, new byte[] { 0 });
+
+            // subscribe to changes to MQTTenabled status of connections and tags
+            Globals.MQTT.Subscribe(new string[] { "connection/+/setmqttenabled", "tag/+/setmqttenabled" }, new byte[] { 0, 0 });
+
+            // start uptime reporting
+            upTimeReporterTmr = new System.Threading.Timer(ReportUptime, null, 0, 60000);
+
+            // publish the current connection list
+            if (_dataAquisitionManager != null)
+                _dataAquisitionManager.PublishUpdatedConnectionsList();
+
+
+            PublishSubscribables();
+        }
+
+        /// <summary>
+        /// publish any Subscribeable Objects that have MQTT enabled
+        /// </summary>
+        private static void PublishSubscribables()
+        {
+             if (_dataAquisitionManager != null)
+            {
+                if (DataAcqManager._connectionsDictionary != null)
+                {
+                    foreach (SubscriptionManager.SubscribeableObject connection in DataAcqManager._connectionsDictionary.Values)
+                    {
+                        if (connection.MQTTEnabled)
+                            connection.PublishAll();  // PublishAll checks if the MQTT enabled flag is set
+                    }
+                }
+            }
+
+            if (Globals.DBManager != null)
+            {
+                Dictionary<Guid, FDADataPointDefinitionStructure> tags = ((DBManager)Globals.DBManager).GetAllTagDefs();
+                if (tags != null)
+                {
+                    foreach (SubscriptionManager.SubscribeableObject tag in tags.Values)
+                    {
+                        if (tag.MQTTEnabled)
+                            tag.PublishAll();
+                    }
+                }
+            }
+        }
+
+        private static void PublishFDAInfo()
+        {
+            // publish FDA version number (with retain)
+            Globals.MQTT.Publish("FDA/version", Encoding.UTF8.GetBytes(Globals.FDAVersion), 0, true);
+
+            // publish the FDA execution ID (with retain)
+            Globals.MQTT.Publish("FDA/executionid", Encoding.UTF8.GetBytes(ExecutionID.ToString()), 0, true);
+
+            // publish the DB connection string (with retain)
+            //Globals.MQTT.Publish("FDA/dbconnstring", Encoding.UTF8.GetBytes(Globals.SystemManager.GetAppDBConnectionString()), 0, true);
+
+            // publish the run status
+            Globals.MQTT.Publish("FDA/runstatus", new byte[] { (byte)Globals.AppState.Normal }, 0, true);
+
+            // publish the FDA identifier
+            //Globals.MQTT.Publish("FDA/identifier", Encoding.UTF8.GetBytes(FDAidentifier), 0, true);
+
+            // publish the DB type;
+            Globals.MQTT?.Publish("FDA/DBType", Encoding.UTF8.GetBytes(DBType.ToUpper()), 0, true);
+
+        }
         static internal void MQTT_MqttMsgPublishReceived(object sender, uPLibrary.Networking.M2Mqtt.Messages.MqttMsgPublishEventArgs e)
         {
             string[] topic = e.Topic.Split('/');

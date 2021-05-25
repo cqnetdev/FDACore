@@ -54,152 +54,13 @@ namespace FDAController
             }
         }
 
-        private void Bg_StatusChecker_DoWork(object sender, DoWorkEventArgs e)
-        {
-            FDAControllerService = new ServiceController("FDAControllerService");
-            while (!e.Cancel)
-            {
-                string result;
-                string status;
-                Color textcolor = GoodColor;
-                bool controllerGood = false;
 
-                // is the controller service running?
-                if (ProcessRunning("FDAControllerService"))
-                {
-                    status = "FDAControllerService is running";
-                    textcolor = GoodColor;
-
-                    // is the controller responsive to requests?
-                    result = SendRequest(_controllerIP, _controllerPort, "PING");
-                    if (result == "UP")
-                    {
-                        status += " and responsive";
-                        controllerGood = true;
-                    }
-                    else
-                    {
-                        status += " but is not responsive";
-                        textcolor = WarningColor;
-                        controllerGood = false;
-                    }
-                }
-                else
-                {
-                    status = "FDA Controller service is not running";
-                    textcolor = BadColor;
-                    SafePropertySet(btnStop, "Enabled", false);
-                    SafePropertySet(btnStart, "Enabled", false);
-                    SafePropertySet(btnStartConsole, "Enabled", false);
-                    controllerGood = false;
-                }
-
-                SafePropertySet(lblControllerService, "Text", status);
-                SafePropertySet(lblControllerService, "ForeColor", textcolor);
-                SafePropertySet(btnFDAMonitor, "Enabled", controllerGood);
-                
-
-
-                // is MQTT running?
-                if (ProcessRunning("mosquitto"))
-                {
-                    SafePropertySet(lblMQTT, "Text", "MQTT service is running");
-
-                    textcolor = GoodColor;
-                }
-                else
-                {
-                    SafePropertySet(lblMQTT, "Text", "MQTT service is not running");
-                    
-
-                    textcolor = BadColor;
-                }
-
-                SafePropertySet(lblMQTT, "ForeColor", textcolor);
-
-
-
-                // is the FDA running?
-                if (ProcessRunning("FDACore"))
-                {
-                    _isStarting = false;
-                    status = "FDACore is running";
-                    textcolor = GoodColor;
-                    if (!_isStopping)
-                    {
-                        SafePropertySet(btnStop, "Enabled", true);
-                    }
-
-                    if (controllerGood)
-                    {
-                        SafePropertySet(btnStart, "Enabled", false);
-                        SafePropertySet(btnStartConsole, "Enabled", false);
-                        SafePropertySet(btnStart, "Text", "Start");
-                    }
-  
-
-                    // ask the FDA controller for the FDA's run mode (background or console)
-                    result = SendRequest(_controllerIP, _controllerPort, "RUNMODE");
-                    if (result != "")
-                    {
-                        status += " in " + result + " mode";
-                    }
-
-                    // ask the FDA controller for the FDA's current queue count (serves as an 'FDA is responsive' test)
-                    result = SendRequest(_controllerIP, _controllerPort, "TOTALQUEUECOUNT");
-                    if (int.TryParse(result, out int count))
-                    {
-                        if (count > -1)
-                        {
-                            status += ", " + count + " items in the communications queues";
-                        }
-                    }
-                    else
-                    {
-                        status += ", unknown number of items in the communications queues";
-                        textcolor = WarningColor;
-                    }
-                }
-                else
-                {
-                    status = "FDACore is not running";
-                    textcolor = BadColor;
-                    if (_isStopping)
-                    {
-                        SafePropertySet(btnStop, "Text", "Stop");
-
-                    }
-                    _isStopping = false;
-                    
-                    SafePropertySet(btnStop, "Enabled", false);
-
-                    if (!_isStarting && controllerGood)
-                    {
-                        SafePropertySet(btnStart, "Enabled",true);
-                        SafePropertySet(btnStart, "Text", "Start");
-                        SafePropertySet(btnStartConsole, "Enabled", true);
-
-                    }
-
-                }
-                SafePropertySet(lblFDA, "Text", status);
-                SafePropertySet(lblFDA, "ForeColor", textcolor);
-
-
-
-                // update the 'last status update' timestamp
-                SafePropertySet(lblLastupdate, "Text", "Last status update: " + DateTime.Now.ToString());
-
-    
-            }
-        }
-
-        private void Timer_Tick(object sender, EventArgs e)
+        private bool CheckControllerService()
         {
             string result;
             string status;
             Color textcolor = GoodColor;
-            bool controllerGood = false;
+            bool controllerStatus = false;
 
             // is the controller service running?
             if (ProcessRunning("FDAControllerService"))
@@ -212,38 +73,60 @@ namespace FDAController
                 if (result == "UP")
                 {
                     status += " and responsive";
-                    controllerGood = true;
+                    controllerStatus = true;
                 }
                 else
                 {
                     status += " but is not responsive";
                     textcolor = WarningColor;
+                    controllerStatus = false;
                 }
             }
             else
             {
                 status = "FDA Controller service is not running";
                 textcolor = BadColor;
-                btnStop.Enabled = false;
-                btnStart.Enabled = false;
-                btnStartConsole.Enabled = false;               
+                SafePropertySet(btnStop, "Enabled", false);
+                SafePropertySet(btnStart, "Enabled", false);
+                SafePropertySet(btnStartConsole, "Enabled", false);
+                controllerStatus = false;
             }
-            lblControllerService.Text = status;
-            lblControllerService.ForeColor = textcolor;
-            btnFDAMonitor.Enabled = controllerGood;
 
-            // is MQTT running?
+            SafePropertySet(lblControllerService, "Text", status);
+            SafePropertySet(lblControllerService, "ForeColor", textcolor);
+            SafePropertySet(btnFDAMonitor, "Enabled", controllerStatus);
+
+            return controllerStatus;
+
+        }
+
+        private void CheckMosquittoService()
+        {
+            Color textcolor = GoodColor;
+
             if (ProcessRunning("mosquitto"))
             {
-                lblMQTT.Text = "MQTT service is running";
+                SafePropertySet(lblMQTT, "Text", "MQTT service is running");
+
                 textcolor = GoodColor;
             }
             else
             {
-                lblMQTT.Text = "MQTT service is not running";
+                SafePropertySet(lblMQTT, "Text", "MQTT service is not running");
+
+
                 textcolor = BadColor;
             }
-            lblMQTT.ForeColor = textcolor;
+
+            SafePropertySet(lblMQTT, "ForeColor", textcolor);
+        }
+
+        private void CheckFDAProcess(bool controllerRunning)
+        {
+            string result;
+            string status;
+            Color textcolor = GoodColor;
+        
 
             // is the FDA running?
             if (ProcessRunning("FDACore"))
@@ -253,11 +136,16 @@ namespace FDAController
                 textcolor = GoodColor;
                 if (!_isStopping)
                 {
-                    btnStop.Enabled = true;
+                    SafePropertySet(btnStop, "Enabled", true);
                 }
-                btnStart.Enabled = false;
-                btnStartConsole.Enabled = false;
-                btnStart.Text = "Start";
+
+                if (controllerRunning)
+                {
+                    SafePropertySet(btnStart, "Enabled", false);
+                    SafePropertySet(btnStartConsole, "Enabled", false);
+                    SafePropertySet(btnStart, "Text", "Start");
+                }
+
 
                 // ask the FDA controller for the FDA's run mode (background or console)
                 result = SendRequest(_controllerIP, _controllerPort, "RUNMODE");
@@ -287,26 +175,49 @@ namespace FDAController
                 textcolor = BadColor;
                 if (_isStopping)
                 {
-                    btnStop.Text = "Stop";
+                    SafePropertySet(btnStop, "Text", "Stop");
+
                 }
                 _isStopping = false;
-                btnStop.Enabled = false;
-                if (!_isStarting)
+
+                SafePropertySet(btnStop, "Enabled", false);
+
+                if (!_isStarting && controllerRunning)
                 {
-                    btnStart.Enabled = true;
-                    btnStart.Text = "Start";
-                    btnStartConsole.Enabled = true;
+                    SafePropertySet(btnStart, "Enabled", true);
+                    SafePropertySet(btnStart, "Text", "Start");
+                    SafePropertySet(btnStartConsole, "Enabled", true);
+
                 }
-                
+
             }
-            lblFDA.Text = status;
-            lblFDA.ForeColor = textcolor;
-
-
-            // update the 'last status update' timestamp
-            lblLastupdate.Text = "Last status update: " + DateTime.Now.ToString();
+            SafePropertySet(lblFDA, "Text", status);
+            SafePropertySet(lblFDA, "ForeColor", textcolor);
         }
 
+        private void Bg_StatusChecker_DoWork(object sender, DoWorkEventArgs e)
+        {
+            FDAControllerService = new ServiceController("FDAControllerService");
+
+            Color textcolor = GoodColor;
+            bool controllerStatus;
+            while (!e.Cancel)
+            {
+
+                controllerStatus = CheckControllerService();
+
+                CheckMosquittoService();
+
+
+                CheckFDAProcess(controllerStatus);
+
+
+                // update the 'last status update' timestamp
+                SafePropertySet(lblLastupdate, "Text", "Last status update: " + DateTime.Now.ToString());    
+            }
+        }
+
+   
         private string SendRequest(string address,int port, string request)
         {
             byte[] buffer = new byte[1024];

@@ -58,17 +58,17 @@ namespace ControllerService
                     _basicServicesPort.Send(e.ClientID, "UP"); // yes, I'm here
                     break;
                 case "TOTALQUEUECOUNT":
-                    string count = Globals.BasicServicesClient.FDAQueueCount.ToString();
+                    string count = ControllerGlobals.BasicServicesClient.FDAQueueCount.ToString();
                     //_logger.LogInformation("Returning the total queue count (" + count + ") to the requestor", new object[] { });
                     _basicServicesPort.Send(e.ClientID, count);  // return the last known queue count to the requestor
                     break;
                 case "RUNMODE":
                     //_logger.LogInformation("Returning the run mode '" + Globals.BasicServicesClient.FDAMode + "'");
-                    _basicServicesPort.Send(e.ClientID, Globals.BasicServicesClient.FDAMode);
+                    _basicServicesPort.Send(e.ClientID, ControllerGlobals.BasicServicesClient.FDAMode);
                     break;
                 default:
                     //_logger.LogInformation("Forwarding command '" + command + "' to the FDA", new object[] { });
-                    Globals.BasicServicesClient.Send(command); // forward all other messages to the FDA
+                    ControllerGlobals.BasicServicesClient.Send(command); // forward all other messages to the FDA
                     _basicServicesPort.Send(e.ClientID, "FORWARDED"); // reply  back to the requestor that the command was forwarded to the FDA
                     break;
             }

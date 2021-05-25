@@ -31,7 +31,7 @@ namespace Common
             public DateTime Timestamp {get{ return new DateTime(TimeStamp_FileTimeTicks + FILETIME_TO_DATETIMETICKS); } }
         }
        
-        public static List<string> SupportedProtocols = new List<string>(new string[] { "ROC", "MODBUS","MODBUSTCP","ENRONMODBUS","BSAP","BSAPUDP"});
+        public readonly static List<string> SupportedProtocols = new List<string>(new string[] { "ROC", "MODBUS","MODBUSTCP","ENRONMODBUS","BSAP","BSAPUDP"});
         public static bool RunConsoleCommand(string command, string args, string workingDir = "")
         {
             try

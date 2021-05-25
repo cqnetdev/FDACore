@@ -2417,6 +2417,7 @@ namespace FDA
             lock (_requestgroupConfig) { _requestgroupConfig.Clear(); }
             lock (_dataPointConfig) { _dataPointConfig.Clear(); }
             lock (_connectionsConfig) { _connectionsConfig.Clear(); }
+            lock (_scriptsConfig) { _scriptsConfig.Clear(); }
         }
     
 
