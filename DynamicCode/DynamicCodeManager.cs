@@ -9,7 +9,7 @@ using FDA;
 
 namespace DynamicCode
 {
-    public class DynamicCodeManager
+    public static class DynamicCodeManager 
     {
         /********************* public ****************************/
         public static Dictionary<Guid, FDADataPointDefinitionStructure> Tags { get => _tags; set { _tags = value; Module.Tags = value; } }
@@ -31,7 +31,7 @@ namespace DynamicCode
 
         /******************** private *****************************/
         private static string UserCodeWrapper = @"public class UserCode
-                                                  {
+                                                  {                           
                                                     private static Dictionary<Guid, FDADataPointDefinitionStructure> _tagsref;
                                                     private static Dictionary<Guid, ConnectionManager> _connectionsref;
 
@@ -41,24 +41,55 @@ namespace DynamicCode
                                                        _connectionsref = connMgrs;  
                                                     }
 
-                                                    private FDADataPointDefinitionStructure DPDS(string tagid)
+                                                    private class Tag
+                                                    {
+                                                        private FDADataPointDefinitionStructure _tagref;
+                                                        
+                                                        public Double Value {get => _tagref.LastRead.Value;}
+                                                        public DateTime Timestamp {get => _tagref.LastRead.Timestamp;}
+                                                        public int Quality { get => _tagref.LastRead.Quality;}
+                                                        
+                                                        public void SetValue(Double value, int quality, DateTime timestamp,string destination="""")
+                                                        {
+                                                            _tagref.LastRead = new FDADataPointDefinitionStructure.Datapoint(value, quality, timestamp,destination, DataType.UNKNOWN, DataRequest.WriteMode.Insert);
+                                                        }
+
+                                                        public Tag(FDADataPointDefinitionStructure tagref)
+                                                        {
+                                                            _tagref = tagref;
+                                                        }
+                                                    }
+
+                                                    private class Connection
+                                                    {
+                                                        private ConnectionManager _connref;
+                                                        public bool ConnectionEnabled {get => _connref.ConnectionEnabled; set => _connref.ConnectionEnabled = value;}
+                                                        public bool CommunicationsEnabled {get => _connref.CommunicationsEnabled; set => _connref.CommunicationsEnabled = value;}
+                                                        public bool CommsLogEnabled {get => _connref.CommsLogEnabled; set => _connref.CommsLogEnabled = value;}
+                                                        public Connection(ConnectionManager connref)
+                                                        {
+                                                            _connref = connref;
+                                                        }
+                                                    }
+
+                                                    private Tag GetTag(string tagid)
                                                     {
                                                         Guid tagGuid = Guid.Parse(tagid);
                                                         try
                                                         {
-                                                           return _tagsref[tagGuid];
+                                                           return new Tag(_tagsref[tagGuid]);
                                                         } catch (Exception ex)
                                                         {
-                                                            throw new Exception(""DPDS with ID "" + tagid + "" not found"",ex);
+                                                            throw new Exception(""Tag with ID "" + tagid + "" not found"",ex);
                                                         }
                                                     }
 
-                                                    private ConnectionManager Connection(string connid)
+                                                    private Connection GetConnection(string connid)
                                                     {
-                                                        Guid connuid = Guid.Parse(connid);
+                                                        Guid connuid = Guid.Parse(connid);                   
                                                         try
                                                         {
-                                                           return _connectionsref[connuid];
+                                                           return new Connection(_connectionsref[connuid]);
                                                         } catch (Exception ex)
                                                         {
                                                             throw new Exception(""Connection with ID "" + connid + "" not found"",ex);
@@ -155,6 +186,7 @@ namespace DynamicCode
             if (UserCodeModules.ContainsKey(moduleName))
             {
                 UserCodeModules[moduleName].UserMethodExecuted -= UserModuleMethodExecuted;
+                UserCodeModules[moduleName].UserMethodRuntimeError -= UserModuleMethodRuntimeError;
                 UserCodeModules[moduleName].Dispose();
                 UserCodeModules.Remove(moduleName);
             }
@@ -164,59 +196,16 @@ namespace DynamicCode
             }
         }
 
-        /*
-        private static List<Tuple<string, string>> GetRunSpecs(string userCode, ref string outputUserCode)
+        public static void UnloadAllUserModules()
         {
-            List<Tuple<string, string>> output = new List<Tuple<string, string>>();
-            char[] delims = new[] { '\r', '\n' };
-
-            string[] userCodeLines = userCode.Split(delims, StringSplitOptions.RemoveEmptyEntries);
-            string functionDefLine;
-            string[] functionDefLinePieces;
-            string functionName;
-            string runSpec;
-
-            for (int i = 0; i < userCodeLines.Length; i++)
+            foreach (Module module in UserCodeModules.Values)
             {
-                if (userCodeLines[i].StartsWith("public void"))
-                {
-                    // we've found a function defnition
-                    functionDefLine = userCodeLines[i];
-
-                    // remove any multiple spaces
-                    while (functionDefLine.Contains("  ")) functionDefLine = functionDefLine.Replace("  ", " ");
-
-                    // break it up into words
-                    functionDefLinePieces = functionDefLine.Split(' ');
-
-                    // function name should be in element 2 (remove the braces, leaving just the name)
-                    functionName = functionDefLinePieces[2].Replace("(", "").Replace(")", "");
-
-
-                    // now re-split the line, using $ as the split character
-                    functionDefLinePieces = functionDefLine.Split('$');
-
-                    // first element is the function declaration, any additional elements are run specs
-                    // record the run spec(s) for this function in the output
-                    if (functionDefLinePieces.Length > 1)
-                    {
-                        for (int j = 1; j < functionDefLinePieces.Length; j++)
-                        {
-                            runSpec = functionDefLinePieces[j];
-                            output.Add(new Tuple<string, string>(functionName, runSpec));
-                        }
-
-                        // remove the run specs from the user code, so it'll compile
-                        userCodeLines[i] = functionDefLinePieces[0];
-                    }
-
-                }
+                module.UserMethodExecuted -= UserModuleMethodExecuted;
+                module.UserMethodRuntimeError -= UserModuleMethodRuntimeError;
+                module.Dispose();
             }
 
-            // put the code back together, minus the run specs
-            outputUserCode = string.Join(Environment.NewLine, userCodeLines);
-            return output;
+            UserCodeModules.Clear();
         }
-        */
     }
 }
