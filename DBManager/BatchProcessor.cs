@@ -8,6 +8,7 @@ using System.Threading;
 using System.ComponentModel;
 using System.Data.SqlClient;
 using System.Diagnostics;
+using Support;
 
 namespace FDA
 {
@@ -200,7 +201,7 @@ namespace FDA
                     SQL.Append("('");
                     SQL.Append(tag.TagID);
                     SQL.Append("','");
-                    SQL.Append(Helpers.FormatDateTime(tag.Timestamp));
+                    SQL.Append(DateTimeHelpers.FormatDateTime(tag.Timestamp));
                     SQL.Append("',");
                     SQL.Append(tag.Value);
                     SQL.Append(",");

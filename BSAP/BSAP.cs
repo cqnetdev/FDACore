@@ -9,6 +9,7 @@ using System.Data.OleDb;
 using FDA;
 using System.CodeDom;
 using System.Security.Policy;
+using Support;
 
 namespace BSAP
 {
@@ -639,7 +640,7 @@ namespace BSAP
                     goto BadResponse;
                 }
 
-                bool isResponseToWriteReq = (Helpers.GetBit(request[9], 7));
+                bool isResponseToWriteReq = (IntHelpers.GetBit(request[9], 7));
 
                 // check the CRC       
                 if (!CRCCheck(response))
@@ -681,18 +682,18 @@ namespace BSAP
                     byte errorCode = response[9];
                     requestObj.SetStatus(DataRequest.RequestStatus.Error);
                     List<string> errorMessages = new List<string>();
-                    if (Helpers.GetBit(errorCode, 7)) // bit 7 is on (remote is reporting an error)
+                    if (IntHelpers.GetBit(errorCode, 7)) // bit 7 is on (remote is reporting an error)
                     {
 
-                        if (Helpers.GetBit(errorCode, 6))
+                        if (IntHelpers.GetBit(errorCode, 6))
                             errorMessages.Add("Invalid data base function requested");
-                        if (Helpers.GetBit(errorCode, 5))
+                        if (IntHelpers.GetBit(errorCode, 5))
                             errorMessages.Add("Version number does not match");
-                        if (Helpers.GetBit(errorCode, 4))
+                        if (IntHelpers.GetBit(errorCode, 4))
                             errorMessages.Add("No match found");
-                        if (Helpers.GetBit(errorCode, 3))
+                        if (IntHelpers.GetBit(errorCode, 3))
                             errorMessages.Add("Analog value found in packed logical processing");
-                        if (Helpers.GetBit(errorCode, 2))
+                        if (IntHelpers.GetBit(errorCode, 2))
                             errorMessages.Add("No match on name found or Memory Read request exceeds maximum allow message buffer byte count");
                         if (errorMessages.Count > 0)
                         {
@@ -825,7 +826,7 @@ namespace BSAP
                     goto BadResponse;
                 }
 
-                bool isResponseToWriteReq = (Helpers.GetBit(request[25], 7));
+                bool isResponseToWriteReq = (IntHelpers.GetBit(request[25], 7));
 
       
          
@@ -858,17 +859,17 @@ namespace BSAP
 
                     requestObj.SetStatus(DataRequest.RequestStatus.Error);
                     List<string> errorMessages = new List<string>();
-                    if (Helpers.GetBit(errorCode, 7)) // bit 7 is on (remote is reporting an error)
+                    if (IntHelpers.GetBit(errorCode, 7)) // bit 7 is on (remote is reporting an error)
                     {
-                        if (Helpers.GetBit(errorCode, 6))
+                        if (IntHelpers.GetBit(errorCode, 6))
                             errorMessages.Add("Invalid data base function requested");
-                        if (Helpers.GetBit(errorCode, 5))
+                        if (IntHelpers.GetBit(errorCode, 5))
                             errorMessages.Add("Version number does not match");
-                        if (Helpers.GetBit(errorCode, 4))
+                        if (IntHelpers.GetBit(errorCode, 4))
                             errorMessages.Add("No match found");
-                        if (Helpers.GetBit(errorCode, 3))
+                        if (IntHelpers.GetBit(errorCode, 3))
                             errorMessages.Add("Analog value found in packed logical processing");
-                        if (Helpers.GetBit(errorCode, 2))
+                        if (IntHelpers.GetBit(errorCode, 2))
                             errorMessages.Add("No match on name found or Memory Read request exceeds maximum allow message buffer byte count");
                         if (errorMessages.Count > 0)
                         {
@@ -980,7 +981,7 @@ namespace BSAP
 
                 // if this was a write operation, there's nothing for us to do with the response (it's already been checked for error codes)
                 // just send an ack back
-                if (Helpers.GetBit(request[25], 7))
+                if (IntHelpers.GetBit(request[25], 7))
                 {
                     requestObj.AckBytes = new byte[] { 0x0E, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, requestObj.ResponseBytes[6], requestObj.ResponseBytes[7], requestObj.ResponseBytes[8], requestObj.ResponseBytes[9] };
                     return;
@@ -1005,7 +1006,7 @@ namespace BSAP
                 bool includesMSD = (request[25] == 0x04); // we've set up all read-by-name requests to include the MSD in the response
 
 
-                if (Helpers.GetBit(response[23], 7))  // if bit 7 of byte 9 is on, there is at least one signal specific error (an extra byte is included at the beginning of each signal to indcate the error)
+                if (IntHelpers.GetBit(response[23], 7))  // if bit 7 of byte 9 is on, there is at least one signal specific error (an extra byte is included at the beginning of each signal to indcate the error)
                     includesEERByte = true;
 
                 int byteIdx = 25; // data starts at byte 25
@@ -1080,7 +1081,7 @@ namespace BSAP
                 byte[] request = UnescapeDLE(new List<byte>(requestObj.RequestBytes)).ToArray();
 
                 // if this was a write operation, there's nothing for us to do with the response (it's already been checked for error codes)
-                if (Helpers.GetBit(request[9], 7))
+                if (IntHelpers.GetBit(request[9], 7))
                     return;
 
 
@@ -1095,7 +1096,7 @@ namespace BSAP
                 bool includesMSD = (request[9] == 0x04); // we've set up all read-by-name requests to include the MSD in the response
 
 
-                if (Helpers.GetBit(response[9], 7))  // if bit 7 of byte 9 is on, there is at least one signal specific error (an extra byte is included at the beginning of each signal to indcate the error)
+                if (IntHelpers.GetBit(response[9], 7))  // if bit 7 of byte 9 is on, there is at least one signal specific error (an extra byte is included at the beginning of each signal to indcate the error)
                     includesEERByte = true;
 
                 int byteIdx = 11; // data starts at byte 11
@@ -1164,11 +1165,11 @@ namespace BSAP
 
         public static string GetDataType(byte typeByte)
         {
-            if (!Helpers.GetBit(typeByte, 1))
+            if (!IntHelpers.GetBit(typeByte, 1))
                 return "logical";
             else
             {
-                if (Helpers.GetBit(typeByte, 0))
+                if (IntHelpers.GetBit(typeByte, 0))
                     return "string";
                 else
                     return "analog";
@@ -1180,14 +1181,14 @@ namespace BSAP
             if (data.Length < 2)
                 return false;
 
-            ushort responseCRC = Helpers.ToUInt16(data[data.Length - 2], data[data.Length - 1]);
+            ushort responseCRC = IntHelpers.ToUInt16(data[data.Length - 2], data[data.Length - 1]);
 
             byte[] dataForCRCCalculation = new byte[data.Length - 5];
             Array.Copy(data, 2,dataForCRCCalculation,0, data.Length - 6);
             dataForCRCCalculation[dataForCRCCalculation.Length - 1] = 0x03;
             byte[] unescapedDataforCRC = UnescapeDLE(new List<byte>(dataForCRCCalculation)).ToArray();
-            ushort calcdCRC = Helpers.CalcCRC16(unescapedDataforCRC, CRCInitial, CRCPoly, CRCSwapOutputBytes);
-            calcdCRC = Helpers.SwapBytes(calcdCRC);
+            ushort calcdCRC = CRCHelpers.CalcCRC16(unescapedDataforCRC, CRCInitial, CRCPoly, CRCSwapOutputBytes);
+            calcdCRC = IntHelpers.SwapBytes(calcdCRC);
 
             return (responseCRC == calcdCRC);
         }
@@ -1334,8 +1335,8 @@ namespace BSAP
             for (int i = 0; i < signalList.Length; i++)
             {
 
-                thisMessage.Add(Helpers.GetLowByte(signalList[i]));
-                thisMessage.Add(Helpers.GetHighByte(signalList[i]));
+                thisMessage.Add(IntHelpers.GetLowByte(signalList[i]));
+                thisMessage.Add(IntHelpers.GetHighByte(signalList[i]));
                 thisMessageSignalCount++;
 
                 if (thisMessageSignalCount == perMessageSignalCount || i == signalList.Length - 1)
@@ -1559,8 +1560,8 @@ namespace BSAP
 
 
                 // add the address of the signal
-                thisMessage.Add(Helpers.GetLowByte(signalList[i]));
-                thisMessage.Add(Helpers.GetHighByte(signalList[i]));
+                thisMessage.Add(IntHelpers.GetLowByte(signalList[i]));
+                thisMessage.Add(IntHelpers.GetHighByte(signalList[i]));
                 thisMessageSize += 2;
                 thisMessageDataSize += 2;
 
@@ -1897,8 +1898,8 @@ namespace BSAP
             for (int i = 0; i < signalList.Length; i++)
             {
 
-                thisMessage.Add(Helpers.GetLowByte(signalList[i]));
-                thisMessage.Add(Helpers.GetHighByte(signalList[i]));
+                thisMessage.Add(IntHelpers.GetLowByte(signalList[i]));
+                thisMessage.Add(IntHelpers.GetHighByte(signalList[i]));
                 thisMessageSignalCount++;
 
                 if (thisMessageSignalCount == perMessageSignalCount || i == signalList.Length-1)
@@ -1990,8 +1991,8 @@ namespace BSAP
 
 
                 // add the address of the signal
-                thisMessage.Add(Helpers.GetLowByte(signalList[i]));
-                thisMessage.Add(Helpers.GetHighByte(signalList[i]));
+                thisMessage.Add(IntHelpers.GetLowByte(signalList[i]));
+                thisMessage.Add(IntHelpers.GetHighByte(signalList[i]));
                 thisMessageSize += 2;
 
 
@@ -2140,15 +2141,15 @@ namespace BSAP
             ushort appSeqNumber = SerialGetNextApplicationSeqNumber();
             byte serialNum = GetNextSerialNumber();
             partialMessage[1] = serialNum;
-            partialMessage[3] = Helpers.GetLowByte(appSeqNumber);
-            partialMessage[4] = Helpers.GetHighByte(appSeqNumber);
+            partialMessage[3] = IntHelpers.GetLowByte(appSeqNumber);
+            partialMessage[4] = IntHelpers.GetHighByte(appSeqNumber);
 
 
             // add the ETX for CRC calculation purposes
             partialMessage.Add(ETX);
 
             // calculate CRC
-            ushort CRC = Helpers.CalcCRC16(partialMessage.ToArray(), CRCInitial, CRCPoly, CRCSwapOutputBytes);
+            ushort CRC = CRCHelpers.CalcCRC16(partialMessage.ToArray(), CRCInitial, CRCPoly, CRCSwapOutputBytes);
 
             // escape any DLEs in the message body
             List<byte> escapedMessageBody = EscapeDLE(partialMessage);
@@ -2160,8 +2161,8 @@ namespace BSAP
             final.AddRange(escapedMessageBody);
             final.Insert(final.Count - 1, DLE);  // escape the ETX
 
-            final.Add(Helpers.GetLowByte(CRC));
-            final.Add(Helpers.GetHighByte(CRC));
+            final.Add(IntHelpers.GetLowByte(CRC));
+            final.Add(IntHelpers.GetHighByte(CRC));
 
             return final;
         }

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Text;
+using Support;
 
 namespace Common
 {
@@ -67,9 +68,9 @@ namespace Common
                 sb.Append("',");
                 sb.Append(AttemptNum);
                 sb.Append(",'");
-                sb.Append(Helpers.FormatDateTime(EventTime));
+                sb.Append(DateTimeHelpers.FormatDateTime(EventTime));
                 sb.Append("','");
-                sb.Append(Helpers.FormatDateTime(EventTime));
+                sb.Append(DateTimeHelpers.FormatDateTime(EventTime));
                 sb.Append("',");
                 sb.Append(elapsed);
                 sb.Append(",");
@@ -135,9 +136,9 @@ namespace Common
                 sb.Append("','',");
                 sb.Append(Attempt);
                 sb.Append(",'");
-                sb.Append(Helpers.FormatDateTime(StartTime));
+                sb.Append(DateTimeHelpers.FormatDateTime(StartTime));
                 sb.Append("','");
-                sb.Append(Helpers.FormatDateTime(endTime));
+                sb.Append(DateTimeHelpers.FormatDateTime(endTime));
                 sb.Append("',");
                 sb.Append(Elapsed.TotalMilliseconds);
                 sb.Append(",");
@@ -172,11 +173,15 @@ namespace Common
 
         public override bool ToSQL(string tablename,Guid executionID,StringBuilder sb,bool firstItem)
         {
-            //  (FDAExecutionID, connectionID, DeviceAddress, Attempt, TimestampUTC1, TimestampUTC2, ElapsedPeriod, TransCode, TransStatus, ApplicationMessage,DBRGUID,DBRGIdx,DBRGSize,Details01,TxSize,Details02,RxSize,ProtocolNote,Protocol) values ");
+            // generate the SQL for inserting this log item into the database (will be appended to a larger query for inserting several records in a single query)
+            
+            // the entire insert query looks like this:
+            // Insert into CommsLog (FDAExecutionID, connectionID, DeviceAddress, Attempt, TimestampUTC1, TimestampUTC2, ElapsedPeriod, TransCode, TransStatus, ApplicationMessage,DBRGUID,DBRGIdx,DBRGSize,Details01,TxSize,Details02,RxSize,ProtocolNote,Protocol) values ")
+            // values (log item 1),(log item 2), etc...
 
             try
             {
-                string timestampStr = Helpers.FormatDateTime(Timestamp);
+                string timestampStr = DateTimeHelpers.FormatDateTime(Timestamp);
 
                 if (!firstItem)
                     sb.Append(",");
@@ -220,11 +225,8 @@ namespace Common
         public string ApplicationMessage;
         public string Protocol;
         public string DeviceAddress;
-                   
-           
 
-
-        public TransactionLogItem(DataRequest request,int attemptNum,Guid connectionID, Guid groupID, int groupSize, string groupIdx,string AppMsg="N/A") : base(connectionID)
+        public TransactionLogItem(DataRequest request,int attemptNum,Guid connectionID, Guid groupID, int groupSize, string groupIdx,string AppMsg="N/A") : base(request.ConnectionID)
         {
             RequestTimestamp = request.RequestTimestamp;
             ResponseTimestamp = request.ResponseTimestamp;
@@ -249,14 +251,18 @@ namespace Common
 
         public override bool ToSQL(string tablename,Guid executionID,StringBuilder sb,bool firstItem)
         {
+            // generate the SQL for inserting this log item into the database (will be appended to a larger query for inserting several records in a single query)
+            // the entire insert query looks like this:
+            // Insert into CommsLog (FDAExecutionID, connectionID, DeviceAddress, Attempt, TimestampUTC1, TimestampUTC2, ElapsedPeriod, TransCode, TransStatus, ApplicationMessage,DBRGUID,DBRGIdx,DBRGSize,Details01,TxSize,Details02,RxSize,ProtocolNote,Protocol)
+            // values (log item 1),(log item 2), etc...
+            
             try
             {
                 Int64 elapsed = Convert.ToInt64(ResponseTimestamp.Subtract(RequestTimestamp).TotalMilliseconds);
                 if (!firstItem)
                     sb.Append(",");
 
-                //  (FDAExecutionID, connectionID, DeviceAddress, Attempt, TimestampUTC1, TimestampUTC2, ElapsedPeriod, TransCode, TransStatus, ApplicationMessage,DBRGUID,DBRGIdx,DBRGSize,Details01,TxSize,Details02,RxSize,ProtocolNote,Protocol) values ");
-
+ 
                 sb.Append("('");
                 sb.Append(executionID);
                 sb.Append("','");
@@ -266,9 +272,9 @@ namespace Common
                 sb.Append("',");
                 sb.Append(AttemptNum);
                 sb.Append(",'");
-                sb.Append(Helpers.FormatDateTime(RequestTimestamp));
+                sb.Append(DateTimeHelpers.FormatDateTime(RequestTimestamp));
                 sb.Append("','");
-                sb.Append(Helpers.FormatDateTime(ResponseTimestamp));
+                sb.Append(DateTimeHelpers.FormatDateTime(ResponseTimestamp));
                 sb.Append("',");
                 sb.Append(elapsed);
                 sb.Append(",");

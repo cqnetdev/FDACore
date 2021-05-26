@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Text;
+using Support;
 
 namespace Common
 {
@@ -42,7 +43,7 @@ namespace Common
             _arguments = arguments;
             physical_point = arguments;
 
-            if (IsValidGUID(_tagID))
+            if (ValidationHelpers.IsValidGuid(_tagID))
             {
                 DPDUID = Guid.Parse(tagID);
             }
@@ -61,7 +62,7 @@ namespace Common
         public virtual void Initialize()
         {
             // tag id is valid
-            if (!IsValidGUID(_tagID))
+            if (!ValidationHelpers.IsValidGuid(_tagID))
             {
                 DPDSEnabled = false;
                 _valid = false;
@@ -94,10 +95,6 @@ namespace Common
                 return false;
         }
 
-        protected static bool IsValidGUID(string testval)
-        {
-            return Guid.TryParse(testval, out _);
-        }
 
         protected static UInt32 UInt32FromByteArray(BitArray bitArray)
         {
@@ -169,7 +166,7 @@ namespace Common
             }
 
             // first argument (source tag) must be a valid guid
-            if (!IsValidGUID(argumentsList[0]))
+            if (!ValidationHelpers.IsValidGuid(argumentsList[0]))
             {
                 DPDSEnabled = false;
                 _valid = false;
@@ -357,7 +354,7 @@ namespace Common
             }
 
             // first argument (source tag) must be a valid guid
-            if (!IsValidGUID(argumentsList[0]))
+            if (!ValidationHelpers.IsValidGuid(argumentsList[0]))
             {
                 DPDSEnabled = false;
                 _valid = false;

@@ -71,6 +71,8 @@ namespace FDA
 
         public void Dispose()
         {
+            Globals.SystemManager.LogApplicationEvent(this, "", "Stopping Scheduler '" + Description + "' (" + ID + ")");
+            Enabled = false;
             if (Timer != null)
             {
                 Timer.Dispose();

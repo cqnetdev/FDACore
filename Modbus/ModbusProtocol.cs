@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using Common;
 using FDA;
+using Support;
 
 namespace Modbus
 {
@@ -567,9 +568,9 @@ namespace Modbus
                         Array.Copy(data, byteIndex, valueBytes, 0, dataSize);
 
                         if (currentTag.SwapBytes)
-                            valueBytes = Helpers.SwapBytes(valueBytes);
+                            valueBytes = IntHelpers.SwapBytes(valueBytes);
                         if (currentTag.SwapWords)
-                            valueBytes = Helpers.SwapWords(valueBytes);
+                            valueBytes = IntHelpers.SwapWords(valueBytes);
 
                         value = MBDatatype.FromBytes(valueBytes);
                         value = Convert.ChangeType(value, hostDataType); 
@@ -781,7 +782,7 @@ namespace Modbus
                 if (tagInfo.Length > 1)
                 {
                     //element 1 is a valid guid
-                    if (!Helpers.IsValidGuid(tagInfo[1]))
+                    if (!ValidationHelpers.IsValidGuid(tagInfo[1]))
                     {
                         //Globals.SystemManager.LogApplicationEvent(obj, "", "The group " + groupID + ", reqested by " + requestor + " contains an request with invalid tag information (the tag ID '" + tagInfo[1] + "' is not a valid UID, should be in the format xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx). This request group will not be processed",true);
                         RecordValidationError(obj,groupID,requestor,"contains an request with invalid tag information (the tag ID '" + tagInfo[1] + "' is not a valid UID, should be in the format xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)");
@@ -824,8 +825,8 @@ namespace Modbus
         {
             // transaction identifier (2 bytes)
             ushort transIdentifier = (ushort)Globals.FDANow().GetHashCode();
-            bytes.Add(Helpers.GetHighByte(transIdentifier));
-            bytes.Add(Helpers.GetLowByte(transIdentifier));
+            bytes.Add(IntHelpers.GetHighByte(transIdentifier));
+            bytes.Add(IntHelpers.GetLowByte(transIdentifier));
 
             // protocol identifier (2 bytes, 0 for MODBUS)
             bytes.Add(0);
@@ -842,12 +843,12 @@ namespace Modbus
             if (slave > 254)
             {
                 bytes.Add(0xFF);
-                bytes.Add(Helpers.GetHighByte(slave));
-                bytes.Add(Helpers.GetLowByte(slave));
+                bytes.Add(IntHelpers.GetHighByte(slave));
+                bytes.Add(IntHelpers.GetLowByte(slave));
             }
             else
             {
-                bytes.Add(Helpers.GetLowByte(slave));
+                bytes.Add(IntHelpers.GetLowByte(slave));
             }
         }
         private static bool RespondingDeviceCheck(byte[] request, byte[] response, bool tcp)
@@ -886,12 +887,12 @@ namespace Modbus
             if (tcp)
                 return true;
 
-            ushort responseCRC = Helpers.ToUInt16(data[data.Length - 2], data[data.Length - 1]);
+            ushort responseCRC = IntHelpers.ToUInt16(data[data.Length - 2], data[data.Length - 1]);
 
             byte[] msgBytes = new byte[data.Length-2];
             Array.Copy(data,0,msgBytes, 0, data.Length-2);
 
-            ushort calcdCRC = Helpers.CalcCRC16(msgBytes, CRCInitial, CRCPoly, CRCSwapOutputBytes);
+            ushort calcdCRC = CRCHelpers.CalcCRC16(msgBytes, CRCInitial, CRCPoly, CRCSwapOutputBytes);
 
             return (responseCRC == calcdCRC);
         }
@@ -929,9 +930,9 @@ namespace Modbus
                     // crc
                     if (!tcp)
                     { // add the CRC if not using modbustcp
-                        ushort CRC = Helpers.CalcCRC16(requestBytes.ToArray(), CRCInitial, CRCPoly, CRCSwapOutputBytes);
-                        requestBytes.Add(Helpers.GetHighByte(CRC));
-                        requestBytes.Add(Helpers.GetLowByte(CRC));
+                        ushort CRC = CRCHelpers.CalcCRC16(requestBytes.ToArray(), CRCInitial, CRCPoly, CRCSwapOutputBytes);
+                        requestBytes.Add(IntHelpers.GetHighByte(CRC));
+                        requestBytes.Add(IntHelpers.GetLowByte(CRC));
                     }
 
                     DataRequest request = new DataRequest()
@@ -1023,35 +1024,35 @@ namespace Modbus
                     requestBytes.Add(opCode);
 
                     // add the start register (high byte first)
-                    requestBytes.Add(Helpers.GetHighByte(registerIdx));
-                    requestBytes.Add(Helpers.GetLowByte(registerIdx));
+                    requestBytes.Add(IntHelpers.GetHighByte(registerIdx));
+                    requestBytes.Add(IntHelpers.GetLowByte(registerIdx));
 
                     // num registers (or num tags for enron)
                     if (enron)
                     {
-                        requestBytes.Add(Helpers.GetHighByte((ushort)enronTagCount));
-                        requestBytes.Add(Helpers.GetLowByte((ushort)enronTagCount));
+                        requestBytes.Add(IntHelpers.GetHighByte((ushort)enronTagCount));
+                        requestBytes.Add(IntHelpers.GetLowByte((ushort)enronTagCount));
                     }
                     else
                     {
-                        requestBytes.Add(Helpers.GetHighByte((ushort)Math.Ceiling(registerCount)));
-                        requestBytes.Add(Helpers.GetLowByte((ushort)Math.Ceiling(registerCount)));
+                        requestBytes.Add(IntHelpers.GetHighByte((ushort)Math.Ceiling(registerCount)));
+                        requestBytes.Add(IntHelpers.GetLowByte((ushort)Math.Ceiling(registerCount)));
                     }
 
                     // crc
                     if (!tcp)
                     {
-                        ushort CRC = Helpers.CalcCRC16(requestBytes.ToArray(), CRCInitial, CRCPoly, CRCSwapOutputBytes);
-                        requestBytes.Add(Helpers.GetHighByte(CRC));
-                        requestBytes.Add(Helpers.GetLowByte(CRC));
+                        ushort CRC = CRCHelpers.CalcCRC16(requestBytes.ToArray(), CRCInitial, CRCPoly, CRCSwapOutputBytes);
+                        requestBytes.Add(IntHelpers.GetHighByte(CRC));
+                        requestBytes.Add(IntHelpers.GetLowByte(CRC));
                     }
 
                     // update the data length in the MBAP header (if using modbus tcp)
                     if (tcp)
                     {
                         ushort msgLength = (ushort)(requestBytes.Count - 6);
-                        requestBytes[4] = Helpers.GetHighByte(msgLength);
-                        requestBytes[5] = Helpers.GetLowByte(msgLength);
+                        requestBytes[4] = IntHelpers.GetHighByte(msgLength);
+                        requestBytes[5] = IntHelpers.GetLowByte(msgLength);
                     }
 
 
@@ -1332,27 +1333,27 @@ namespace Modbus
                                 byte[] valueBytes = tagtype.ToBytes(value);
 
                                 if (writeTag.SwapBytes)
-                                    valueBytes = Helpers.SwapBytes(valueBytes);
+                                    valueBytes = IntHelpers.SwapBytes(valueBytes);
 
                                 if (writeTag.SwapWords)
-                                    valueBytes = Helpers.SwapWords(valueBytes);
+                                    valueBytes = IntHelpers.SwapWords(valueBytes);
 
                                 dataBytes.AddRange(valueBytes);
                             }
                             numRegisters += (ushort)Math.Ceiling(dataBytes.Count / 2.0);
 
-                            requestBytes.Add(Helpers.GetHighByte(startReg));
-                            requestBytes.Add(Helpers.GetLowByte(startReg));
+                            requestBytes.Add(IntHelpers.GetHighByte(startReg));
+                            requestBytes.Add(IntHelpers.GetLowByte(startReg));
 
                             if (enron)
                             {
-                                requestBytes.Add(Helpers.GetHighByte((ushort)writeRequest.TagList.Count));
-                                requestBytes.Add(Helpers.GetLowByte((ushort)writeRequest.TagList.Count));
+                                requestBytes.Add(IntHelpers.GetHighByte((ushort)writeRequest.TagList.Count));
+                                requestBytes.Add(IntHelpers.GetLowByte((ushort)writeRequest.TagList.Count));
                             }
                             else
                             {
-                                requestBytes.Add(Helpers.GetHighByte(numRegisters));
-                                requestBytes.Add(Helpers.GetLowByte(numRegisters));
+                                requestBytes.Add(IntHelpers.GetHighByte(numRegisters));
+                                requestBytes.Add(IntHelpers.GetLowByte(numRegisters));
                             }
 
                             requestBytes.Add((byte)dataBytes.Count);
@@ -1362,8 +1363,8 @@ namespace Modbus
 
                         case 6:  //(function code 6) (write single register)
                                  // address of the first register
-                            requestBytes.Add(Helpers.GetHighByte(startReg));
-                            requestBytes.Add(Helpers.GetLowByte(startReg));
+                            requestBytes.Add(IntHelpers.GetHighByte(startReg));
+                            requestBytes.Add(IntHelpers.GetLowByte(startReg));
 
                             if (writeRequest.TagList.Count > 0)
                             {
@@ -1373,10 +1374,10 @@ namespace Modbus
                                 byte[] valueBytes = tagtype.ToBytes(value);
 
                                 if (thisTag.SwapBytes)
-                                    valueBytes = Helpers.SwapBytes(valueBytes);
+                                    valueBytes = IntHelpers.SwapBytes(valueBytes);
 
                                 if (thisTag.SwapWords)
-                                    valueBytes = Helpers.SwapWords(valueBytes);
+                                    valueBytes = IntHelpers.SwapWords(valueBytes);
 
 
                                 requestBytes.AddRange(valueBytes);
@@ -1384,8 +1385,8 @@ namespace Modbus
                             break;
                         case 5: // (function code 5 - write single coil)
                             thisTag = writeRequest.TagList[0];
-                            requestBytes.Add(Helpers.GetHighByte(startReg));
-                            requestBytes.Add(Helpers.GetLowByte(startReg));
+                            requestBytes.Add(IntHelpers.GetHighByte(startReg));
+                            requestBytes.Add(IntHelpers.GetLowByte(startReg));
                             value = valuesToWrite[thisTag.TagID];
                             try
                             {
@@ -1404,11 +1405,11 @@ namespace Modbus
                         case 15: // (function code 15 - write multiple coils)
                             dataBytes = new List<byte>(); // using byte to store 1's and 0's, boolean evaluates to 0 and -1
 
-                            requestBytes.Add(Helpers.GetHighByte(startReg));
-                            requestBytes.Add(Helpers.GetLowByte(startReg));
+                            requestBytes.Add(IntHelpers.GetHighByte(startReg));
+                            requestBytes.Add(IntHelpers.GetLowByte(startReg));
                             byte tagCount = (byte)writeRequest.TagList.Count;
-                            requestBytes.Add(Helpers.GetHighByte(tagCount));
-                            requestBytes.Add(Helpers.GetLowByte(tagCount));
+                            requestBytes.Add(IntHelpers.GetHighByte(tagCount));
+                            requestBytes.Add(IntHelpers.GetLowByte(tagCount));
 
                             byte tagValue;
 
@@ -1460,17 +1461,17 @@ namespace Modbus
                     // add CRC if not using modbus tcp
                     if (!tcp)
                     {
-                        ushort CRC = Helpers.CalcCRC16(requestBytes.ToArray(), CRCInitial, CRCPoly, CRCSwapOutputBytes);
-                        requestBytes.Add(Helpers.GetHighByte(CRC));
-                        requestBytes.Add(Helpers.GetLowByte(CRC));
+                        ushort CRC = CRCHelpers.CalcCRC16(requestBytes.ToArray(), CRCInitial, CRCPoly, CRCSwapOutputBytes);
+                        requestBytes.Add(IntHelpers.GetHighByte(CRC));
+                        requestBytes.Add(IntHelpers.GetLowByte(CRC));
                     }
 
                     // update the message length in the MBAP header (if using modbus tcp)
                     if (tcp)
                     {
                         ushort msgLength = (ushort)(requestBytes.Count - 6);
-                        requestBytes[4] = Helpers.GetHighByte(msgLength);
-                        requestBytes[5] = Helpers.GetLowByte(msgLength);
+                        requestBytes[4] = IntHelpers.GetHighByte(msgLength);
+                        requestBytes[5] = IntHelpers.GetLowByte(msgLength);
                     }
 
                     writeRequest.RequestBytes = requestBytes.ToArray();
@@ -1549,7 +1550,7 @@ namespace Modbus
 
                 if (this == INT8)
                 {
-                    bytes = BitConverter.GetBytes(Convert.ToSByte(Helpers.GetLowByte((ushort)value)));
+                    bytes = BitConverter.GetBytes(Convert.ToSByte(IntHelpers.GetLowByte((ushort)value)));
                 }
 
         
@@ -1743,17 +1744,17 @@ namespace Modbus
                 // 16 bit unpacked BCD
                 if (this.Name == "BCD16")
                 {
-                    UInt16 BCD16Value = (UInt16)(Helpers.GetLowNibble(bytes[0]) * 10 + Helpers.GetLowNibble(bytes[1]));
+                    UInt16 BCD16Value = (UInt16)(IntHelpers.GetLowNibble(bytes[0]) * 10 + IntHelpers.GetLowNibble(bytes[1]));
                     return BCD16Value;
                 }
 
                 // 32 bit unpacked BCD
                 if (this.Name == "BCD32")
                 {
-                    UInt16 BCD32Value = (UInt16)(Helpers.GetLowNibble(bytes[0]) * 1000);
-                    BCD32Value += (UInt16)(Helpers.GetLowNibble(bytes[1]) * 100);
-                    BCD32Value += (UInt16)(Helpers.GetLowNibble(bytes[2]) * 10);
-                    BCD32Value += (UInt16)(Helpers.GetLowNibble(bytes[3]));
+                    UInt16 BCD32Value = (UInt16)(IntHelpers.GetLowNibble(bytes[0]) * 1000);
+                    BCD32Value += (UInt16)(IntHelpers.GetLowNibble(bytes[1]) * 100);
+                    BCD32Value += (UInt16)(IntHelpers.GetLowNibble(bytes[2]) * 10);
+                    BCD32Value += (UInt16)(IntHelpers.GetLowNibble(bytes[3]));
 
                     return BCD32Value;
                 }
@@ -1764,11 +1765,11 @@ namespace Modbus
                     
                     byte[] numerals = new byte[4];
 
-                    numerals[0] = Helpers.GetHighNibble(bytes[0]);
-                    numerals[1] = Helpers.GetLowNibble(bytes[0]);
+                    numerals[0] = IntHelpers.GetHighNibble(bytes[0]);
+                    numerals[1] = IntHelpers.GetLowNibble(bytes[0]);
 
-                    numerals[2] = Helpers.GetHighNibble(bytes[1]);
-                    numerals[3] = Helpers.GetLowNibble(bytes[1]);
+                    numerals[2] = IntHelpers.GetHighNibble(bytes[1]);
+                    numerals[3] = IntHelpers.GetLowNibble(bytes[1]);
 
                     return (UInt16)(numerals[0] * 1000 + numerals[1] * 100 + numerals[2] * 10 + numerals[3]);
                 }
@@ -1779,17 +1780,17 @@ namespace Modbus
 
                     byte[] numerals = new byte[8];
 
-                    numerals[0] = Helpers.GetHighNibble(bytes[0]);
-                    numerals[1] = Helpers.GetLowNibble(bytes[0]);
+                    numerals[0] = IntHelpers.GetHighNibble(bytes[0]);
+                    numerals[1] = IntHelpers.GetLowNibble(bytes[0]);
 
-                    numerals[2] = Helpers.GetHighNibble(bytes[1]);
-                    numerals[3] = Helpers.GetLowNibble(bytes[1]);
+                    numerals[2] = IntHelpers.GetHighNibble(bytes[1]);
+                    numerals[3] = IntHelpers.GetLowNibble(bytes[1]);
 
-                    numerals[4] = Helpers.GetHighNibble(bytes[2]);
-                    numerals[5] = Helpers.GetLowNibble(bytes[2]);
+                    numerals[4] = IntHelpers.GetHighNibble(bytes[2]);
+                    numerals[5] = IntHelpers.GetLowNibble(bytes[2]);
 
-                    numerals[6] = Helpers.GetHighNibble(bytes[3]);
-                    numerals[7] = Helpers.GetLowNibble(bytes[3]);
+                    numerals[6] = IntHelpers.GetHighNibble(bytes[3]);
+                    numerals[7] = IntHelpers.GetLowNibble(bytes[3]);
 
                     return (UInt32)(numerals[0] * 10000000 + numerals[1] * 1000000 + numerals[2] * 100000 + numerals[3] * 10000 + numerals[4]*1000 + numerals[5]*100 + numerals[6]*10 + numerals[7]);
                 }

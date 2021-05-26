@@ -55,7 +55,7 @@ namespace DynamicCode
         readonly object _userCodeObject;                             // an instance of the user class
         readonly SimpleUnloadableAssemblyLoadContext _loadContext;   // for unloading the module when it is being disposed
 
-        Timer _timer;                                       // timer for executing user methods on set schedules
+        readonly Timer _timer;                                       // timer for executing user methods on set schedules
         readonly Dictionary<string, List<string>> _onChangeHandlers = new Dictionary<string, List<string>>();  // for OnChange handling (trigger object ID, list of properties to watch for changes)
 
         public Module(string moduleName, Type userclass, SimpleUnloadableAssemblyLoadContext loadContext, string moduleRunSpec)
@@ -77,7 +77,7 @@ namespace DynamicCode
             switch (runspecparts[0].ToLower())
             {
                 case "onschedule":
-                    CreateSchedule(runspecparts);                 
+                    _timer = CreateSchedule(runspecparts);                 
                     break;
                 case "onchange":
                     SubscribeToTriggers(runspecparts);                 
@@ -112,11 +112,11 @@ namespace DynamicCode
             }
         }
 
-        private void CreateSchedule(string[] runspec)
+        private Timer CreateSchedule(string[] runspec)
         {
             double quantity;
             Int32 milliseconds;
-            Timer newTimer;
+      
 
             if (!Double.TryParse(runspec[1], out quantity))
             {
@@ -126,16 +126,13 @@ namespace DynamicCode
             {
                 case "seconds":
                     milliseconds = Convert.ToInt32(quantity * 1000);
-                    _timer = new Timer(OnTimerTick, null, milliseconds, milliseconds);
-                    break;
+                    return new Timer(OnTimerTick, null, milliseconds, milliseconds);
                 case "minutes":
                     milliseconds = Convert.ToInt32(quantity * 60 * 1000);
-                    _timer = new Timer(OnTimerTick, null, milliseconds, milliseconds);
-                    break;
+                    return new Timer(OnTimerTick, null, milliseconds, milliseconds);
                 case "hours":
                     milliseconds = Convert.ToInt32(quantity * 24 * 60 * 1000);
-                    newTimer = new Timer(OnTimerTick, null, milliseconds, milliseconds);
-                    break;
+                    return new Timer(OnTimerTick, null, milliseconds, milliseconds);
                 default:
                     throw new Exception("Invalid run specification (unrecognized time unit '" + runspec[2] + "')");
             }

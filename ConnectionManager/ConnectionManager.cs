@@ -376,15 +376,16 @@ namespace FDA
         }
 
         // constructor for serial connections
-        public ConnectionManager(Guid ID,string description,string ComPort,int baud,Parity parity,int dataBits,StopBits stopbits,Handshake handshake)
+        public ConnectionManager(Guid ID, string description)//,string ComPort,int baud,Parity parity,int dataBits,StopBits stopbits,Handshake handshake)
         {
             CommonConstructor(ID, description);
-            SerialPortName = ComPort;
-            SerialBaudRate = baud;
-            SerialParity = parity;
-            SerialDataBits = dataBits;
-            SerialStopBits = stopbits;
-            SerialHandshake = handshake;            
+
+            //SerialPortName = ComPort;
+            //SerialBaudRate = baud;
+            //SerialParity = parity;
+            //SerialDataBits = dataBits;
+            //SerialStopBits = stopbits;
+            //SerialHandshake = handshake;            
             ConnectionType = ConnType.Serial;
         }
 
@@ -1611,6 +1612,8 @@ namespace FDA
         #region cleanup
         public void Dispose()
         {
+            Globals.SystemManager.LogApplicationEvent(this, "", "Shutting down connection manager for '" + Description + "' (" + ConnectionID + ")");
+
             base.MQTTEnabled = false;
 
             ConnectionEnabled = false;

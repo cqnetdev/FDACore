@@ -13,7 +13,7 @@ using System.Reflection;
 
 namespace DynamicCode
 {
-    internal class Compiler
+    internal static class Compiler
     {
 
         public static byte[] Compile(string sourceCode)

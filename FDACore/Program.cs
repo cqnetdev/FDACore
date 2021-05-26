@@ -12,8 +12,8 @@ using System.Security.Principal;
 using System.ServiceProcess;
 using System.Text;
 using System.Threading;
-//using System.Windows.Forms;
 using uPLibrary.Networking.M2Mqtt;
+using Support;
 
 namespace FDAApp
 {
@@ -612,7 +612,7 @@ namespace FDAApp
                     break;
                 case "PAUSE":
                     Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "FDA Application", "", "Pause command received", false, true);
-                    Console2.Flush();
+                    AsyncConsole.Flush();
                     Globals.FDAStatus = Globals.AppState.Pausing;
                     break;
                 case "RESUME":

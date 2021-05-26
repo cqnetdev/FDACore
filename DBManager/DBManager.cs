@@ -8,6 +8,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using Common;
+using Support;
 
 namespace FDA
 {
@@ -440,7 +441,7 @@ namespace FDA
                                     batch.Append(" set Value = ");
                                     batch.Append(value);
                                     batch.Append(", Timestamp = '");
-                                    batch.Append(Helpers.FormatDateTime(tag.Timestamp));
+                                    batch.Append(DateTimeHelpers.FormatDateTime(tag.Timestamp));
                                     batch.Append("',Quality = ");
                                     batch.Append(tag.Quality);
                                     batch.Append(" where DPDUID = '");
@@ -454,7 +455,7 @@ namespace FDA
                                     batch.Append(" (DPDUID, Timestamp, Value, Quality) values('");
                                     batch.Append(tag.TagID);
                                     batch.Append("','");
-                                    batch.Append(Helpers.FormatDateTime(tag.Timestamp));
+                                    batch.Append(DateTimeHelpers.FormatDateTime(tag.Timestamp));
                                     batch.Append("',");
                                     batch.Append(value);
                                     batch.Append(",");
@@ -472,7 +473,7 @@ namespace FDA
                         /*
                         if (transactionToLog.MessageType != DataRequest.RequestType.Backfill)
                         {
-                            batch += "update " + Globals.SystemManager.GetTableName("DataPointDefinitionStructures") + " set LastReadDataValue = " + tag.Value + ", LastReadDataTimestamp = '" + Helpers.FormatDateTime(tag.Timestamp) + "' "
+                            batch += "update " + Globals.SystemManager.GetTableName("DataPointDefinitionStructures") + " set LastReadDataValue = " + tag.Value + ", LastReadDataTimestamp = '" + DateTimeHelpers.FormatDateTime(tag.Timestamp) + "' "
                                   + " where DPDUID = '" + tag.TagID.ToString() + "';";
                         }
                         */
@@ -483,7 +484,7 @@ namespace FDA
                             batch.Append("UPDATE FDALastDataValues SET value = ");
                             batch.Append(tag.Value);
                             batch.Append(",timestamp='");
-                            batch.Append(Helpers.FormatDateTime(tag.Timestamp));
+                            batch.Append(DateTimeHelpers.FormatDateTime(tag.Timestamp));
                             batch.Append("',");
                             batch.Append("quality=");
                             batch.Append(tag.Quality);
@@ -494,7 +495,7 @@ namespace FDA
                             batch.Append("',");
                             batch.Append(tag.Value);
                             batch.Append(",'");
-                            batch.Append(Helpers.FormatDateTime(tag.Timestamp));
+                            batch.Append(DateTimeHelpers.FormatDateTime(tag.Timestamp));
                             batch.Append("',");
                             batch.Append(tag.Quality);
                             batch.Append(" WHERE NOT EXISTS (SELECT 1 FROM FDALastDataValues WHERE dpduid = '");
@@ -765,7 +766,7 @@ namespace FDA
 
             // general version
             DateTime oldestLimit = DateTime.UtcNow.Subtract(TimeSpan.FromDays(Globals.SystemManager.EventLogMaxDays));
-            string query = "DELETE FROM " + AppLog + " where Timestamp < '" + Helpers.FormatDateTime(oldestLimit) + "'";
+            string query = "DELETE FROM " + AppLog + " where Timestamp < '" + DateTimeHelpers.FormatDateTime(oldestLimit) + "'";
 
             result = ExecuteNonQuery(query);
 
@@ -782,7 +783,7 @@ namespace FDA
 
             // general version
             oldestLimit = DateTime.UtcNow.Subtract(TimeSpan.FromDays(Globals.SystemManager.CommsLogMaxDays));
-            query = "DELETE FROM " + CommsLog + " where TimestampUTC1 < '" + Helpers.FormatDateTime(oldestLimit) + "'";
+            query = "DELETE FROM " + CommsLog + " where TimestampUTC1 < '" + DateTimeHelpers.FormatDateTime(oldestLimit) + "'";
 
             result = ExecuteNonQuery(query);
             if (result >= 0)
@@ -1468,12 +1469,12 @@ namespace FDA
             string nodeID = PtrPositionRequest.NodeID;
             int affectedRows = 0;
 
-            string ResponseTimestamp = Helpers.FormatDateTime(PtrPositionRequest.ResponseTimestamp);
+            string ResponseTimestamp = DateTimeHelpers.FormatDateTime(PtrPositionRequest.ResponseTimestamp);
 
 
             // update the alarm or event current ptr and timestamp
-            sql = "update " + Globals.SystemManager.GetTableName("FDAHistoricReferences") + " set AlarmsCurPtrPosition = " + almsPtr + ", AlarmsCurPtrTimestamp = '" + Helpers.FormatDateTime(almsTimestamp) + "'";
-            sql += ",EventsCurPtrPosition = " + evtsPtr + ", EventsCurPtrTimestamp = '" + Helpers.FormatDateTime(evtsTimestamp) + "'";
+            sql = "update " + Globals.SystemManager.GetTableName("FDAHistoricReferences") + " set AlarmsCurPtrPosition = " + almsPtr + ", AlarmsCurPtrTimestamp = '" + DateTimeHelpers.FormatDateTime(almsTimestamp) + "'";
+            sql += ",EventsCurPtrPosition = " + evtsPtr + ", EventsCurPtrTimestamp = '" + DateTimeHelpers.FormatDateTime(evtsTimestamp) + "'";
             sql += " where NodeDetails = '" + nodeID + "' and ConnectionUID = '" + PtrPositionRequest.ConnectionID + "';";
             affectedRows = ExecuteNonQuery(sql);
 
@@ -1519,7 +1520,7 @@ namespace FDA
 
 
 
-            lastRead = Helpers.AddCircular(lastRead, -1, 0, 239);
+            lastRead = MiscHelpers.AddCircular(lastRead, -1, 0, 239);
 
             return new byte[] { Convert.ToByte(lastRead), Convert.ToByte(currPtr) };
         }

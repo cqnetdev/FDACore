@@ -5,6 +5,7 @@ using System.Threading;
 using System.Diagnostics;
 using System.Text;
 using System.Data;
+using Support;
 
 namespace Common
 {
@@ -385,6 +386,7 @@ namespace Common
             /* Mar 9, 2020 Ignore BackfillDataLapseLimit global setting */
             if (config.OPTIONNAME == "BackfillDataLapseLimit")
                 return;
+
             bool isReadOnly = false;
             if (changeType != "NONE")
             {
@@ -474,7 +476,7 @@ namespace Common
 
         public void LogApplicationError(DateTime timestamp, Exception ex, string description = "")
         {
-            string eventText = Helpers.FormatDateTime(timestamp) + ": " + ex.Message + ", " + description;
+            string eventText = DateTimeHelpers.FormatDateTime(timestamp) + ": " + ex.Message + ", " + description;
             
             // display it in the console if we're in interactive mode
             if (Environment.UserInteractive)
@@ -515,12 +517,12 @@ namespace Common
             if (detailed && !Globals.DetailedMessaging)
                 return;
 
-            string eventText = Helpers.FormatDateTime(timestamp) + ": " + objectType + "(" + objectName + "), " + description;
+            string eventText = DateTimeHelpers.FormatDateTime(timestamp) + ": " + objectType + "(" + objectName + "), " + description;
 
             // write it to the console
             if (Globals.ConsoleMode && Environment.UserInteractive)
             {
-                Console2.WriteLine(eventText);
+                AsyncConsole.WriteLine(eventText);
             }
 
             // send it to any tcp clients (typically the ControllerService, which will forward it to remote clients, if any are connected)
@@ -718,11 +720,11 @@ namespace Common
 
             if (versionColExists)
             {
-                sql = "insert into FDAStarts (FDAExecutionID,UTCTimestamp,FDAVersion) values ('" + instanceID.ToString() + "','" + Helpers.FormatDateTime(timestamp) + "','" + version + "');";
+                sql = "insert into FDAStarts (FDAExecutionID,UTCTimestamp,FDAVersion) values ('" + instanceID.ToString() + "','" + DateTimeHelpers.FormatDateTime(timestamp) + "','" + version + "');";
             }
             else
             {
-                sql = "insert into FDAStarts(FDAExecutionID, UTCTimestamp) values('" + instanceID.ToString() + "', '" + Helpers.FormatDateTime(timestamp) + "'); ";
+                sql = "insert into FDAStarts(FDAExecutionID, UTCTimestamp) values('" + instanceID.ToString() + "', '" + DateTimeHelpers.FormatDateTime(timestamp) + "'); ";
             }
           
             ExecuteSQLSync(sql,SystemDBConnectionString, false);
@@ -774,7 +776,7 @@ namespace Common
                     }
 
                     Globals.SystemManager.LogApplicationEvent(this, "", "Event logger thread closed");
-                    Console2.Flush();
+                    AsyncConsole.Flush();
                 }
 
                 // TODO: free unmanaged resources (unmanaged objects) and override a finalizer below.

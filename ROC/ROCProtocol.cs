@@ -4,6 +4,7 @@ using System.Linq;
 using System.Collections;
 using Common;
 using FDA;
+using Support;
 
 namespace ROC
 {
@@ -332,7 +333,7 @@ namespace ROC
                         // elements 4+ are valid guids and reference existing tags (there can be references to multiple tags if using the BIN type)
                         for (int counter = 4; counter < tagInfo.Length; counter++)
                         {
-                            if (!Helpers.IsValidGuid(tagInfo[counter]))
+                            if (!ValidationHelpers.IsValidGuid(tagInfo[counter]))
                             {
                                 if (!(dataType == "BIN" && tagInfo[counter] == "0")) // exception for guid = 0 in the case of BIN data type
                                 {
@@ -471,7 +472,7 @@ namespace ROC
 
                         //day
                         int day = int.Parse(fromTimeStr[2]);
-                        if (!Helpers.IsValidDayOfMonth(day,month))
+                        if (!DateTimeHelpers.IsValidDayOfMonth(day,month))
                         {
                             //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with  invalid information ('" + tagInfo[3] + "' has an invalid day).", true);
                             RecordValidationError(obj,groupID,requestor,"contains a request with  invalid information ('" + tagInfo[3] + "' has an invalid day).");
@@ -540,7 +541,7 @@ namespace ROC
 
                         //day
                         day = int.Parse(toTimeStr[2]);
-                        if (!Helpers.IsValidDayOfMonth(day, month))
+                        if (!DateTimeHelpers.IsValidDayOfMonth(day, month))
                         {
 //                            Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with  invalid information ('" + tagInfo[4] + "' has an invalid day).", true);
                             RecordValidationError(obj,groupID,requestor,"contains a request with  invalid information ('" + tagInfo[4] + "' has an invalid day).");
@@ -604,7 +605,7 @@ namespace ROC
                     }
 
                     //element 2 is a valid UID
-                    if (!Helpers.IsValidGuid(tagInfo[2]))
+                    if (!ValidationHelpers.IsValidGuid(tagInfo[2]))
                     {
                         if (!(dataType == "BIN" && tagInfo[2] == "0")) // exception for guid = 0 in the case of BIN data type
                         {
@@ -1145,8 +1146,8 @@ namespace ROC
                                 int.TryParse(TagData[1], out end);
 
                                 // adjust the supplied pointers to a 0 based system
-                                start = Helpers.AddCircular(start, -1, 0, 239);
-                                end = Helpers.AddCircular(end, -1, 0, 239);
+                                start = MiscHelpers.AddCircular(start, -1, 0, 239);
+                                end = MiscHelpers.AddCircular(end, -1, 0, 239);
 
                                 // when specifying pointers, we need to include the first and last record in the results (the last read and current records are normally excluded), so we set "inclusive" to true
                                 subRequestList = GenerateAlarmEventsRequests(requestGroup.ID, "", groupNum, devNum, 1, 1, 121,Convert.ToUInt16(start),Convert.ToUInt16(end),true,(requestIdx + 1).ToString());
@@ -1175,7 +1176,7 @@ namespace ROC
                                 {
                                     lastRead = ptrs[0];
                                     current = ptrs[1];
-                                    if (Helpers.AddCircular(lastRead,1,1,240)==current)
+                                    if (MiscHelpers.AddCircular(lastRead,1,1,240)==current)
                                     {
                                         Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "ROCProtocol", "", "Alarms request for device " + groupNum + ":" + devNum + " on connection " + requestGroup.ConnectionID + " cancelled, because there are no new records");
                                         break;
@@ -1199,8 +1200,8 @@ namespace ROC
                                 int.TryParse(TagData[1], out end);
 
                                 // convert to zero based
-                                start = Helpers.AddCircular(start, -1, 0, 239);
-                                end = Helpers.AddCircular(end, -1, 0, 239);
+                                start = MiscHelpers.AddCircular(start, -1, 0, 239);
+                                end = MiscHelpers.AddCircular(end, -1, 0, 239);
 
                                 subRequestList = GenerateAlarmEventsRequests(requestGroup.ID, "", groupNum, devNum, 1, 1, 122, Convert.ToUInt16(start),Convert.ToUInt16(end), true, (requestIdx + 1).ToString());
                             }
@@ -1470,11 +1471,11 @@ namespace ROC
             List<byte> requestBytes = new List<byte>() { unit, group, hostUnit, hostGroup, 120,0};
 
             // calculate the checksum
-            ushort CRC16 = Helpers.CalcCRC16(requestBytes.ToArray(), CRCInitial, CRCPoly, CRCSwapOutputBytes);
+            ushort CRC16 = CRCHelpers.CalcCRC16(requestBytes.ToArray(), CRCInitial, CRCPoly, CRCSwapOutputBytes);
 
             // add the checksum bytes to the end of the request
-            requestBytes.Add(Helpers.GetLowByte(CRC16));         // CRC Low Byte
-            requestBytes.Add(Helpers.GetHighByte(CRC16));        // CRC High Byte
+            requestBytes.Add(IntHelpers.GetLowByte(CRC16));         // CRC Low Byte
+            requestBytes.Add(IntHelpers.GetHighByte(CRC16));        // CRC High Byte
 
 
             DataRequest request = new DataRequest()
@@ -1576,9 +1577,9 @@ namespace ROC
                 requestBytes.Add(thisRequestRecordCount); // number of records requested
                 requestBytes.AddRange(DataType.INT16.ToBytes(recordIdx)); // first record number
 
-                ushort CRC = Helpers.CalcCRC16(requestBytes.ToArray(), CRCInitial, CRCPoly, CRCSwapOutputBytes);
-                requestBytes.Add(Helpers.GetLowByte(CRC));
-                requestBytes.Add(Helpers.GetHighByte(CRC));
+                ushort CRC = CRCHelpers.CalcCRC16(requestBytes.ToArray(), CRCInitial, CRCPoly, CRCSwapOutputBytes);
+                requestBytes.Add(IntHelpers.GetLowByte(CRC));
+                requestBytes.Add(IntHelpers.GetHighByte(CRC));
 
                 thisRequest.RequestBytes = requestBytes.ToArray();
                 thisRequest.ExpectedResponseSize = 11 + 22 * thisRequestRecordCount + 2;  // header + (22 * the number of records) + 2 bytes for the CRC
@@ -1635,7 +1636,7 @@ namespace ROC
                 requestType = DataRequest.RequestType.Events;
             }
 
-            if (Helpers.AddCircular(currentPointer,-1,1,240) == lastReadRecord)
+            if (MiscHelpers.AddCircular(currentPointer,-1,1,240) == lastReadRecord)
             {
                 Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "ROCProtocol", "", requestType.ToString() + " request for device " + nodeID + " on connection " + OpCode120Request.ConnectionID + " cancelled, because there are no new records");
                 return AlarmEventsRequestGroup;
@@ -1775,10 +1776,10 @@ namespace ROC
                 };
 
 
-                ushort CRC = Helpers.CalcCRC16(requestByteList.ToArray(), CRCInitial, CRCPoly, CRCSwapOutputBytes);
+                ushort CRC = CRCHelpers.CalcCRC16(requestByteList.ToArray(), CRCInitial, CRCPoly, CRCSwapOutputBytes);
 
-                requestByteList.Add(Helpers.GetLowByte(CRC));
-                requestByteList.Add(Helpers.GetHighByte(CRC));
+                requestByteList.Add(IntHelpers.GetLowByte(CRC));
+                requestByteList.Add(IntHelpers.GetHighByte(CRC));
 
                 DataRequest thisRequest = new DataRequest()
                 {
@@ -1858,16 +1859,16 @@ namespace ROC
                 historyType,
                 historyPointNumber,
                 recordCount,
-                Helpers.GetLowByte(startIdx),   
-                Helpers.GetHighByte(startIdx)
+                IntHelpers.GetLowByte(startIdx),   
+                IntHelpers.GetHighByte(startIdx)
                     
             };
 
 
-            ushort CRC = Helpers.CalcCRC16(requestByteList.ToArray(), CRCInitial, CRCPoly, CRCSwapOutputBytes);
+            ushort CRC = CRCHelpers.CalcCRC16(requestByteList.ToArray(), CRCInitial, CRCPoly, CRCSwapOutputBytes);
 
-            requestByteList.Add(Helpers.GetLowByte(CRC));
-            requestByteList.Add(Helpers.GetHighByte(CRC));
+            requestByteList.Add(IntHelpers.GetLowByte(CRC));
+            requestByteList.Add(IntHelpers.GetHighByte(CRC));
             Opcode130params OC130Params = new Opcode130params() { StartIdx = startIdx, RecordCount = recordCount, Interval = recordStep };
 
             DataRequest thisRequest = new DataRequest()
@@ -1972,10 +1973,10 @@ namespace ROC
                 };
 
 
-                ushort CRC = Helpers.CalcCRC16(requestByteList.ToArray(), CRCInitial, CRCPoly, CRCSwapOutputBytes);
+                ushort CRC = CRCHelpers.CalcCRC16(requestByteList.ToArray(), CRCInitial, CRCPoly, CRCSwapOutputBytes);
 
-                requestByteList.Add(Helpers.GetLowByte(CRC));
-                requestByteList.Add(Helpers.GetHighByte(CRC));
+                requestByteList.Add(IntHelpers.GetLowByte(CRC));
+                requestByteList.Add(IntHelpers.GetHighByte(CRC));
 
 
                 DataType ROCDataType = DataType.GetType(historyRequestData[1]);
@@ -2119,11 +2120,11 @@ namespace ROC
                 message.AddRange(dataBlock);
 
                 // calculate the checksum
-                ushort CRC16 = Helpers.CalcCRC16((byte[])message.ToArray(), CRCInitial, CRCPoly, CRCSwapOutputBytes);
+                ushort CRC16 = CRCHelpers.CalcCRC16((byte[])message.ToArray(), CRCInitial, CRCPoly, CRCSwapOutputBytes);
 
                 // add the checksum bytes to the end of the request
-                message.Add(Helpers.GetLowByte(CRC16));         // CRC Low Byte
-                message.Add(Helpers.GetHighByte(CRC16));        // CRC High Byte
+                message.Add(IntHelpers.GetLowByte(CRC16));         // CRC Low Byte
+                message.Add(IntHelpers.GetHighByte(CRC16));        // CRC High Byte
 
                 // convert from an ArrayList to a simple array of bytes 
                 byte[] requestBytes = (Byte[])message.ToArray();
@@ -2232,11 +2233,11 @@ namespace ROC
                     message.AddRange(datablock);                         // add the data block
 
                     // calculate the checksum
-                    ushort CRC16 = Helpers.CalcCRC16(message.ToArray(), CRCInitial, CRCPoly, CRCSwapOutputBytes);
+                    ushort CRC16 = CRCHelpers.CalcCRC16(message.ToArray(), CRCInitial, CRCPoly, CRCSwapOutputBytes);
 
                     // add the checksum bytes to the end of the request
-                    message.Add(Helpers.GetLowByte(CRC16));         // CRC Low Byte
-                    message.Add(Helpers.GetHighByte(CRC16));        // CRC High Byte
+                    message.Add(IntHelpers.GetLowByte(CRC16));         // CRC Low Byte
+                    message.Add(IntHelpers.GetHighByte(CRC16));        // CRC High Byte
 
                     // convert from an List to a simple array of bytes 
                     byte[] requestBytes = message.ToArray();
@@ -2352,16 +2353,16 @@ namespace ROC
                         ID[0],
                         ID[1],
                         ID[2],
-                        Helpers.GetHighByte(pass),
-                        Helpers.GetLowByte(pass)
+                        IntHelpers.GetHighByte(pass),
+                        IntHelpers.GetLowByte(pass)
                     };
                 }
 
                 // calculate and add the checksum
-                ushort CRC16 = Helpers.CalcCRC16((byte[])message.ToArray(typeof(byte)), CRCInitial, CRCPoly, CRCSwapOutputBytes);
+                ushort CRC16 = CRCHelpers.CalcCRC16((byte[])message.ToArray(typeof(byte)), CRCInitial, CRCPoly, CRCSwapOutputBytes);
 
-                message.Add(Helpers.GetLowByte(CRC16));
-                message.Add(Helpers.GetHighByte(CRC16));
+                message.Add(IntHelpers.GetLowByte(CRC16));
+                message.Add(IntHelpers.GetHighByte(CRC16));
 
                 // build a request object
                 DataRequest request = new DataRequest
@@ -2836,7 +2837,7 @@ namespace ROC
                                 {
                                     Tag thisTag;
                                     //Tag nextTag;
-                                    byte[] bits = Helpers.ByteToBits((byte)value);
+                                    byte[] bits = BitHelpers.ByteToBits((byte)value);
                                     int i;
                                     for (i = 0; i < 8; i++)
                                     {
@@ -3157,17 +3158,17 @@ namespace ROC
 
         private static bool CRCCheck(byte[] data)
         {
-            ushort responseCRC = Helpers.ToUInt16(data[data.Length - 2], data[data.Length - 1]);
+            ushort responseCRC = IntHelpers.ToUInt16(data[data.Length - 2], data[data.Length - 1]);
 
-            //ushort calcdCRC = Helpers.CalcCRC16(data.Take(data.Length - 2).ToArray(), CRCInitial, CRCPoly, CRCSwapOutputBytes);
+            //ushort calcdCRC = CRCHelpers.CalcCRC16(data.Take(data.Length - 2).ToArray(), CRCInitial, CRCPoly, CRCSwapOutputBytes);
 
             // this is more efficient
             byte[] data_noCRC = new byte[data.Length - 2];
             Array.Copy(data, data_noCRC, data.Length - 2);
 
 
-            ushort calcdCRC = Helpers.CalcCRC16(data_noCRC, CRCInitial, CRCPoly, CRCSwapOutputBytes);
-            calcdCRC = Helpers.SwapBytes(calcdCRC);
+            ushort calcdCRC = CRCHelpers.CalcCRC16(data_noCRC, CRCInitial, CRCPoly, CRCSwapOutputBytes);
+            calcdCRC = IntHelpers.SwapBytes(calcdCRC);
 
             return (responseCRC == calcdCRC);
         }
@@ -3454,7 +3455,7 @@ namespace ROC
                     ConnectionID = connID;
                     NodeDetails = node;
                     EventPtrPosition = eventPtrPos;
-                    EventPtrPosDisplay = Helpers.AddCircular(EventPtrPosition, 1, 1, 240);
+                    EventPtrPosDisplay = MiscHelpers.AddCircular(EventPtrPosition, 1, 1, 240);
                     DevicePtrPosition = devPtrPos;
                     DestTable = destTable;
                     SourceData = BitConverter.ToString(eventData);
@@ -3701,7 +3702,7 @@ namespace ROC
                 if (!updatePointers)
                     return "";
 
-                string sql =  "Update " + Globals.SystemManager.GetTableName("FDAHistoricReferences") + " set EventsLastPtrReadPosition = " + EventPtrPosDisplay + ", EventsLastPtrReadTimestamp = '" + Helpers.FormatDateTime(FDATimestamp) + "' ";
+                string sql =  "Update " + Globals.SystemManager.GetTableName("FDAHistoricReferences") + " set EventsLastPtrReadPosition = " + EventPtrPosDisplay + ", EventsLastPtrReadTimestamp = '" + DateTimeHelpers.FormatDateTime(FDATimestamp) + "' ";
                 sql += "where ConnectionUID = '" + ConnectionID.ToString() + "' and NodeDetails = '" + NodeDetails + "';";
 
                 return sql;
@@ -3714,12 +3715,12 @@ namespace ROC
 
                 string sql = "insert into " + destTables[0] + " (ConnectionUID,NodeDetails,Format,PointType,ParmFSTCal,EventPtrPosition,DevicePtrPosition,FDATimestamp,";
                 sql += "EventTimestamp1,EventTimestamp2,PtNum,Operator,EventText,ValuesConverted,EventValue1,EventValue2,EventDesc,SourceData) values (";
-                sql += "'" + ConnectionID.ToString() + "','" + NodeDetails + "'," + Format + "," + PointType + "," + ParamFSTCal + "," + EventPtrPosDisplay + "," + DevicePtrPosition + ",'" + Helpers.FormatDateTime(FDATimestamp) + "',";
-                sql += "'" + Helpers.FormatDateTime(EventTimestamp1) + "',";
+                sql += "'" + ConnectionID.ToString() + "','" + NodeDetails + "'," + Format + "," + PointType + "," + ParamFSTCal + "," + EventPtrPosDisplay + "," + DevicePtrPosition + ",'" + DateTimeHelpers.FormatDateTime(FDATimestamp) + "',";
+                sql += "'" + DateTimeHelpers.FormatDateTime(EventTimestamp1) + "',";
                 if (EventTimestamp2 == DateTime.MinValue)
                     sql += "NULL,";
                 else
-                    sql += "'" + Helpers.FormatDateTime(EventTimestamp2) + "',";
+                    sql += "'" + DateTimeHelpers.FormatDateTime(EventTimestamp2) + "',";
                 
                 sql += PtNum + ",'" + Operator + "','" + EventText + "'";
 
@@ -3779,7 +3780,7 @@ namespace ROC
                     NodeDetails = node;
                     FDATimestamp = timestamp;
                     AlarmPtrPostion = alarmPtrPos;
-                    AlarmPtrPosDisplay = Helpers.AddCircular(AlarmPtrPostion, 1, 1, 240);
+                    AlarmPtrPosDisplay = MiscHelpers.AddCircular(AlarmPtrPostion, 1, 1, 240);
                     DevicePtrPostion = devPtrPos;
                     DestTable = destTable;
                     AlarmType = alarmData[0];
@@ -3916,8 +3917,8 @@ namespace ROC
                 string sql = "insert into " + destTables[0] + "(ConnectionUID,NodeDetails,FDATimestamp,AlarmPtrPosition,DevicePtrPosition,AlarmType,AlarmCode,AlarmTimestamp";
                 sql += ",AlarmTag,DeviceValue,AlarmValue,AlarmDesc) values (";
 
-                sql += "'" + ConnectionID.ToString() + "','" + NodeDetails + "','" + Helpers.FormatDateTime(FDATimestamp) + "'," + AlarmPtrPosDisplay + "," + DevicePtrPostion + "," + AlarmType + "," + AlarmCode;
-                sql += ",'" + Helpers.FormatDateTime(AlarmTimestamp) + "','" + AlarmTag + "'," + DeviceValue + "," + AlarmValue + ",'" + AlarmDesc + "');";
+                sql += "'" + ConnectionID.ToString() + "','" + NodeDetails + "','" + DateTimeHelpers.FormatDateTime(FDATimestamp) + "'," + AlarmPtrPosDisplay + "," + DevicePtrPostion + "," + AlarmType + "," + AlarmCode;
+                sql += ",'" + DateTimeHelpers.FormatDateTime(AlarmTimestamp) + "','" + AlarmTag + "'," + DeviceValue + "," + AlarmValue + ",'" + AlarmDesc + "');";
                 return sql;
             }
 
@@ -3926,7 +3927,7 @@ namespace ROC
                 if (!UpdatePointers)
                     return "";
 
-                string sql = "Update " + Globals.SystemManager.GetTableName("FDAHistoricReferences") + " set AlarmsLastPtrReadPosition = " + AlarmPtrPosDisplay + ", AlarmsLastPtrReadTimestamp = '" + Helpers.FormatDateTime(FDATimestamp) + "' ";
+                string sql = "Update " + Globals.SystemManager.GetTableName("FDAHistoricReferences") + " set AlarmsLastPtrReadPosition = " + AlarmPtrPosDisplay + ", AlarmsLastPtrReadTimestamp = '" + DateTimeHelpers.FormatDateTime(FDATimestamp) + "' ";
                 sql += "where ConnectionUID = '" + ConnectionID.ToString() + "' and NodeDetails = '" + NodeDetails + "';";
 
                 return sql;

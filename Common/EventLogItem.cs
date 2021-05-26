@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Support;
 
 namespace Common
 {
@@ -66,7 +67,7 @@ namespace Common
             sb.Append("('");
             sb.Append(executionID);
             sb.Append("','");
-            sb.Append(Helpers.FormatDateTime(Timestamp));
+            sb.Append(DateTimeHelpers.FormatDateTime(Timestamp));
             sb.Append("','");
             sb.Append(EventType.ToString());
             sb.Append("','");

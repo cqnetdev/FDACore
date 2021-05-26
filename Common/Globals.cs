@@ -14,6 +14,7 @@ using System.Diagnostics;
 
 namespace Common
 {
+
     public static class Globals
     {
         /* not .NET Core compatible
@@ -120,6 +121,8 @@ namespace Common
         }
 
         [Serializable]
+        // a serializable structure containing the information about a connection
+        // used for passing connection information to MQTT
         public class ConnDetails : ISerializable, INotifyPropertyChanged
         {
             private string _ID;
@@ -201,6 +204,7 @@ namespace Common
 
             protected ConnDetails(SerializationInfo info, StreamingContext context)
             {
+                // deserializer
                 ID = info.GetString("ID");
                 ConnectionEnabled = info.GetBoolean("ConnectionEnabled");
                 CommunicationsEnabled = info.GetBoolean("CommunicationsEnabled");
@@ -221,9 +225,10 @@ namespace Common
                 Description = info.GetString("Description");
             }
 
-
+            
             public void GetObjectData(SerializationInfo info, StreamingContext context)
             {
+                // serializer
                 info.AddValue("ID", ID);
                 info.AddValue("ConnectionEnabled", ConnectionEnabled);
                 info.AddValue("CommunicationsEnabled", CommunicationsEnabled);

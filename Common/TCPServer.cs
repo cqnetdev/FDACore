@@ -13,6 +13,7 @@ using System.IO;
 using System.Security.Cryptography.X509Certificates;
 using System.Net.Security;
 using System.Security.Authentication;
+using Support;
 
 namespace FDA
 {
@@ -78,7 +79,7 @@ namespace FDA
                 _server.Start();
             } catch (Exception ex)
             {
-                Console2.WriteLine("Error starting TCP server on port " + Port + ": " + ex.Message);
+                AsyncConsole.WriteLine("Error starting TCP server on port " + Port + ": " + ex.Message);
                 success = false;
             }
 

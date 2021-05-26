@@ -99,19 +99,18 @@ namespace Common
 
         }
 
-
+        // handle notifications of a change in one of the monitored table
         private void _conn_Notification(object sender, NpgsqlNotificationEventArgs e)
         {
-
+           
             JObject json = JObject.Parse(e.Payload);
 
-            // get the name of the table that changed, check if it's the table we're looking for
+            // get the name of the table that changed, if it's not the one this listener is watching, ignore it
             string table = (string)json["table"];
-
-  
             if (table.ToLower() != _table)
                 return;
 
+            // get the change type (update, delete, insert)
             string operation = (string)json["operation"];
 
             DBNotification<T> notificationData = new DBNotification<T>();
@@ -128,20 +127,20 @@ namespace Common
             string[] keycolsarray = key_columns.Split(",");
             string[] keyvalsarray = key_values.Split(",");
 
-            PropertyInfo pi;
+            PropertyInfo propInfo;
             if (operation == "DELETE")
             {
                 notificationData.row = new T();
                 for (int i = 0; i < keycolsarray.Length; i++)
                 {
-                    pi = notificationData.row.GetType().GetProperty(keycolsarray[i]);
-                    if (pi.PropertyType == typeof(Guid))
-                        pi.SetValue(notificationData.row, Guid.Parse(keyvalsarray[i]));
-                    if (pi.PropertyType == typeof(Int32))
-                        pi.SetValue(notificationData.row, Int32.Parse(keyvalsarray[i]));
+                    propInfo = notificationData.row.GetType().GetProperty(keycolsarray[i]);
+                    if (propInfo.PropertyType == typeof(Guid))
+                        propInfo.SetValue(notificationData.row, Guid.Parse(keyvalsarray[i]));
+                    if (propInfo.PropertyType == typeof(Int32))
+                        propInfo.SetValue(notificationData.row, Int32.Parse(keyvalsarray[i]));
 
-                    if (pi.PropertyType == typeof(string))
-                        pi.SetValue(notificationData.row, keyvalsarray[i]);
+                    if (propInfo.PropertyType == typeof(string))
+                        propInfo.SetValue(notificationData.row, keyvalsarray[i]);
                 }
             }
             else
@@ -155,10 +154,9 @@ namespace Common
                     where += keycolsarray[i] + " = '" + keyvalsarray[i] + "'";
                 }
 
-                // query for the row
+                // query for the row that changed or was inserted
                 string query = "select row_to_json(t) from( select * from " + table + where + ") t;";
                 string jsonResult;
-
                 using (NpgsqlConnection conn = new NpgsqlConnection(_connstring))
                 {
                     conn.Open();
@@ -169,9 +167,11 @@ namespace Common
                     }
                 }
 
-                // convert the row into an object of type T (very cool! I could use this elsewhere, like in LoadConfig() )
+                // convert the row into an object of type T (very cool! I could use this elsewhere, like in DatabaseManager.LoadConfig() )
                 notificationData.row = JsonConvert.DeserializeObject<T>(jsonResult, new CustomJsonConvert());
             }
+
+            // raise an event to notify the app that the monitored table has changed, include the row data and operation type
             Notification?.Invoke(this, new PostgreSQLNotification(notificationData));
         }
 

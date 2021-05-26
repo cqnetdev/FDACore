@@ -6,13 +6,9 @@ using System.Threading;
 using System.Threading.Tasks;
 
 
-namespace Common
+namespace Support
 {
-  
-
-
-
-    public static class Console2
+    public static class AsyncConsole
     {
         private static readonly StringBuilder _sb = new StringBuilder();
         private static volatile CancellationTokenSource _cts;

@@ -157,13 +157,15 @@ namespace FDA
                                     "2" => StopBits.Two,
                                     _ => throw new FormatException("unrecognized serial stop bits option '" + connDetails[4] + "'. Valid options are N,1,1.5, or 2"),
                                 };
-                                newConn = new ConnectionManager(connectionconfig.SCUID, connectionconfig.Description,
-                                    comPort,                                            // COM Port
-                                    int.Parse(connDetails[1]),                                 // baud
-                                    parity,
-                                    int.Parse(connDetails[2]),                                 // databits
-                                    stopBits,
-                                    Handshake.None); // handshaking (hard coded to "none")
+
+                                newConn = new ConnectionManager(connectionconfig.SCUID, connectionconfig.Description)
+                                {
+                                    SerialPortName = comPort,                                            
+                                    SerialBaudRate = int.Parse(connDetails[1]),                                 
+                                    SerialParity = parity,
+                                    SerialDataBits = int.Parse(connDetails[2]),      
+                                    SerialStopBits = stopBits,
+                                    SerialHandshake = Handshake.None};              // handshaking (hard coded to "none")
                                 break;
                         }
                         newConn.RequestRetryDelay = connectionconfig.RequestRetryDelay;
@@ -1500,16 +1502,14 @@ namespace FDA
             Globals.SystemManager.LogApplicationEvent(this, "", "Unloading user scripts");
             DynamicCodeManager.UnloadAllUserModules();
 
+            // dispose scheduelrs and clear schedulers dictionary
             if (_schedulersDictionary != null)
             {
                 foreach (FDAScheduler sched in _schedulersDictionary.Values)
                 {
-                    Globals.SystemManager.LogApplicationEvent(this, "", "Stopping Scheduler '" + sched.Description + "' (" + sched.ID + ")");
-                    sched.Enabled = false;
-                    sched.Dispose();
+                      sched.Dispose();
                 }
                 _schedulersDictionary.Clear();
-                _schedulersDictionary = null;
             }
 
             // dispose connections and then clear the connections dictionary
@@ -1517,12 +1517,9 @@ namespace FDA
             {
                 foreach (ConnectionManager conn in _connectionsDictionary.Values)
                 {
-                    Globals.SystemManager.LogApplicationEvent(this, "", "Shutting down connection manager for '" + conn.Description + "' (" + conn.ConnectionID + ")");
-                    conn.Dispose();
+                     conn.Dispose();
                 }
-
                 _connectionsDictionary.Clear();
-                _connectionsDictionary = null;
             }
 
             _dbManager?.Dispose();
