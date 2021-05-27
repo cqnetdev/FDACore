@@ -225,6 +225,8 @@ namespace FDA
             private void ClientWorker_DoWork(object sender, DoWorkEventArgs e)
             {
                 NetworkStream stream = null;
+                var autoResetEvent = new AutoResetEvent(false);
+
                 try
                 {
                     using (stream = _connection.GetStream())
@@ -263,7 +265,8 @@ namespace FDA
                                 stream.Write(toSend, 0, toSend.Length);
                             }
 
-                            Thread.Sleep(100);
+                            autoResetEvent.WaitOne(100);
+                            //Thread.Sleep(100);
                         }
                         stream.Close();
                         stream.Dispose();
@@ -317,16 +320,17 @@ namespace FDA
 
             public void Dispose()
             {
+
                 if (_workerThread != null)
                 {
                     if (_workerThread.IsBusy)
                         _workerThread.CancelAsync();
-
-                    while (_workerThread.IsBusy)
-                        Thread.Sleep(10);
+                    
+                    //while (_workerThread.IsBusy)
+                    //    Thread.Sleep(10);
                 }
-                ReceivedQueue.Clear();
-                SendQueue.Clear();
+                lock (ReceivedQueue) { ReceivedQueue.Clear(); }
+                lock (SendQueue) { SendQueue.Clear(); }
             }
         }
 

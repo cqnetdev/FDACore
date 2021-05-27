@@ -753,9 +753,11 @@ namespace Common
 
                         stopwatch.Reset();
                         stopwatch.Start();
+                        
                         while (_bgCommsLogger.IsBusy && stopwatch.Elapsed.Seconds < 5)
                             Thread.Sleep(50);
                         stopwatch.Stop();
+                        
                         _bgCommsLogger.Dispose();
                     }
 

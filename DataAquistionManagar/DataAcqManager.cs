@@ -97,11 +97,11 @@ namespace FDA
                 Globals.DBManager = _dbManager;
 
                 // set up Dynamic Code Manager
-                DynamicCodeManager.NameSpaces = new string[] {"System","System.Collections.Generic","Common","FDA" };
-                DynamicCodeManager.Tags = ((DBManager)Globals.DBManager).GetAllTagDefs();
-                DynamicCodeManager.ConnMgrs = _connectionsDictionary;
-                DynamicCodeManager.UserMethodExecuted += DynamicCodeManager_UserMethodExecuted;
-                DynamicCodeManager.UserMethodRuntimeError += DynamicCodeManager_UserMethodRuntimeError;
+                DynamicCodeManager.Instance.NameSpaces = new string[] {"System","System.Collections.Generic","Common","FDA" };
+                DynamicCodeManager.Instance.Tags = ((DBManager)Globals.DBManager).GetAllTagDefs();
+                DynamicCodeManager.Instance.ConnMgrs = _connectionsDictionary;
+                DynamicCodeManager.Instance.UserMethodExecuted += DynamicCodeManager_UserMethodExecuted;
+                DynamicCodeManager.Instance.UserMethodRuntimeError += DynamicCodeManager_UserMethodRuntimeError;
 
                 // compile and load any user scripts
                 LoadUserScripts();
@@ -278,7 +278,7 @@ namespace FDA
                 Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "DynamicCodeManager", "Loading user script module '" + module.module_name + "'");
                 try
                 {
-                    loadedScripts = DynamicCodeManager.LoadModule(module.module_name, module.script, module.run_spec);
+                    loadedScripts = DynamicCodeManager.Instance.LoadModule(module.module_name, module.script, module.run_spec);
                     Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "DynamicCodeManager", "Loaded user script(s) " + String.Join("() ", loadedScripts.ToArray()));
                 }
                 catch (Exception ex)
@@ -909,7 +909,7 @@ namespace FDA
                 try
                 {
                     // if a module with this name already exists, DynamicCodeManager will unload the existing module before loading the new one
-                    List<string> loaded = DynamicCodeManager.LoadModule(module.module_name, module.script, module.run_spec);
+                    List<string> loaded = DynamicCodeManager.Instance.LoadModule(module.module_name, module.script, module.run_spec);
                     Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "DynamicCodeManager", "Loaded user script(s) " + String.Join("() ", loaded.ToArray()));
                 }
                 catch (Exception ex)
@@ -934,7 +934,7 @@ namespace FDA
             {
                 try
                 {
-                    DynamicCodeManager.UnloadModule(module.module_name);
+                    DynamicCodeManager.Instance.UnloadModule(module.module_name);
                 }
                 catch (Exception ex)
                 {
@@ -1500,9 +1500,9 @@ namespace FDA
         {
             // stop and unload all user scripts
             Globals.SystemManager.LogApplicationEvent(this, "", "Unloading user scripts");
-            DynamicCodeManager.UnloadAllUserModules();
+            DynamicCodeManager.Instance.UnloadAllUserModules();
 
-            // dispose scheduelrs and clear schedulers dictionary
+            // dispose schedulers and clear schedulers dictionary
             if (_schedulersDictionary != null)
             {
                 foreach (FDAScheduler sched in _schedulersDictionary.Values)

@@ -52,6 +52,7 @@ namespace Common
         public int ActualResponseSize { get { if (_responseBytes != null) return _responseBytes.Length; else return 0; } }
         public string Protocol { get => _protocol; set => _protocol = value; }
         public object ProtocolSpecificParams { get => _protocolSpecificParams; set => _protocolSpecificParams = value; }
+        
         public string Destination;
         public DataRequest ErrorCorrectionRequest { get; set; }
         public bool ErrorCorrectionAttempted = false;

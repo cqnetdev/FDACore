@@ -9,28 +9,32 @@ using FDA;
 
 namespace DynamicCode
 {
-    public static class DynamicCodeManager 
+    public sealed class DynamicCodeManager
     {
+        // singleton pattern
+        public static DynamicCodeManager Instance { get => _instance; }
+        private readonly static DynamicCodeManager _instance = new DynamicCodeManager();
+
         /********************* public ****************************/
-        public static Dictionary<Guid, FDADataPointDefinitionStructure> Tags { get => _tags; set { _tags = value; Module.Tags = value; } }
-        public static Dictionary<Guid, ConnectionManager> ConnMgrs { get => _connMgrs; set { _connMgrs = value; Module.ConnMgrs = value; } }
-        public static string[] NameSpaces { 
+        public Dictionary<Guid, FDADataPointDefinitionStructure> Tags { get => _tags; set { _tags = value; Module.Tags = value; } }
+        public Dictionary<Guid, ConnectionManager> ConnMgrs { get => _connMgrs; set { _connMgrs = value; Module.ConnMgrs = value; } }
+        public string[] NameSpaces { 
             set {
                   string temp = "";
                    foreach (string ns in value) temp += "using " + ns + ";";
                   _namespaces = temp;
                 } 
             }
-        public static List<string> LoadedModules { get { return UserCodeModules.Keys.ToList<string>(); } }
+        public List<string> LoadedModules { get { return UserCodeModules.Keys.ToList<string>(); } }
 
         public delegate void UserMethodExecuteHandler(string methodName);
-        public static event UserMethodExecuteHandler UserMethodExecuted;
+        public event UserMethodExecuteHandler UserMethodExecuted;
 
         public delegate void UserMethodRuntimeErrorHandler(string methodName, string errorMsg);
-        public static event UserMethodRuntimeErrorHandler UserMethodRuntimeError;
+        public event UserMethodRuntimeErrorHandler UserMethodRuntimeError;
 
         /******************** private *****************************/
-        private static string UserCodeWrapper = @"public class UserCode
+        private readonly string UserCodeWrapper = @"public class UserCode
                                                   {                           
                                                     private static Dictionary<Guid, FDADataPointDefinitionStructure> _tagsref;
                                                     private static Dictionary<Guid, ConnectionManager> _connectionsref;
@@ -49,9 +53,9 @@ namespace DynamicCode
                                                         public DateTime Timestamp {get => _tagref.LastRead.Timestamp;}
                                                         public int Quality { get => _tagref.LastRead.Quality;}
                                                         
-                                                        public void SetValue(Double value, int quality, DateTime timestamp,string destination="""")
+                                                        public void SetValue(Double value, int quality, DateTime timestamp,string histdest="""",lastvaluesdest="""")
                                                         {
-                                                            _tagref.LastRead = new FDADataPointDefinitionStructure.Datapoint(value, quality, timestamp,destination, DataType.UNKNOWN, DataRequest.WriteMode.Insert);
+                                                            _tagref.LastRead = new FDADataPointDefinitionStructure.Datapoint(value, quality, timestamp,histdest, DataType.UNKNOWN, DataRequest.WriteMode.Insert);
                                                         }
 
                                                         public Tag(FDADataPointDefinitionStructure tagref)
@@ -98,12 +102,11 @@ namespace DynamicCode
                                                     <USERCODE>
                                                   }";
 
-        private static Dictionary<Guid,FDADataPointDefinitionStructure> _tags;
-        private static Dictionary<Guid, ConnectionManager> _connMgrs;
+        private Dictionary<Guid,FDADataPointDefinitionStructure> _tags;
+        private Dictionary<Guid, ConnectionManager> _connMgrs;
 
-        private static string _namespaces = "";
-        private static readonly Dictionary<string, Module> UserCodeModules = new Dictionary<string, Module>();
-
+        private string _namespaces = "";
+        private readonly Dictionary<string, Module> UserCodeModules = new Dictionary<string, Module>();
 
         /// <summary>
         /// Load a dynamic code module (group of methods)
@@ -111,7 +114,7 @@ namespace DynamicCode
         /// <param name="moduleName">A unique name for referencing this module</param>
         /// <param name="userCode">C# code to be compiled and loaded</param>
         /// <returns></returns>
-        public static List<string> LoadModule(string moduleName, string userCode,string runspec)
+        public List<string> LoadModule(string moduleName, string userCode,string runspec)
         {
             Module newModule = null;
             //string userCodeMinusRunSpecs = "";
@@ -167,12 +170,12 @@ namespace DynamicCode
             return newModule.Methods;
         }
 
-        private static void UserModuleMethodRuntimeError(string methodName, string errorMsg)
+        private void UserModuleMethodRuntimeError(string methodName, string errorMsg)
         {
             UserMethodRuntimeError?.Invoke(methodName, errorMsg);
         }
 
-        private static void UserModuleMethodExecuted(string methodName)
+        private void UserModuleMethodExecuted(string methodName)
         {
             UserMethodExecuted?.Invoke(methodName);
         }
@@ -181,7 +184,7 @@ namespace DynamicCode
         /// Unload a dynamic code module (group of methods)
         /// </summary>
         /// <param name="moduleName">The name of the module to be unloaded</param>
-        public static void UnloadModule(string moduleName)
+        public void UnloadModule(string moduleName)
         {
             if (UserCodeModules.ContainsKey(moduleName))
             {
@@ -196,7 +199,7 @@ namespace DynamicCode
             }
         }
 
-        public static void UnloadAllUserModules()
+        public void UnloadAllUserModules()
         {
             foreach (Module module in UserCodeModules.Values)
             {

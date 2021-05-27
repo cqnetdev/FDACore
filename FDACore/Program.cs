@@ -790,6 +790,7 @@ namespace FDAApp
             Globals.SystemManager?.Dispose();
 
 
+            var autoResetEvent = new AutoResetEvent(false);
 
             // unpublish FDA topics,set run status to "stopped", and shut down the MQTT connection
             if (Globals.MQTTEnabled && Globals.MQTT != null)
@@ -803,7 +804,10 @@ namespace FDAApp
                     Globals.MQTT.Publish("FDA/connectionlist", new byte[0], 0, true);
                     Globals.MQTT.Publish("FDA/runstatus", Encoding.UTF8.GetBytes("Stopped"), 0, true);
                     Globals.MQTT.Publish("FDA/DBType", new byte[0], 0, true);
-                    Thread.Sleep(3000);
+                    
+                    autoResetEvent.WaitOne(3000);
+                    //Thread.Sleep(3000);
+                    
                     Globals.MQTT.Disconnect();
                     Globals.MQTT = null;
                 }

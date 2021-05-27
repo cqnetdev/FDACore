@@ -390,8 +390,7 @@ namespace FDA
 
 
                     string[] destList = transactionToLog.Destination.Split(',');
-
-
+                   
 
                     foreach (Tag tag in transactionToLog.TagList)
                     {
@@ -481,7 +480,8 @@ namespace FDA
                         // if tag quality is good, write the value and timestamp to the FDALastDataValues table (update if it already exists in the table, insert otherwise)
                         if (tag.Quality == 192)
                         {
-                            batch.Append("UPDATE FDALastDataValues SET value = ");
+                            string lastvaluestable = Globals.SystemManager.GetTableName("FDALastDataValues");
+                            batch.Append("UPDATE " + lastvaluestable + " SET value = ");
                             batch.Append(tag.Value);
                             batch.Append(",timestamp='");
                             batch.Append(DateTimeHelpers.FormatDateTime(tag.Timestamp));
@@ -490,7 +490,7 @@ namespace FDA
                             batch.Append(tag.Quality);
                             batch.Append(" where DPDUID='");
                             batch.Append(tag.TagID);
-                            batch.Append("';  INSERT INTO FDALastDataValues(dpduid, value, timestamp, quality) SELECT '");
+                            batch.Append("';  INSERT INTO " + lastvaluestable + "(dpduid, value, timestamp, quality) SELECT '");
                             batch.Append(tag.TagID);
                             batch.Append("',");
                             batch.Append(tag.Value);
@@ -498,7 +498,7 @@ namespace FDA
                             batch.Append(DateTimeHelpers.FormatDateTime(tag.Timestamp));
                             batch.Append("',");
                             batch.Append(tag.Quality);
-                            batch.Append(" WHERE NOT EXISTS (SELECT 1 FROM FDALastDataValues WHERE dpduid = '");
+                            batch.Append(" WHERE NOT EXISTS (SELECT 1 FROM " + lastvaluestable + " WHERE dpduid = '");
                             batch.Append(tag.TagID);
                             batch.Append("');");
                         }
