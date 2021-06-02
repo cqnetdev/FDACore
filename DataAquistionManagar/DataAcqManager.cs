@@ -6,7 +6,8 @@ using TableDependency.SqlClient.Base.EventArgs;
 using System.Text;
 using System.Threading;
 using uPLibrary.Networking.M2Mqtt;
-using DynamicCode;
+using Support;
+using Scripting;
 
 namespace FDA
 {
@@ -18,7 +19,6 @@ namespace FDA
         private readonly DBManager _dbManager;
 
         private readonly BackfillManager _backfillManager;
-
 
         public string DBConnectionString { get => _dbConnectionString; set => _dbConnectionString = value; }
         public string ID { get; set; }
@@ -58,14 +58,20 @@ namespace FDA
            
         }
 
-        private void DynamicCodeManager_UserMethodRuntimeError(string methodName, string errorMsg)
+        private void HandleUserScriptCompileError(string scriptID, List<string> errors)
         {
-            Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "DynamicCodeManager", "", "User script " + methodName + "() failed with error: " + errorMsg);
+            Scripter.GetScript(scriptID).Enabled = false;
+            Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "Scripter", "", "User script '" + scriptID + "' has been disabled because it failed to compile, error(s): " + String.Join("\n",errors));
+        }
+        private void HandleUserScriptRuntimeError(string scriptID, string errorMsg)
+        {
+            Scripter.GetScript(scriptID).Enabled = false;
+            Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "Scripter", "", "User script '" + scriptID + "' has been disabled because it produced a run-time error: " + errorMsg);
         }
 
-        private void DynamicCodeManager_UserMethodExecuted(string methodName)
+        private void HandleUserScriptExecutedEvent(string scriptID)
         {
-            Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "DynamicCodeManager", "", "User script " + methodName + "() executed");
+            Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "Scripter", "", "User script " + scriptID + "() executed");
         }
 
         public int GetTotalQueueCounts()
@@ -95,16 +101,18 @@ namespace FDA
                 Globals.SystemManager.LogApplicationEvent(this, "", "FDA initialization complete");
 
                 Globals.DBManager = _dbManager;
+               
+                
+                //DynamicCodeManager.Instance.NameSpaces = new string[] {"System","System.Collections.Generic","Common","FDA" };
+                //DynamicCodeManager.Instance.IncludeDlls = new string[] {
+                //        MiscHelpers.FindDll(typeof(Tag)),
+                //        MiscHelpers.FindDll(typeof(ConnectionManager)) };
+                //DynamicCodeManager.Instance.Tags = ((DBManager)Globals.DBManager).GetAllTagDefs();
+                //DynamicCodeManager.Instance.ConnMgrs = _connectionsDictionary;
+                //DynamicCodeManager.Instance.UserMethodExecuted += DynamicCodeManager_UserMethodExecuted;
+                //DynamicCodeManager.Instance.UserMethodRuntimeError += DynamicCodeManager_UserMethodRuntimeError;
 
-                // set up Dynamic Code Manager
-                DynamicCodeManager.Instance.NameSpaces = new string[] {"System","System.Collections.Generic","Common","FDA" };
-                DynamicCodeManager.Instance.Tags = ((DBManager)Globals.DBManager).GetAllTagDefs();
-                DynamicCodeManager.Instance.ConnMgrs = _connectionsDictionary;
-                DynamicCodeManager.Instance.UserMethodExecuted += DynamicCodeManager_UserMethodExecuted;
-                DynamicCodeManager.Instance.UserMethodRuntimeError += DynamicCodeManager_UserMethodRuntimeError;
 
-                // compile and load any user scripts
-                LoadUserScripts();
 
                 // apply any app configuration options
                 HandleAppConfigChanges();
@@ -245,47 +253,63 @@ namespace FDA
                 {
                     Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "DataAcqManager: Error while creating timers for the configured schedule(s)");
                 }
+
+                if (Globals.MQTTEnabled)
+                {
+                    PublishUpdatedConnectionsList();
+
+                    // publish the default CommsStats table name
+                    string tableString = Globals.SystemManager.GetTableName("CommsStats");
+                    byte[] tableBytes = Encoding.UTF8.GetBytes(tableString);
+                    Globals.MQTT.Publish("FDA/DefaultCommsStatsTable", tableBytes, 0, true);
+                }
+
+
+                // set up the scripter
+                Scripter.AddNamespace(new string[] {"System"});
+                //Scripter.AddReference(new string[] { }); // Todo: what references do user scripts need?
+                Scripter.ScriptTriggered += HandleUserScriptExecutedEvent;
+                Scripter.RunTimeError += HandleUserScriptRuntimeError;
+                Scripter.CompileError += HandleUserScriptCompileError;
+                Scripter.AddScriptableObject(ScriptableConnection.WrapConn(_connectionsDictionary));
+                Scripter.AddScriptableObject(ScriptableTag.WrapDPD(_dbManager.GetAllTagDefs()));
+                LoadUserScripts();
+                Scripter.Enabled = true;
             }
             catch (Exception ex)
             {
                 Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "DataAcqManager: General error in Start()");
-            }
-
-
-            if (Globals.MQTTEnabled)
-            {
-                PublishUpdatedConnectionsList();
-
-                // publish the default CommsStats table name
-                string tableString = Globals.SystemManager.GetTableName("CommsStats");
-                byte[] tableBytes = Encoding.UTF8.GetBytes(tableString);
-                Globals.MQTT.Publish("FDA/DefaultCommsStatsTable", tableBytes, 0, true);
-            }
-
-         
+            }     
         }
+
+      
 
         private void LoadUserScripts()
         {
-            Dictionary<string, UserScriptModule> modules = _dbManager.GetUserScripts();
+            Dictionary<string, UserScriptDefinition> modules = _dbManager.GetUserScripts();
+
+            //get a the list of scripts and sort them by the load_order
             List<string> loadedScripts = new List<string>();
-            foreach (UserScriptModule module in modules.Values)
+            List<UserScriptDefinition> sortedScriptDef = new List<UserScriptDefinition>(modules.Values);
+            sortedScriptDef.Sort();
+
+            foreach (UserScriptDefinition scriptDef in sortedScriptDef)
             {
                 // skip any disabled modules
-                if (!module.enabled)
-                    continue;
+                //if (!module.enabled)
+                //   continue;
 
-                Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "DynamicCodeManager", "Loading user script module '" + module.module_name + "'");
+                 Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "Scripter", "Loading user script '" + scriptDef.script_name + "'");
                 try
                 {
-                    loadedScripts = DynamicCodeManager.Instance.LoadModule(module.module_name, module.script, module.run_spec);
-                    Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "DynamicCodeManager", "Loaded user script(s) " + String.Join("() ", loadedScripts.ToArray()));
+                    Scripter.LoadScript(scriptDef.script_name, scriptDef.script, scriptDef.enabled, scriptDef.run_spec);
+                    
                 }
                 catch (Exception ex)
                 {
                     if (ex.GetType() == typeof(DynamicCode.CompileException))
                     {
-                        string errormsg = "Failed to load user script module, because of error(s) in code: " + Environment.NewLine;
+                        string errormsg = "Failed to load user script, because of error(s) in code: " + Environment.NewLine;
                         foreach (var diagnostic in ((DynamicCode.CompileException)ex).CompileResult)
                         {
                             errormsg += diagnostic.GetMessage() + Environment.NewLine;
@@ -293,7 +317,7 @@ namespace FDA
                         Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "DynamicCodeManager", errormsg);
                     }
                     else
-                        Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "DynamicCodeManager", "Failed to load user script module '" + module.module_name + ": " + ex.Message);
+                        Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "DynamicCodeManager", ex.Message);
                 }
             }
         }
@@ -898,50 +922,35 @@ namespace FDA
 
         }
 
-       
         private void HandleScriptChanges(ConfigEventArgs e)
-        {  
-            UserScriptModule module = _dbManager.GetUserScript((string)e.ID);
-
-            if ((e.ChangeType == "INSERT" || e.ChangeType == "UPDATE") && module.enabled)
+        {
+            UserScriptDefinition scriptdef = _dbManager.GetUserScript((string)e.ID);
+            if (e.ChangeType == "INSERT")
             {
-
-                try
+                if (Scripter.GetScript(e.ID.ToString()) == null) // check if a script with this ID already exists
                 {
-                    // if a module with this name already exists, DynamicCodeManager will unload the existing module before loading the new one
-                    List<string> loaded = DynamicCodeManager.Instance.LoadModule(module.module_name, module.script, module.run_spec);
-                    Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "DynamicCodeManager", "Loaded user script(s) " + String.Join("() ", loaded.ToArray()));
-                }
-                catch (Exception ex)
-                {
-
-                    if (ex.GetType() == typeof(DynamicCode.CompileException))
-                    {
-                        string errormsg = "Failed to load user script module, because of error(s) in code): " + Environment.NewLine;
-                        foreach (var diagnostic in ((DynamicCode.CompileException)ex).CompileResult)
-                        {
-                            errormsg += diagnostic.GetMessage() + Environment.NewLine;
-                        }
-                        Globals.SystemManager.LogApplicationEvent(this, "", errormsg);
-                    }
-                    else
-                        Globals.SystemManager.LogApplicationEvent(this, "", "Failed to load user script module '" + module.module_name + ": " + ex.Message);
+                    Scripter.LoadScript(scriptdef.script_name, scriptdef.script, scriptdef.enabled, scriptdef.run_spec);
                 }
 
             }
 
-            if (e.ChangeType == "DELETE" || !module.enabled)
+            if (e.ChangeType == "UPDATE")
             {
-                try
+                UserScript scriptToUpdate = Scripter.GetScript(e.ID.ToString());
+
+                if (scriptToUpdate != null)
                 {
-                    DynamicCodeManager.Instance.UnloadModule(module.module_name);
-                }
-                catch (Exception ex)
-                {
-                    Globals.SystemManager.LogApplicationEvent(this, "", "Failed to unload user script module '" + module.module_name + ": " + ex.Message);
+                    scriptToUpdate.Code = scriptdef.script;
+                    scriptToUpdate.RunSpec = scriptdef.run_spec;
+                    scriptToUpdate.Enabled = scriptdef.enabled;
                 }
             }
 
+            if (e.ChangeType == "DELETE")
+            {
+                Scripter.UnloadScript(e.ID.ToString());
+            }
+          
             
         }
     
@@ -1500,7 +1509,7 @@ namespace FDA
         {
             // stop and unload all user scripts
             Globals.SystemManager.LogApplicationEvent(this, "", "Unloading user scripts");
-            DynamicCodeManager.Instance.UnloadAllUserModules();
+            Scripter.Cleanup();
 
             // dispose schedulers and clear schedulers dictionary
             if (_schedulersDictionary != null)

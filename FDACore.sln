@@ -29,7 +29,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FDAControllerService", "Con
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FDAControllerGUI", "FDAController\FDAControllerGUI.csproj", "{9BEBA322-9F71-469C-B0A1-3B13AFF792E5}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DynamicCode", "DynamicCode\DynamicCode.csproj", "{BEDDE090-CCDE-4043-9953-B0CEA43E2747}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Scripting", "Scripting\Scripting.csproj", "{635C52A9-2565-4781-A72E-C1B65BA3E755}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -89,10 +89,10 @@ Global
 		{9BEBA322-9F71-469C-B0A1-3B13AFF792E5}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{9BEBA322-9F71-469C-B0A1-3B13AFF792E5}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{9BEBA322-9F71-469C-B0A1-3B13AFF792E5}.Release|Any CPU.Build.0 = Release|Any CPU
-		{BEDDE090-CCDE-4043-9953-B0CEA43E2747}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{BEDDE090-CCDE-4043-9953-B0CEA43E2747}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{BEDDE090-CCDE-4043-9953-B0CEA43E2747}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{BEDDE090-CCDE-4043-9953-B0CEA43E2747}.Release|Any CPU.Build.0 = Release|Any CPU
+		{635C52A9-2565-4781-A72E-C1B65BA3E755}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{635C52A9-2565-4781-A72E-C1B65BA3E755}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{635C52A9-2565-4781-A72E-C1B65BA3E755}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{635C52A9-2565-4781-A72E-C1B65BA3E755}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

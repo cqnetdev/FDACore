@@ -20,7 +20,7 @@ namespace FDA
         protected Dictionary<Guid, FDASourceConnection> _connectionsConfig;
         protected Dictionary<Guid, FDADevice> _deviceConfig;
         protected Dictionary<Guid, FDATask> _taskConfig;
-        protected Dictionary<string, UserScriptModule> _scriptsConfig;
+        protected Dictionary<string, UserScriptDefinition> _scriptsConfig;
 
         protected Queue<DataRequest> _writeQueue;
         protected BackgroundWorker _dataWriter;
@@ -81,7 +81,7 @@ namespace FDA
             _connectionsConfig = new Dictionary<Guid, FDASourceConnection>();
             _deviceConfig = new Dictionary<Guid, FDADevice>();
             _taskConfig = new Dictionary<Guid, FDATask>();
-            _scriptsConfig = new Dictionary<string, UserScriptModule>();
+            _scriptsConfig = new Dictionary<string, UserScriptDefinition>();
 
             //_derivedTagConfig = new Dictionary<Guid, DerivedTag>();
 
@@ -206,12 +206,12 @@ namespace FDA
                 return null;
         }
 
-        public Dictionary<string, UserScriptModule> GetUserScripts()
+        public Dictionary<string, UserScriptDefinition> GetUserScripts()
         {
             return _scriptsConfig;
         }
 
-        public UserScriptModule GetUserScript(string name)
+        public UserScriptDefinition GetUserScript(string name)
         {
             if (_scriptsConfig.ContainsKey(name))
             {
@@ -1401,23 +1401,24 @@ namespace FDA
             if (_scriptsTableExists)
             {
                 tableName = Globals.SystemManager.GetTableName("fda_scripts");
-                query = "SELECT module_name,script,run_spec,enabled from " + tableName + ";";
+                query = "SELECT script_name,script,run_spec,depends_on,load_order,enabled from " + tableName + ";";
 
                 table = ExecuteQuery(query);
 
-                List<string> scripts;
-                UserScriptModule newModule;
+                UserScriptDefinition newModule;
                 foreach (DataRow row in table.Rows)
                 {
-                    newModule = new UserScriptModule()
+                    newModule = new UserScriptDefinition()
                     {
-                        module_name = row["module_name"].ToString(),
+                        script_name = row["script_name"].ToString(),
                         script = row["script"].ToString(),
                         enabled = (bool)row["enabled"],
+                        load_order = (Int32)row["load_order"],
+                        depends_on = row["depends_on_modules"].ToString(),
                         run_spec = row["run_spec"].ToString()
                     };
 
-                    _scriptsConfig.Add(newModule.module_name,newModule);
+                    _scriptsConfig.Add(newModule.script_name,newModule);
 
  
                 }
@@ -1691,16 +1692,16 @@ namespace FDA
             RaiseConfigChangeEvent(changeType.ToString(), Globals.SystemManager.GetTableName("FDATasks"), task.TASK_ID);
         }
 
-        protected void UserScriptNotification(string changeType, UserScriptModule scriptModule)
+        protected void UserScriptChangeNotification(string changeType, UserScriptDefinition scriptModule)
         {
 
             // check for nulls
             if (changeType == "INSERT" || changeType == "UPDATE")
             {
-                string[] nulls = FindNulls(scriptModule);
+                string[] nulls = FindNulls(scriptModule,new List<string> { "depends_on" });
                 if (nulls.Length > 0)
                 {
-                    Globals.SystemManager.LogApplicationEvent(this, "", "script module " + scriptModule.module_name + " " + changeType.ToString().ToLower() + " rejected, null values in field(s) " + string.Join(",", nulls));
+                    Globals.SystemManager.LogApplicationEvent(this, "", "script " + scriptModule.script_name + " " + changeType.ToString().ToLower() + " rejected, null values in field(s) " + string.Join(",", nulls));
                     return;
                 }
             }
@@ -1709,14 +1710,14 @@ namespace FDA
             switch (changeType)
             {
                 case "INSERT":
-                        _scriptsConfig.Add(scriptModule.module_name, scriptModule);
+                        _scriptsConfig.Add(scriptModule.script_name, scriptModule);
                         action = "inserted";
                     break;
 
                 case "DELETE":
-                    if (_scriptsConfig.ContainsKey(scriptModule.module_name))
+                    if (_scriptsConfig.ContainsKey(scriptModule.script_name))
                     {
-                        _scriptsConfig.Remove(scriptModule.module_name);
+                        _scriptsConfig.Remove(scriptModule.script_name);
                         action = "deleted";
                     }
                     else
@@ -1726,14 +1727,14 @@ namespace FDA
                     action = "deleted"; 
                     break;
                 case "UPDATE":
-                    if (_scriptsConfig.ContainsKey(scriptModule.module_name))
+                    if (_scriptsConfig.ContainsKey(scriptModule.script_name))
                     {
                         action = "updated";
-                        _scriptsConfig[scriptModule.module_name] = scriptModule;
+                        _scriptsConfig[scriptModule.script_name] = scriptModule;
                     }
                     else
                     {
-                        _scriptsConfig.Add(scriptModule.module_name, scriptModule);
+                        _scriptsConfig.Add(scriptModule.script_name, scriptModule);
                         action = "not found, adding it as a new Module";
                         changeType = "INSERT";
                         action = "updated";
@@ -1742,9 +1743,9 @@ namespace FDA
                 default: action = "<action>"; break;
             }
 
-            Globals.SystemManager.LogApplicationEvent(this, "", "User script module '" + scriptModule.module_name + "' was " + action);
+            Globals.SystemManager.LogApplicationEvent(this, "", "User script module '" + scriptModule.script_name + "' was " + action);
 
-            RaiseConfigChangeEvent(changeType, "fda_scripts", scriptModule.module_name);
+            RaiseConfigChangeEvent(changeType, "fda_scripts", scriptModule.script_name);
    
   
         }

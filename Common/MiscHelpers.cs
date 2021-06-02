@@ -19,6 +19,9 @@ namespace Support
             return newValue;
         }
 
-
+        public static string FindDll(Type type)
+        {
+            return type.Assembly.Location;
+        }
     }
 }

@@ -21,7 +21,7 @@ namespace FDA
         SqlTableDependency<FDASourceConnection> _connectionDefMonitor;
         SqlTableDependency<FDADevice> _deviceDefMonitor;
         SqlTableDependency<FDATask> _taskDefMonitor;
-        SqlTableDependency<UserScriptModule> _scriptMonitor;
+        SqlTableDependency<UserScriptDefinition> _scriptMonitor;
 
         public DBManagerSQL(string connString) : base(connString)
         {
@@ -49,7 +49,7 @@ namespace FDA
                     _taskDefMonitor = new SqlTableDependency<FDATask>(ConnectionString, Globals.SystemManager.GetTableName("FDATasks"));
 
                 if (_scriptsTableExists)
-                    _scriptMonitor = new SqlTableDependency<UserScriptModule>(ConnectionString, Globals.SystemManager.GetTableName("fda_scripts"));
+                    _scriptMonitor = new SqlTableDependency<UserScriptDefinition>(ConnectionString, Globals.SystemManager.GetTableName("fda_scripts"));
 
                 //----------------------verbose messaging for the SQLTableDependency Objects------------------------------------------
                 //_schedMonitor.TraceLevel = System.Diagnostics.TraceLevel.Verbose;
@@ -421,61 +421,53 @@ namespace FDA
         {
             Globals.SystemManager.LogApplicationError(Globals.FDANow(),e.Error, "Error reported by SQLTableDependency : " + e.Message);
         }
-        private void _scriptMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<UserScriptModule> e)
+        private void _scriptMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<UserScriptDefinition> e)
         {
             string changeType = e.ChangeType.ToString().ToUpper();
-            UserScriptModule task = e.Entity;
-            base.UserScriptNotification(changeType, task);
+            base.UserScriptChangeNotification(changeType, e.Entity);
         }
 
         private void _taskDefMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<FDATask> e)
         {
             string changeType = e.ChangeType.ToString().ToUpper();
-            FDATask task = e.Entity;
-            base.TaskMonitorNotification(changeType, task);
+            base.TaskMonitorNotification(changeType, e.Entity);
         }
 
         private void _deviceDefMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<FDADevice> e)
         {
             string changeType = e.ChangeType.ToString().ToUpper();
-            FDADevice device = e.Entity;
-            base.DeviceMonitorNotification(changeType, device);
+            base.DeviceMonitorNotification(changeType, e.Entity);
         }
 
         private void _dataPointDefMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<FDADataPointDefinitionStructure> e)
         {
             string changeType = e.ChangeType.ToString().ToUpper();
-            FDADataPointDefinitionStructure datapoint = e.Entity;
-            base.DataPointMonitorNotification(changeType, datapoint);
+            base.DataPointMonitorNotification(changeType, e.Entity);
         }
 
         private void _requestGroupMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<FDADataBlockRequestGroup> e)
         {
             string changeType = e.ChangeType.ToString().ToUpper();
-            FDADataBlockRequestGroup group = e.Entity;
-            base.RequestGroupMonitorNotification(changeType, group);
+            base.RequestGroupMonitorNotification(changeType, e.Entity);
         }
 
         private void _SchedMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<FDARequestGroupScheduler> e)
         {
             string changeType = e.ChangeType.ToString().ToUpper();
-            FDARequestGroupScheduler sched = e.Entity;
-            base.SchedulerMonitorNotification(changeType, sched);
+            base.SchedulerMonitorNotification(changeType, e.Entity);
         }
 
         private void _DemandMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<FDARequestGroupDemand> e)
         {
             string changeType = e.ChangeType.ToString().ToUpper();
-            FDARequestGroupDemand demand = e.Entity;
-            base.DemandMonitorNotification(changeType, demand);
+            base.DemandMonitorNotification(changeType, e.Entity);
         }
 
 
         private void _connectionDefMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<FDASourceConnection> e)
         {
             string changeType = e.ChangeType.ToString().ToUpper();
-            FDASourceConnection connection = e.Entity;
-            base.SourceConnectionMonitorNotification(changeType, connection);
+            base.SourceConnectionMonitorNotification(changeType, e.Entity);
         }
 
         private void ConnectionDefMonitor_OnError(object sender, TableDependency.SqlClient.Base.EventArgs.ErrorEventArgs e)

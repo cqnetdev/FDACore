@@ -287,12 +287,18 @@ namespace Common
         public string DescLong { get; set; }
     }
 
-    public class UserScriptModule
+    public class UserScriptDefinition : IComparable
     {
-        public string module_name { get; set; }
+        public string script_name { get; set; }
         public string script { get; set; }
         public string run_spec { get; set; }
+        public int load_order { get; set; }
+        public string depends_on { get; set; }
         public bool enabled { get; set; }
+        public int CompareTo(object other)
+        {
+            return load_order.CompareTo(((UserScriptDefinition)other).load_order);
+        }
     }
 
 
