@@ -7,7 +7,6 @@
   <ItemGroup>
     <ProjectReference Include="..\Common\Common.csproj" />
     <ProjectReference Include="..\ConnectionManager\ConnectionManager.csproj" />
-    <ProjectReference Include="..\DynamicCode\DynamicCode.csproj" />
     <ProjectReference Include="..\FDAScheduler\FDATimer.csproj" />
     <ProjectReference Include="..\ROC\ROC.csproj" />
     <ProjectReference Include="..\Scripting\Scripting.csproj" />

@@ -307,17 +307,7 @@ namespace FDA
                 }
                 catch (Exception ex)
                 {
-                    if (ex.GetType() == typeof(DynamicCode.CompileException))
-                    {
-                        string errormsg = "Failed to load user script, because of error(s) in code: " + Environment.NewLine;
-                        foreach (var diagnostic in ((DynamicCode.CompileException)ex).CompileResult)
-                        {
-                            errormsg += diagnostic.GetMessage() + Environment.NewLine;
-                        }
-                        Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "DynamicCodeManager", errormsg);
-                    }
-                    else
-                        Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "DynamicCodeManager", ex.Message);
+                    Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "Scripter", ex.Message);
                 }
             }
         }

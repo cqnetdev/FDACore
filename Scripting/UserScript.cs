@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Collections.Immutable;
 using System.Threading.Tasks;
+using System.Globalization;
 
 namespace Scripting
 {
@@ -20,6 +21,7 @@ namespace Scripting
         private string _code;
         private Script _script;      // compiled script, ready for executing
         private Timer _timer;     // timer for executing user script on a set schedule
+        private Timer _runOnceTimer;      // timer for executing user script only once, at a particular time
         private object _scriptableObjects;
         private Type _scriptableObjectsType;
         private bool _enabled = false;
@@ -46,9 +48,7 @@ namespace Scripting
             _scriptableObjectsType = typeof(ScriptInterface);
 
 
-            SetupTimersOrTriggers(runspec);
-
-          
+            SetupTimersOrTriggers(runspec);      
         }
 
         private void SetupTimersOrTriggers(string runspec)
@@ -67,12 +67,14 @@ namespace Scripting
             {
                 switch (runspecparts[0].ToLower())
                 {
-                    case "onschedule":
-                      
+                    case "every":                    
                         _timer = CreateSchedule(runspecparts);
                         break;
                     case "onchange":
                         SubscribeToTriggers(runspecparts);
+                        break;
+                    case "onceat":
+                        _timer = ScheduleExecution(runspecparts);
                         break;
                     default:
                         throw new Exception("Invalid run specification (unrecognized trigger type '" + runspecparts[0] + "')");
@@ -81,36 +83,91 @@ namespace Scripting
             }
         }
 
+
+        private Timer ScheduleExecution(string[] runspecparts)
+        {
+            if (runspecparts.Length < 2)
+                throw new Exception("Invalid run specification (missing scheduled executation time (HH:mm:ss)");
+
+         
+            DateTime scheduledTime = GetDateTime(runspecparts, 1);
+            
+            TimeSpan waitTime = scheduledTime.Subtract(DateTime.Now);
+
+            if (waitTime < TimeSpan.Zero)
+                throw new Exception("Invalid run specification. Script run time must be in the future");
+
+
+            return new Timer(OnTimerTick, null, (long)waitTime.TotalMilliseconds,-1);
+            
+        }
+
+        private DateTime GetDateTime(string[] runspecparts,int idx)
+        {
+            string timestring = runspecparts[idx];
+
+            DateTime datetime = new DateTime();
+            if (!DateTime.TryParseExact(timestring, "HH:mm:ss", new CultureInfo("en-US"), System.Globalization.DateTimeStyles.None, out datetime))
+                throw new Exception("Script run time must be supplied in this format (24 hr clock): HH:mm:ss");
+
+            // if it's in the past, add a day
+            if (datetime < DateTime.Now)
+                datetime = datetime.AddDays(1);
+
+            return datetime;
+        }
+
         private Timer CreateSchedule(string[] runspec)
         {
             double quantity;
-            Int32 milliseconds;
-
+            Int32 intervalms;
+            Int32 waitms = -1;
 
             if (!Double.TryParse(runspec[1], out quantity))
             {
                 throw new Exception("Invalid run specification (invalid time quantity '" + runspec[1] + "', must be numeric)");
             }
+
+            DateTime scheduledTime = DateTime.MinValue;
+            if (runspec.Length >= 5)
+            {
+                scheduledTime = GetDateTime(runspec, 4);
+                TimeSpan waitTime = scheduledTime.Subtract(DateTime.Now);
+                waitms = (int)waitTime.TotalMilliseconds;
+            }
+
             switch (runspec[2].ToLower())
             {
                 case "seconds":
-                    milliseconds = Convert.ToInt32(quantity * 1000);
-                    return new Timer(OnTimerTick, null, milliseconds, milliseconds);
+                    intervalms = Convert.ToInt32(quantity * 1000);
+                    if (waitms < 0)
+                        waitms = intervalms;
+                    return new Timer(OnTimerTick, null, waitms, intervalms);
                 case "second":
-                    milliseconds = Convert.ToInt32(quantity * 1000);
-                    return new Timer(OnTimerTick, null, milliseconds, milliseconds);
+                    intervalms = Convert.ToInt32(quantity * 1000);
+                    if (waitms < 0)
+                        waitms = intervalms;
+                    return new Timer(OnTimerTick, null, waitms, intervalms);
                 case "minutes":
-                    milliseconds = Convert.ToInt32(quantity * 60 * 1000);
-                    return new Timer(OnTimerTick, null, milliseconds, milliseconds);
+                    intervalms = Convert.ToInt32(quantity * 60 * 1000);
+                    if (waitms < 0)
+                        waitms = intervalms;
+                    return new Timer(OnTimerTick, null, waitms, intervalms);
                 case "minute":
-                    milliseconds = Convert.ToInt32(quantity * 60 * 1000);
-                    return new Timer(OnTimerTick, null, milliseconds, milliseconds);
+                    intervalms = Convert.ToInt32(quantity * 60 * 1000);
+                    if (waitms < 0)
+                        waitms = intervalms;
+                    return new Timer(OnTimerTick, null, waitms, intervalms);
                 case "hours":
-                    milliseconds = Convert.ToInt32(quantity * 24 * 60 * 1000);
-                    return new Timer(OnTimerTick, null, milliseconds, milliseconds);
+                    intervalms = Convert.ToInt32(quantity * 24 * 60 * 1000);
+                    if (waitms < 0)
+                        waitms = intervalms;
+                    return new Timer(OnTimerTick, null, waitms, intervalms);
                 case "hour":
-                    milliseconds = Convert.ToInt32(quantity * 24 * 60 * 1000);
-                    return new Timer(OnTimerTick, null, milliseconds, milliseconds);
+                    intervalms = Convert.ToInt32(quantity * 24 * 60 * 1000);
+                    if (waitms < 0)
+                        waitms = intervalms;
+                    return new Timer(OnTimerTick, null, waitms, intervalms);
                 default:
                     throw new Exception("Invalid run specification (unrecognized time unit '" + runspec[2] + "')");
             }

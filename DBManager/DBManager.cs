@@ -1414,7 +1414,7 @@ namespace FDA
                         script = row["script"].ToString(),
                         enabled = (bool)row["enabled"],
                         load_order = (Int32)row["load_order"],
-                        depends_on = row["depends_on_modules"].ToString(),
+                        depends_on = row["depends_on"].ToString(),
                         run_spec = row["run_spec"].ToString()
                     };
 
