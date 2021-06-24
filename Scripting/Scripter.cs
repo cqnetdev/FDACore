@@ -6,6 +6,7 @@ using System.Threading;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Collections.Immutable;
 
 namespace Scripting
 {
@@ -65,6 +66,16 @@ namespace Scripting
         public static void AddReference(IEnumerable<string> libs)
         {
             _references.AddRange(libs);
+        }
+
+
+        public static ImmutableArray<Diagnostic> CheckScript(string code)
+        {
+            Script _script = CSharpScript.Create(code, ScriptOptions.Default.AddReferences(_references).WithImports(_imports), typeof(ScriptInterface));
+
+            ImmutableArray<Diagnostic> result = _script.Compile();
+
+            return result;
         }
 
         public static void LoadScript(string id,string code, bool enabled=false,string runspec="")

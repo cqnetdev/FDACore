@@ -8,7 +8,17 @@ namespace Scripting
     {
         Dictionary<string, ScriptableObject> _scriptables = new Dictionary<string, ScriptableObject>();
        
-        public dynamic Get(string ID)
+        public dynamic GetTag(string ID)
+        {
+            return Get(ID);
+        }
+
+        public dynamic GetConnection(string ID)
+        {
+            return Get(ID);
+        }
+
+        internal dynamic Get(string ID)
         {
             ID = ID.ToLower();
             if (_scriptables.ContainsKey(ID))

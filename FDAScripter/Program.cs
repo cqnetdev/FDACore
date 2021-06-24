@@ -6,6 +6,11 @@ using System.Windows.Forms;
 using System.Data.SqlClient;
 using System.Data.Common;
 using System.Data;
+using Microsoft.CodeAnalysis.CSharp.Scripting;
+using Microsoft.CodeAnalysis.Scripting;
+using Scripting;
+using System.Collections.Immutable;
+using Microsoft.CodeAnalysis;
 
 namespace FDAScripter
 {
@@ -32,7 +37,9 @@ namespace FDAScripter
             Application.SetHighDpiMode(HighDpiMode.SystemAware);
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-            
+
+            Scripter.AddNamespace(new string[] { "System" });
+
             LoadRecentConnections();
             loginForm = new frmLogin();
             Application.Run(loginForm);
@@ -74,8 +81,28 @@ namespace FDAScripter
 
 
             scriptEditor = new frmScriptEditor();
+            scriptEditor.FormClosed += ScriptEditor_FormClosed;
             scriptEditor.Show();
             loginForm.Hide();          
+        }
+
+        private static void ScriptEditor_FormClosed(object sender, FormClosedEventArgs e)
+        {
+            Shutdown();
+        }
+
+        private static void Shutdown()
+        {
+            if (ConnectedDBType == DB.SQL)
+            {
+                if (SQL.State == ConnectionState.Open)
+                {
+                    SQL.Close();
+                    SQL.Dispose();
+                }
+            }
+
+            Application.Exit();
         }
 
         private static void AddToRecent(string instance, string dbname, string user, string password="")
@@ -95,9 +122,10 @@ namespace FDAScripter
         {
             DataTable result = new DataTable();
 
+            string safequery = GetSafeQuery(query);
             if (ConnectedDBType == DB.SQL)
             {
-                using (SqlDataAdapter da = new SqlDataAdapter(query, SQL))
+                using (SqlDataAdapter da = new SqlDataAdapter(safequery, SQL))
                 {
                     da.Fill(result);
                 }
@@ -108,13 +136,26 @@ namespace FDAScripter
 
         internal static void ExecuteDBquery(string query)
         {
+            string safequery = GetSafeQuery(query);
             using (SqlCommand comm = SQL.CreateCommand())
             {
-                comm.CommandText = query;
+                comm.CommandText = safequery;
                 comm.ExecuteNonQuery();
             }
         }
 
+        internal static ImmutableArray<Diagnostic> CheckScript(string code)
+        {
+            
+            ImmutableArray<Diagnostic> result = Scripter.CheckScript(code);
+
+            return result;
+        }
+
+        private static string GetSafeQuery(string unsafeQuery)
+        {
+            return unsafeQuery;
+        }
 
 
         internal class RecentConn
