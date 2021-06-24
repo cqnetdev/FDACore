@@ -6,8 +6,6 @@ using FDA;
 
 namespace ControllerService
 {
-  
-
     class BasicServicesServer : IDisposable
     {
         private static TCPServer _basicServicesPort;
@@ -17,7 +15,7 @@ namespace ControllerService
         public BasicServicesServer(int port,ILogger<Worker> logger)
         {
             _logger = logger;
-            _basicServicesPort = FDA.TCPServer.NewTCPServer(port);
+            _basicServicesPort = TCPServer.NewTCPServer(port);
             _basicServicesPort.DataAvailable += BasicServices_DataAvailable;
         }
 
@@ -57,19 +55,17 @@ namespace ControllerService
                     //_logger.LogInformation("replying with 'UP'", new object[] { });
                     _basicServicesPort.Send(e.ClientID, "UP"); // yes, I'm here
                     break;
-                case "TOTALQUEUECOUNT":
-                    string count = ControllerGlobals.BasicServicesClient.FDAQueueCount.ToString();
-                    //_logger.LogInformation("Returning the total queue count (" + count + ") to the requestor", new object[] { });
-                    _basicServicesPort.Send(e.ClientID, count);  // return the last known queue count to the requestor
-                    break;
-                case "RUNMODE":
-                    //_logger.LogInformation("Returning the run mode '" + Globals.BasicServicesClient.FDAMode + "'");
-                    _basicServicesPort.Send(e.ClientID, ControllerGlobals.BasicServicesClient.FDAMode);
+                case "FDASTATUS":
+                    string jsonStatus = ControllerGlobals.BasicServicesClient.Status.JSON();
+                    _basicServicesPort.Send(e.ClientID, jsonStatus);
                     break;
                 default:
                     //_logger.LogInformation("Forwarding command '" + command + "' to the FDA", new object[] { });
-                    ControllerGlobals.BasicServicesClient.Send(command); // forward all other messages to the FDA
-                    _basicServicesPort.Send(e.ClientID, "FORWARDED"); // reply  back to the requestor that the command was forwarded to the FDA
+                    if (ControllerGlobals.BasicServicesClient.FDAConnected)
+                    {
+                        ControllerGlobals.BasicServicesClient.Send(command); // forward all other messages to the FDA (Eg. SHUTDOWN command)
+                        _basicServicesPort.Send(e.ClientID, "FORWARDED"); // reply  back to the requestor that the command was forwarded to the FDA
+                    }
                     break;
             }
 
@@ -81,7 +77,7 @@ namespace ControllerService
 
             if (Environment.OSVersion.Platform == PlatformID.Win32NT)
             {
-                RunConsoleCommand("FDACore.exe", "", "c:\\IntricateFDA\\");
+                RunConsoleCommand("FDACore.exe", "", "C:\\IntricateFDA\\FDACore\\");
             }
 
             if (Environment.OSVersion.Platform == PlatformID.Unix)

@@ -11,6 +11,9 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.ServiceProcess;
+using System.Security.Principal;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace FDAController
 {
@@ -24,6 +27,7 @@ namespace FDAController
         private bool _isStopping = false;
         private bool _isStarting = false;
         private ServiceController FDAControllerService;
+        private ServiceController MQTTService;
         private readonly BackgroundWorker bg_StatusChecker;
 
         private delegate void SafePropertyUpdateDelgate(Control control, string property, object value);
@@ -36,14 +40,23 @@ namespace FDAController
             bg_StatusChecker.WorkerSupportsCancellation = true;
             bg_StatusChecker.RunWorkerAsync();
 
+            FDAControllerService = new ServiceController("FDAControllerService");
+            MQTTService = new ServiceController("mosquitto");
+
+            // set the Tag properties of the buttons to the names of the services, so we know what service to start/stop when they're clicked
+            btnController.Tag = "FDAControllerService";
+            btnMQTT.Tag = "mosquitto"; 
+
+
             //timer = new Timer();
             //timer.Interval = 1000;
             //timer.Tick += Timer_Tick;
             //timer.Start();
         }
 
-        private void SafePropertySet(Control control,string property,object value)
+        private void SafePropertySet(Control control, string property, object value)
         {
+
             if (control.InvokeRequired)
             {
                 control.Invoke(new SafePropertyUpdateDelgate(SafePropertySet), new object[] { control, property, value });
@@ -63,7 +76,8 @@ namespace FDAController
             bool controllerStatus = false;
 
             // is the controller service running?
-            if (ProcessRunning("FDAControllerService"))
+            FDAControllerService.Refresh();
+            if (FDAControllerService.Status == ServiceControllerStatus.Running)
             {
                 status = "FDAControllerService is running";
                 textcolor = GoodColor;
@@ -74,21 +88,22 @@ namespace FDAController
                 {
                     status += " and responsive";
                     controllerStatus = true;
+                    if (!_isStarting && !_isStopping)
+                        SafePropertySet(btnFDA, "Enabled", true);
                 }
                 else
                 {
                     status += " but is not responsive";
                     textcolor = WarningColor;
                     controllerStatus = false;
+                    SafePropertySet(btnFDA, "Enabled", false);
                 }
             }
             else
             {
                 status = "FDA Controller service is not running";
                 textcolor = BadColor;
-                SafePropertySet(btnStop, "Enabled", false);
-                SafePropertySet(btnStart, "Enabled", false);
-                SafePropertySet(btnStartConsole, "Enabled", false);
+                SafePropertySet(btnFDA, "Enabled", false);
                 controllerStatus = false;
             }
 
@@ -96,129 +111,150 @@ namespace FDAController
             SafePropertySet(lblControllerService, "ForeColor", textcolor);
             SafePropertySet(btnFDAMonitor, "Enabled", controllerStatus);
 
+            SetButtonMode(btnController, controllerStatus);
+            
+
             return controllerStatus;
 
+        }
+
+        private void SetButtonMode(Button button, bool status)
+        {
+           
+            if (status)
+            {
+                SafePropertySet(button, "Text", "Stop");
+               // ttFDAStart.Active = false;
+            }
+            else
+            {
+                SafePropertySet(button, "Text", "Start");
+               // ttFDAStart.Active = true;
+            }
         }
 
         private void CheckMosquittoService()
         {
             Color textcolor = GoodColor;
-
-            if (ProcessRunning("mosquitto"))
+            MQTTService.Refresh();
+            bool status = MQTTService.Status == ServiceControllerStatus.Running;
+            
+            if (status)
             {
                 SafePropertySet(lblMQTT, "Text", "MQTT service is running");
-
                 textcolor = GoodColor;
             }
             else
             {
                 SafePropertySet(lblMQTT, "Text", "MQTT service is not running");
-
-
                 textcolor = BadColor;
             }
 
             SafePropertySet(lblMQTT, "ForeColor", textcolor);
+
+            SetButtonMode(btnMQTT, status);
         }
 
         private void CheckFDAProcess(bool controllerRunning)
         {
-            string result;
-            string status;
             Color textcolor = GoodColor;
-        
+            string result;
+            string statusText;
+            
+            bool runstatus = ProcessRunning("FDACore");
 
             // is the FDA running?
-            if (ProcessRunning("FDACore"))
+            if (runstatus)
             {
                 _isStarting = false;
-                status = "FDACore is running";
+                statusText = "FDACore process is running";
                 textcolor = GoodColor;
-                if (!_isStopping)
-                {
-                    SafePropertySet(btnStop, "Enabled", true);
-                }
 
                 if (controllerRunning)
                 {
-                    SafePropertySet(btnStart, "Enabled", false);
-                    SafePropertySet(btnStartConsole, "Enabled", false);
-                    SafePropertySet(btnStart, "Text", "Start");
-                }
-
-
-                // ask the FDA controller for the FDA's run mode (background or console)
-                result = SendRequest(_controllerIP, _controllerPort, "RUNMODE");
-                if (result != "")
-                {
-                    status += " in " + result + " mode";
-                }
-
-                // ask the FDA controller for the FDA's current queue count (serves as an 'FDA is responsive' test)
-                result = SendRequest(_controllerIP, _controllerPort, "TOTALQUEUECOUNT");
-                if (int.TryParse(result, out int count))
-                {
-                    if (count > -1)
+                    // Get the current FDA status
+                    result = SendRequest(_controllerIP, _controllerPort, "FDASTATUS\0");
+                    FDAStatus status = null;
+                    try
                     {
-                        status += ", " + count + " items in the communications queues";
+                        status = FDAStatus.Deserialize(result);
+                    }
+                    catch { }
+
+                    if (result == null)
+                    {
+                        return;
+                    }
+
+                    if (status.RunStatus != "")
+                    {
+                        statusText += ", the status is '" + status.RunStatus + "'";
+                    }
+
+                  
+                    if (status.RunMode != "")
+                    {
+                        statusText += "\nFDACore mode is '" + status.RunMode + "'";
+                    }
+
+                    // ask the FDA controller for the FDA's current queue count (serves as an 'FDA is responsive' test)
+                    //result = SendRequest(_controllerIP, _controllerPort, "TOTALQUEUECOUNT\0");
+                    if (status.TotalQueueCount > -1)
+                    {
+                        statusText += "\n" + status.TotalQueueCount + " items in the communications queues";
                     }
                 }
-                else
-                {
-                    status += ", unknown number of items in the communications queues";
-                    textcolor = WarningColor;
-                }
+               
             }
             else
             {
-                status = "FDACore is not running";
+                statusText = "FDACore process is not running";
                 textcolor = BadColor;
-                if (_isStopping)
-                {
-                    SafePropertySet(btnStop, "Text", "Stop");
-
-                }
-                _isStopping = false;
-
-                SafePropertySet(btnStop, "Enabled", false);
+             
 
                 if (!_isStarting && controllerRunning)
                 {
-                    SafePropertySet(btnStart, "Enabled", true);
-                    SafePropertySet(btnStart, "Text", "Start");
-                    SafePropertySet(btnStartConsole, "Enabled", true);
-
+                    SafePropertySet(btnFDA, "Enabled", true);
+                    SafePropertySet(btnFDA, "Text", "Start");
+                   
                 }
 
             }
-            SafePropertySet(lblFDA, "Text", status);
+            SafePropertySet(lblFDA, "Text", statusText);
             SafePropertySet(lblFDA, "ForeColor", textcolor);
+
+            SetButtonMode(btnFDA, runstatus);
+
+
+    
+
         }
 
         private void Bg_StatusChecker_DoWork(object sender, DoWorkEventArgs e)
         {
-            FDAControllerService = new ServiceController("FDAControllerService");
-
             Color textcolor = GoodColor;
             bool controllerStatus;
             while (!e.Cancel)
             {
-
-                controllerStatus = CheckControllerService();
-
-                CheckMosquittoService();
-
-
-                CheckFDAProcess(controllerStatus);
+                try
+                {
+                    controllerStatus = CheckControllerService();
 
 
-                // update the 'last status update' timestamp
-                SafePropertySet(lblLastupdate, "Text", "Last status update: " + DateTime.Now.ToString());    
+                    CheckMosquittoService();
+
+                    CheckFDAProcess(controllerStatus);
+
+                    // update the 'last status update' timestamp
+                    SafePropertySet(lblLastupdate, "Text", "Last status update: " + DateTime.Now.ToString());
+                }
+                catch { }
             }
+          
         }
 
-   
-        private string SendRequest(string address,int port, string request)
+
+        private string SendRequest(string address, int port, string request)
         {
             byte[] buffer = new byte[1024];
             byte[] response;
@@ -231,7 +267,8 @@ namespace FDAController
                     client.Connect(address, port);
                     client.GetStream().WriteTimeout = 1000;
                     client.GetStream().ReadTimeout = 1000;
-                } catch 
+                }
+                catch
                 {
                     return "";
                 }
@@ -241,7 +278,8 @@ namespace FDAController
                 {
                     byte[] requestBytes = Encoding.UTF8.GetBytes(request);
                     client.GetStream().Write(requestBytes, 0, requestBytes.Length);
-                } catch 
+                }
+                catch
                 {
                     client.Close();
                     return "";
@@ -250,7 +288,8 @@ namespace FDAController
                 try
                 {
                     bytesRead = client.GetStream().Read(buffer, 0, buffer.Length);
-                } catch
+                }
+                catch
                 {
                     client.Close();
                     return "";
@@ -268,51 +307,47 @@ namespace FDAController
 
         private void BtnStartConsole_Click(object sender, EventArgs e)
         {
+           
             StartFDA("-console");
         }
 
-        private void BtnStart_Click(object sender, EventArgs e)
+        private void BtnFDA_click(object sender, EventArgs e)
+        {       
+        }
+      
+
+        private void btnFDA_MouseClick(object sender, MouseEventArgs e)
+        {
+   
+            if (!ProcessRunning("FDACore"))
+            {
+                if (e.Button == MouseButtons.Right)
+                {
+                    ctxStartFDA.Show(Cursor.Position);
+                }
+                else
+                {
+                    StartFDA("");
+                }
+            }
+            else
+                StopFDA();
+
+        }
+
+        private void miStartFDAbg_Click(object sender, EventArgs e)
         {
             StartFDA("");
         }
 
-
-        private void BtnFDAMonitor_Click(object sender, EventArgs e)
+        private void miStartFDAConsole_Click(object sender, EventArgs e)
         {
-            RunConsoleCommand("openFDAMonitor.bat","");
-            //RunConsoleCommand("notepad.exe", "");
-            //RunConsoleCommand("cmd.exe","");
-            //RunConsoleCommand("%SystemRoot%\\System32\\telnet.exe", "127.0.0.1 9570"); //<--- this is not working grrr
-            //RunConsoleCommand("cmd.exe", "/c cd c:\\");
-            //RunConsoleCommand("telnet.exe","");       
+            StartFDA("-console");
         }
 
-        private void StartFDA(string args)
+        private void StopFDA()
         {
-            // instead of sending the start command to the FDAController like we do in linux (because the FDA is a service)
-            // we can just run the FDA directly from here
-            _isStarting = true;
-            btnStart.Enabled = false;
-            btnStartConsole.Enabled = false;
-            string applicationDir = System.IO.Path.GetDirectoryName(System.Windows.Forms.Application.ExecutablePath);
-
-            if (File.Exists("FDACore.exe"))
-                RunConsoleCommand("cmd.exe","/c FDACore.exe " + args, applicationDir);
-            else
-            {
-                MessageBox.Show("FDA executable not found in the current folder \"" + applicationDir + "\\FDACore.exe");
-            }
-
-        }
-
-        private void BtnStop_Click(object sender, EventArgs e)
-        {
-            btnStart.Enabled = false;
-            btnStartConsole.Enabled = false;
-            btnStop.Enabled = false;
-
-
-            string response = SendRequest(_controllerIP, _controllerPort, "SHUTDOWN");
+            string response = SendRequest(_controllerIP, _controllerPort, "SHUTDOWN\0");
             if (response != "FORWARDED")
             {
                 MessageBox.Show("Shutdown command failed: " + response);
@@ -320,10 +355,34 @@ namespace FDAController
             else
             {
                 _isStopping = true;
-                btnStop.Text = "Stopping";
+                btnFDA.Enabled = false;
             }
         }
 
+
+        private void BtnFDAMonitor_Click(object sender, EventArgs e)
+        {
+            RunConsoleCommand("telnet.exe", "127.0.0.1 9570"); 
+        }
+
+        private void StartFDA(string args)
+        {
+            // instead of sending the start command to the FDAController like we do in linux (because the FDA is a service)
+            // we can just run the FDA directly from here
+            _isStarting = true;
+
+            string applicationDir = "C:\\IntricateFDA\\FDACore\\";
+
+            if (File.Exists(applicationDir+"FDACore.exe"))
+                RunConsoleCommand("cmd.exe", "/c FDACore.exe " + args, applicationDir);
+            else
+            {
+                MessageBox.Show("FDA executable not found in the current folder \"" + applicationDir + "\\FDACore.exe");
+            }
+
+        }
+
+ 
 
         private static void RunConsoleCommand(string command, string args, string workingDir = "")
         {
@@ -347,10 +406,11 @@ namespace FDAController
                 process.Start();
                 //string output = process.StandardOutput.ReadToEnd();
                 //string error = process.StandardError.ReadToEnd();
-                              
+
 
                 //process.WaitForExit();
-            } catch (Exception ex)
+            }
+            catch (Exception ex)
             {
                 MessageBox.Show("Failed execute command '" + command + "', " + ex.Message);
             }
@@ -365,9 +425,80 @@ namespace FDAController
             Process[] proc = Process.GetProcessesByName(processname);
             return (self && proc.Length > 1) || (!self && proc.Length > 0);
         }
+        
+        private void startstopBtn_Click(object sender, EventArgs e)
+        {
+            // check if controller gui was run as admin
+            bool isAdmin = new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator);
+            if (!isAdmin)
+            {
+                MessageBox.Show("Please close the app and Run as Administrator to enable starting/stopping services");
+                return;
+            }
 
-      
+            string serviceName = ((Button)sender).Tag.ToString();
+            ServiceController sc = new ServiceController(serviceName);
+
+            try
+            {
+                if (sc.Status == ServiceControllerStatus.Running)
+                    sc.Stop();
+                if (sc.Status == ServiceControllerStatus.Stopped)
+                    sc.Start();
+            } catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message);
+            }
+       
+
+        }
+
+
+
+        public class FDAStatus
+        {
+            public TimeSpan UpTime { get; set; }
+            public String RunStatus { get; set; }
+            public String Version { get; set; }
+            public String DB { get; set; }
+
+            public String RunMode { get; set; }
+
+            public int TotalQueueCount { get; set; }
+
+            public FDAStatus()
+            {
+                UpTime = new TimeSpan(0);
+                RunStatus  = "";
+                Version = "";
+                DB = "";
+                RunMode = "";
+                TotalQueueCount = -1;
+            }
+
+            public string JSON()
+            {
+                return JsonSerializer.Serialize<FDAStatus>(this);
+            }
+
+            public static FDAStatus Deserialize(string json)
+            {
+                FDAStatus status;
+                try
+                {
+                    status = JsonSerializer.Deserialize<FDAStatus>(json);
+                }
+                catch (Exception ex)
+                {
+                    return new FDAStatus();
+                }
+
+                return status;
+            }
+        }
 
     }
 }
+
+
 

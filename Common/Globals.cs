@@ -83,7 +83,7 @@ namespace Common
         public enum AppState { Starting, Normal, ShuttingDown, Pausing, Paused, Stopped };
 
         private static AppState _FDAStatus;
-        public static AppState FDAStatus { get { return _FDAStatus; } set { _FDAStatus = value; ReportFDAStatus(value); } }
+        public static AppState FDAStatus { get { return _FDAStatus; } set { _FDAStatus = value; /*ReportFDAStatus(value);*/ } }
 
         //public static bool ShuttingDown = false;
 
@@ -91,7 +91,9 @@ namespace Common
 
         public static string FDAVersion;
 
-        public static DateTime ExecutionTime;
+        public static bool FDAIsElevated;
+
+        public static DateTime ExecutionTime = DateTime.MinValue;
 
         public static DateTime SQLMinDate = new DateTime(1900, 1, 1, 0, 0, 0);
 
@@ -107,6 +109,7 @@ namespace Common
 
         public enum RequesterType { Schedule, Demand, System };
 
+        /*
         private static void ReportFDAStatus(AppState status)
         {
             // publish the FDAStatus
@@ -119,6 +122,7 @@ namespace Common
             }
 
         }
+        */
 
         [Serializable]
         // a serializable structure containing the information about a connection

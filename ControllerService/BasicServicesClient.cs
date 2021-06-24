@@ -6,6 +6,7 @@ using System.ComponentModel;
 using System.Threading;
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
+using System.Text.Json;
 
 namespace ControllerService
 {
@@ -19,6 +20,12 @@ namespace ControllerService
         private Queue<string> _sendQueue;
         public int FDAQueueCount;
         public string FDAMode = "";
+        public string FDAVersion = "";
+        public string FDADBType = "";
+        public string FDAUpTime = "";
+        public Common.FDAStatus Status = null;
+
+        public bool FDAConnected { get { if (_FDA == null) return false; else return _FDA.Connected;} }
 
         private BackgroundWorker _bgWorker;
 
@@ -56,19 +63,21 @@ namespace ControllerService
             Stopwatch stopwatch = new Stopwatch();
             string message;
             string responseStr;
-            int qCount;
 
 
             stopwatch.Start();
             while (!e.Cancel)
             {
+                // if not connected, try to connect until successful
                 if (!_FDA.Connected)
                 {
-                    FDAMode = "";
+                    Status = new Common.FDAStatus(); // default FDA status (runtime = 0:00:00, all other fields null)                  
                     Connect(e);
                 }
               
+                // we're connected now
 
+                // send any pending requests
                 while (_sendQueue.Count > 0)
                 {
                     message = _sendQueue.Dequeue();
@@ -76,28 +85,22 @@ namespace ControllerService
                     _logger.LogInformation("Sending '" + message + "' to the FDA...response = '" + responseStr + "'");
                 }
 
+                // get a status update from the FDA
                 if (stopwatch.ElapsedMilliseconds >= 3000)
-                {              
-                    // Get the current queue count from the FDA
-                    responseStr = DoTransaction("TOTALQUEUECOUNT\0");
-                    _logger.LogInformation("Total Queue count received: " + responseStr);
-                    if (int.TryParse(responseStr, out qCount))
-                    {
-                        FDAQueueCount = qCount;
-                    }
+                {
+                    responseStr = DoTransaction("STATUS\0");
 
-                    // get the FDA run mode if we don't already know it (only need to get this once)
-                    if (FDAMode == "")
-                    {
-                        FDAMode = DoTransaction("RUNMODE\0");
-                        _logger.LogInformation("Run mode received: " + FDAMode);
-                    }
+                    if (responseStr != "")
+                        Status = Common.FDAStatus.Deserialize(responseStr);
+                    else
+                        Status = new Common.FDAStatus(); // no response from FDA, set the current status to the default status
+
 
                     stopwatch.Reset();
                     stopwatch.Start();
                 }
                 
-                Thread.Sleep(250);
+                Thread.Sleep(100);
             }
         }
 
@@ -110,26 +113,43 @@ namespace ControllerService
             string responseStr;
 
             if (!_FDA.Connected)
-                return "not connected";
+                return "";
 
             try
             {
                 // send the message
-                FDAstream.Flush();
                 commandBytes = Encoding.UTF8.GetBytes(message);
                 FDAstream.Write(commandBytes, 0, commandBytes.Length);
 
+                WaitForResponse(FDAstream, 2000);
+
                 //read the response
-                readsize = FDAstream.Read(buffer, 0, buffer.Length);
-                response = new byte[readsize];
-                Array.Copy(buffer, response, readsize);
-                responseStr = Encoding.UTF8.GetString(response);
+                if (FDAstream.DataAvailable)
+                {
+                    readsize = FDAstream.Read(buffer, 0, buffer.Length);
+                    response = new byte[readsize];
+                    Array.Copy(buffer, response, readsize);
+                    responseStr = Encoding.UTF8.GetString(response);
+                }
+                else
+                    return ""; // no response
+
             } catch (Exception ex)
             {
                 return "error: " + ex.Message;
             }
 
             return responseStr;
+        }
+
+        private void WaitForResponse(NetworkStream stream,int limit)
+        {
+            int wait = 0;
+            while (!stream.DataAvailable && wait < limit)
+            {
+                Thread.Sleep(50);
+                wait += 50;
+            }
         }
 
         private void Connect(DoWorkEventArgs e)
