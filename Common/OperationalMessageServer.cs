@@ -22,6 +22,12 @@ namespace Common
             _TCPServer.Start();
         }
 
+        public static void Stop()
+        {
+            _TCPServer.Dispose();
+
+        }
+
         public static void Write(string value)
         {
             lock (_sb) _sb.Append(value);

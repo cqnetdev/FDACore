@@ -21,7 +21,7 @@ namespace FDA
     {
         private readonly int _listeningPort;
 
-        private readonly int _tickRate = 250; //ms
+        private readonly int _tickRate = 100; //ms
         TcpListener _server;
         Dictionary<Guid, Client> _clients;
         System.Threading.Timer _timer;
@@ -42,7 +42,10 @@ namespace FDA
         public delegate void ConnectedHandler(object sender, ClientEventArgs e);
         public event ConnectedHandler ClientConnected;
 
-
+        /// <summary>
+        /// Create a new TCP Server o nthe specified port
+        /// </summary>
+        /// <param name="listeningPort"></param>
         private TCPServer(int listeningPort)
         {
             _listeningPort = listeningPort;
@@ -94,6 +97,10 @@ namespace FDA
         public bool Send(Guid clientID, string message)
         {
             bool broadcast = (clientID == Guid.Empty);   // Guid.Empty = broadcast to all clients 
+
+            // check for null message
+            if (message == null)
+                return false;
 
             //if (!_clients.ContainsKey(clientID) && !broadcast)
             //    return false; // client doesn't exist, can't send anything to it
@@ -225,7 +232,6 @@ namespace FDA
             private void ClientWorker_DoWork(object sender, DoWorkEventArgs e)
             {
                 NetworkStream stream = null;
-                var autoResetEvent = new AutoResetEvent(false);
 
                 try
                 {
@@ -242,12 +248,10 @@ namespace FDA
                         while (Connected && IsConnected(_connection.Client) && !_workerThread.CancellationPending /*&& stream.IsAuthenticated*/)  //while the client is connected at both ends, we look for incoming messages or messages queued for sending
                         {
                             while (_connection.GetStream().DataAvailable)
-                            {
-    
+                            {    
                                 readSize = stream.Read(readBuffer, 0, readBuffer.Length);
                                 messageArray = new byte[readSize];
                                 Array.Copy(readBuffer, messageArray,readSize);
-
 
                                 lock (ReceivedQueue)
                                 {
@@ -265,8 +269,7 @@ namespace FDA
                                 stream.Write(toSend, 0, toSend.Length);
                             }
 
-                            autoResetEvent.WaitOne(100);
-                            //Thread.Sleep(100);
+                            Thread.Sleep(50);
                         }
                         stream.Close();
                         stream.Dispose();

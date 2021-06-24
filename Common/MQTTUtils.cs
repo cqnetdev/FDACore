@@ -13,8 +13,9 @@ namespace Common
     public static class MQTTUtils
     {
         private static readonly string serviceName = "mosquitto";
-        private static readonly string exeRelativePath = "\\MQTT\\mosquitto.exe";
-        private static readonly string MQTTFolderRelativePath = "\\MQTT";
+        private static readonly string exePath = "C:\\IntricateFDA\\MQTT\\mosquitto.exe";
+        private static readonly string workingDir = "C:\\IntricateFDA\\MQTT";
+
 
 
         private static string RunCommand(string command, string args, string workingDir = "")
@@ -183,10 +184,9 @@ namespace Common
         }
 
         public static bool MQTTPathCorrect()
-        {
-            string correctPath = System.IO.Path.GetDirectoryName(Assembly.GetEntryAssembly().Location) + MQTTFolderRelativePath;
+        {         
             string mosquittoPath = Environment.GetEnvironmentVariable("MOSQUITTO_DIR",EnvironmentVariableTarget.Machine);
-            return (mosquittoPath == correctPath);
+            return (mosquittoPath == workingDir);
         }
 
         public static string SetMQTTPath()
@@ -194,8 +194,7 @@ namespace Common
 
             try
             {
-                string correctPath = System.IO.Path.GetDirectoryName(Assembly.GetEntryAssembly().Location) + MQTTFolderRelativePath;
-                Environment.SetEnvironmentVariable("MOSQUITTO_DIR", correctPath,EnvironmentVariableTarget.Machine);
+                Environment.SetEnvironmentVariable("MOSQUITTO_DIR", workingDir,EnvironmentVariableTarget.Machine);
             }
             catch (Exception ex)
             {
@@ -411,9 +410,9 @@ namespace Common
             Process process = new Process();
             ProcessStartInfo startInfo = new ProcessStartInfo() { WindowStyle = ProcessWindowStyle.Normal };
 
-            string path = System.IO.Path.GetDirectoryName(Assembly.GetEntryAssembly().Location) + exeRelativePath;
+            //string path = System.IO.Path.GetDirectoryName(Assembly.GetEntryAssembly().Location) + exePath;
 
-            startInfo.FileName = path;
+            startInfo.FileName = exePath;
             startInfo.Arguments = argument;
 
             process.StartInfo = startInfo;
