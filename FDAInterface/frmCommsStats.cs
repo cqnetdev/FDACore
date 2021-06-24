@@ -176,7 +176,10 @@ namespace FDAInterface
                     theDataSet.ReadXml(theReader);
 
                     if (theDataSet.Tables.Count == 0)
+                    {
                         dataGridView1.DataSource = null;
+                        MessageBox.Show("Unable to calculate sstatistics, there were no records found");
+                    }
                     else
                         dataGridView1.DataSource = theDataSet.Tables[0];
                 }

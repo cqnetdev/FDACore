@@ -36,7 +36,6 @@
             this.Version = new System.Windows.Forms.ToolStripStatusLabel();
             this.Uptime = new System.Windows.Forms.ToolStripStatusLabel();
             this.dbtypeDisplay = new System.Windows.Forms.ToolStripStatusLabel();
-            this.dbConnStatus = new System.Windows.Forms.ToolStripStatusLabel();
             this.mqttStatus = new System.Windows.Forms.ToolStripStatusLabel();
             this.menuStrip1 = new System.Windows.Forms.MenuStrip();
             this.fDAToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -53,19 +52,19 @@
             this.tabControl1 = new System.Windows.Forms.TabControl();
             this.tabDetails = new System.Windows.Forms.TabPage();
             this.panel1 = new System.Windows.Forms.Panel();
+            this.connDetails = new FDAInterface.ConnDetailsCtrl();
             this.tabQueues = new System.Windows.Forms.TabPage();
+            this.qHist = new FDAInterface.QueueHistory();
             this.panel2 = new System.Windows.Forms.Panel();
             this.panel3 = new System.Windows.Forms.Panel();
+            this.imgControllerServiceStatus = new FDAInterface.SuperSpecialPictureBox();
             this.imgFDARunStatus = new System.Windows.Forms.PictureBox();
+            this.imgBrokerStatus = new FDAInterface.SuperSpecialPictureBox();
             this.label1 = new System.Windows.Forms.Label();
             this.tb_connectionstate = new System.Windows.Forms.TextBox();
             this.label3 = new System.Windows.Forms.Label();
             this.label2 = new System.Windows.Forms.Label();
             this.tree = new System.Windows.Forms.TreeView();
-            this.connDetails = new FDAInterface.ConnDetailsCtrl();
-            this.qHist = new FDAInterface.QueueHistory();
-            this.imgControllerServiceStatus = new FDAInterface.SuperSpecialPictureBox();
-            this.imgBrokerStatus = new FDAInterface.SuperSpecialPictureBox();
             this.statusStrip1.SuspendLayout();
             this.menuStrip1.SuspendLayout();
             this.tabControl1.SuspendLayout();
@@ -100,8 +99,7 @@
             this.statusStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.Version,
             this.Uptime,
-            this.dbtypeDisplay,
-            this.dbConnStatus});
+            this.dbtypeDisplay});
             this.statusStrip1.Location = new System.Drawing.Point(0, 667);
             this.statusStrip1.Name = "statusStrip1";
             this.statusStrip1.Padding = new System.Windows.Forms.Padding(2, 0, 21, 0);
@@ -133,13 +131,7 @@
             this.dbtypeDisplay.Name = "dbtypeDisplay";
             this.dbtypeDisplay.Size = new System.Drawing.Size(136, 29);
             this.dbtypeDisplay.Text = "Database Type:";
-            // 
-            // dbConnStatus
-            // 
-            this.dbConnStatus.BorderStyle = System.Windows.Forms.Border3DStyle.Bump;
-            this.dbConnStatus.Name = "dbConnStatus";
-            this.dbConnStatus.Size = new System.Drawing.Size(224, 29);
-            this.dbConnStatus.Text = "FDA Database Connection:";
+            
             // 
             // mqttStatus
             // 
@@ -291,16 +283,39 @@
             this.panel1.Size = new System.Drawing.Size(1413, 597);
             this.panel1.TabIndex = 38;
             // 
+            // connDetails
+            // 
+            this.connDetails.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+            this.connDetails.ConnDetailsObj = null;
+            this.connDetails.DbConnStr = "";
+            this.connDetails.FDAExecutionID = "";
+            this.connDetails.Location = new System.Drawing.Point(4, 5);
+            this.connDetails.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
+            this.connDetails.Name = "connDetails";
+            this.connDetails.Size = new System.Drawing.Size(1377, 934);
+            this.connDetails.TabIndex = 37;
+            // 
             // tabQueues
             // 
             this.tabQueues.Controls.Add(this.qHist);
             this.tabQueues.Location = new System.Drawing.Point(4, 24);
             this.tabQueues.Name = "tabQueues";
             this.tabQueues.Padding = new System.Windows.Forms.Padding(3);
-            this.tabQueues.Size = new System.Drawing.Size(1419, 601);
+            this.tabQueues.Size = new System.Drawing.Size(1419, 603);
             this.tabQueues.TabIndex = 1;
             this.tabQueues.Text = "Queues";
             this.tabQueues.UseVisualStyleBackColor = true;
+            // 
+            // qHist
+            // 
+            this.qHist.ConnectionID = new System.Guid("00000000-0000-0000-0000-000000000000");
+            this.qHist.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.qHist.Location = new System.Drawing.Point(3, 3);
+            this.qHist.Margin = new System.Windows.Forms.Padding(6, 8, 6, 8);
+            this.qHist.Name = "qHist";
+            this.qHist.Priority = 0;
+            this.qHist.Size = new System.Drawing.Size(1413, 597);
+            this.qHist.TabIndex = 34;
             // 
             // panel2
             // 
@@ -327,6 +342,20 @@
             this.panel3.Size = new System.Drawing.Size(380, 186);
             this.panel3.TabIndex = 37;
             // 
+            // imgControllerServiceStatus
+            // 
+            this.imgControllerServiceStatus.ImageConnected = null;
+            this.imgControllerServiceStatus.ImageConnecting = null;
+            this.imgControllerServiceStatus.ImageDefault = null;
+            this.imgControllerServiceStatus.ImageDisconnected = null;
+            this.imgControllerServiceStatus.Location = new System.Drawing.Point(11, 107);
+            this.imgControllerServiceStatus.Margin = new System.Windows.Forms.Padding(0);
+            this.imgControllerServiceStatus.Name = "imgControllerServiceStatus";
+            this.imgControllerServiceStatus.Size = new System.Drawing.Size(30, 31);
+            this.imgControllerServiceStatus.Status = FDAInterface.SuperSpecialPictureBox.ConnStatus.Default;
+            this.imgControllerServiceStatus.TabIndex = 44;
+            this.imgControllerServiceStatus.RetryRequested += new FDAInterface.SuperSpecialPictureBox.ClickHandler(this.HandleRetryRequested);
+            // 
             // imgFDARunStatus
             // 
             this.imgFDARunStatus.Location = new System.Drawing.Point(11, 144);
@@ -336,15 +365,29 @@
             this.imgFDARunStatus.TabIndex = 43;
             this.imgFDARunStatus.TabStop = false;
             // 
+            // imgBrokerStatus
+            // 
+            this.imgBrokerStatus.ImageConnected = null;
+            this.imgBrokerStatus.ImageConnecting = null;
+            this.imgBrokerStatus.ImageDefault = null;
+            this.imgBrokerStatus.ImageDisconnected = null;
+            this.imgBrokerStatus.Location = new System.Drawing.Point(11, 70);
+            this.imgBrokerStatus.Margin = new System.Windows.Forms.Padding(0);
+            this.imgBrokerStatus.Name = "imgBrokerStatus";
+            this.imgBrokerStatus.Size = new System.Drawing.Size(30, 31);
+            this.imgBrokerStatus.Status = FDAInterface.SuperSpecialPictureBox.ConnStatus.Default;
+            this.imgBrokerStatus.TabIndex = 41;
+            this.imgBrokerStatus.RetryRequested += new FDAInterface.SuperSpecialPictureBox.ClickHandler(this.HandleRetryRequested);
+            // 
             // label1
             // 
             this.label1.AutoSize = true;
             this.label1.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.label1.Location = new System.Drawing.Point(42, 141);
             this.label1.Name = "label1";
-            this.label1.Size = new System.Drawing.Size(146, 28);
+            this.label1.Size = new System.Drawing.Size(187, 28);
             this.label1.TabIndex = 40;
-            this.label1.Text = "FDA Run Status";
+            this.label1.Text = "FDACore Run Status";
             // 
             // tb_connectionstate
             // 
@@ -399,57 +442,6 @@
             this.tree.StateImageList = this.imageList1;
             this.tree.TabIndex = 31;
             this.tree.AfterSelect += new System.Windows.Forms.TreeViewEventHandler(this.tree_AfterSelect);
-            // 
-            // connDetails
-            // 
-            this.connDetails.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            this.connDetails.ConnDetailsObj = null;
-            this.connDetails.DbConnStr = "";
-            this.connDetails.FDAExecutionID = "";
-            this.connDetails.Location = new System.Drawing.Point(4, 5);
-            this.connDetails.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
-            this.connDetails.Name = "connDetails";
-            this.connDetails.Size = new System.Drawing.Size(1377, 934);
-            this.connDetails.TabIndex = 37;
-            // 
-            // qHist
-            // 
-            this.qHist.ConnectionID = new System.Guid("00000000-0000-0000-0000-000000000000");
-            this.qHist.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.qHist.Location = new System.Drawing.Point(3, 3);
-            this.qHist.Margin = new System.Windows.Forms.Padding(6, 8, 6, 8);
-            this.qHist.Name = "qHist";
-            this.qHist.Priority = 0;
-            this.qHist.Size = new System.Drawing.Size(1413, 595);
-            this.qHist.TabIndex = 34;
-            // 
-            // imgControllerServiceStatus
-            // 
-            this.imgControllerServiceStatus.ImageConnected = ((System.Drawing.Image)(resources.GetObject("imgControllerServiceStatus.ImageConnected")));
-            this.imgControllerServiceStatus.ImageConnecting = ((System.Drawing.Image)(resources.GetObject("imgControllerServiceStatus.ImageConnecting")));
-            this.imgControllerServiceStatus.ImageDefault = ((System.Drawing.Image)(resources.GetObject("imgControllerServiceStatus.ImageDefault")));
-            this.imgControllerServiceStatus.ImageDisconnected = ((System.Drawing.Image)(resources.GetObject("imgControllerServiceStatus.ImageDisconnected")));
-            this.imgControllerServiceStatus.Location = new System.Drawing.Point(11, 107);
-            this.imgControllerServiceStatus.Margin = new System.Windows.Forms.Padding(0);
-            this.imgControllerServiceStatus.Name = "imgControllerServiceStatus";
-            this.imgControllerServiceStatus.Size = new System.Drawing.Size(30, 31);
-            this.imgControllerServiceStatus.Status = FDAInterface.SuperSpecialPictureBox.ConnStatus.Default;
-            this.imgControllerServiceStatus.TabIndex = 44;
-            this.imgControllerServiceStatus.RetryRequested += new FDAInterface.SuperSpecialPictureBox.ClickHandler(this.HandleRetryRequested);
-            // 
-            // imgBrokerStatus
-            // 
-            this.imgBrokerStatus.ImageConnected = ((System.Drawing.Image)(resources.GetObject("imgBrokerStatus.ImageConnected")));
-            this.imgBrokerStatus.ImageConnecting = ((System.Drawing.Image)(resources.GetObject("imgBrokerStatus.ImageConnecting")));
-            this.imgBrokerStatus.ImageDefault = ((System.Drawing.Image)(resources.GetObject("imgBrokerStatus.ImageDefault")));
-            this.imgBrokerStatus.ImageDisconnected = ((System.Drawing.Image)(resources.GetObject("imgBrokerStatus.ImageDisconnected")));
-            this.imgBrokerStatus.Location = new System.Drawing.Point(11, 70);
-            this.imgBrokerStatus.Margin = new System.Windows.Forms.Padding(0);
-            this.imgBrokerStatus.Name = "imgBrokerStatus";
-            this.imgBrokerStatus.Size = new System.Drawing.Size(30, 31);
-            this.imgBrokerStatus.Status = FDAInterface.SuperSpecialPictureBox.ConnStatus.Default;
-            this.imgBrokerStatus.TabIndex = 41;
-            this.imgBrokerStatus.RetryRequested += new FDAInterface.SuperSpecialPictureBox.ClickHandler(this.HandleRetryRequested);
             // 
             // frmMain2
             // 
@@ -514,7 +506,6 @@
         private System.Windows.Forms.Label label3;
         private System.Windows.Forms.Label label2;
         private System.Windows.Forms.TextBox tb_connectionstate;
-        private System.Windows.Forms.ToolStripStatusLabel dbConnStatus;
         private System.Windows.Forms.Label label1;
         private System.Windows.Forms.PictureBox imgFDARunStatus;
         private SuperSpecialPictureBox imgBrokerStatus;

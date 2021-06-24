@@ -16,6 +16,8 @@ using uPLibrary.Networking.M2Mqtt;
 using FDAInterface.Properties;
 using System.ComponentModel;
 using System.Xml.Serialization;
+using System.Text.Json.Serialization;
+using System.Text.Json;
 
 namespace FDAInterface
 {
@@ -122,12 +124,18 @@ namespace FDAInterface
         internal static string _CurrentFDA = "";
         internal static string _FDAName;
         internal static string _FDAStatus;
+        internal static long _FDARuntime;
 
         internal static ConnectionStatus MQTTConnectionStatus { get { return _MQTTConnectionStatus; } set { _MQTTConnectionStatus = value; StatusUpdate?.Invoke(null, new StatusUpdateArgs("MQTT",value)); } }
         internal static ConnectionStatus ControllerConnectionStatus { get { return _ControllerConnectionStatus; } set { _ControllerConnectionStatus = value; StatusUpdate?.Invoke(null, new StatusUpdateArgs("Controller", value)); } }
         internal static string CurrentFDA { get { return _CurrentFDA; } set { _CurrentFDA = value; FDANameUpdate?.Invoke(null, _CurrentFDA); } }
         internal static string FDAName { get { return _FDAName; } set { _FDAName = value; } }
-        internal static string FDAStatus { get { return _FDAStatus; } set { _FDAStatus = value; } }
+        internal static string FDARunStatus { get { return _FDAStatus; } set { _FDAStatus = value; } }
+        internal static string _FDAVersion = "";
+        internal static string _FDADBType = "";
+
+
+        internal static FDAStatus Status;
 
         internal static ConnectionHistory ConnHistory;
         private static NotifyIcon notifyIcon;     
@@ -208,7 +216,7 @@ namespace FDAInterface
             bg_ControllerConnect.RunWorkerCompleted += Bg_ControllerConnect_RunWorkerCompleted;
 
             MQTTReconnectTimer = new System.Threading.Timer(MQTTReconnectTimer_Tick);
-            ControllerPinger = new System.Threading.Timer(ControllerPing);
+            ControllerPinger = new System.Threading.Timer(PingController);
             ControllerRetryTimer = new System.Threading.Timer(ControllerReconnectTimer_Tick);
 
        
@@ -294,7 +302,7 @@ namespace FDAInterface
                 if (MainFormActive())
                 {
                      //_mainForm.SetConnectionMenuItems(false);
-                    _mainForm.SetFDAStatus("unknown");
+                    _mainForm.SetFDAStatus(Status);
                 }
                 string[] args = new string[] { newHost, newFDAName,"False"};
 
@@ -369,7 +377,6 @@ namespace FDAInterface
                 isRetry = true;
                 goto Retry;
             }
-
 
             e.Result = new string[] { host,name,(success && FDAControllerClient.Connected).ToString(), message};
         }
@@ -509,7 +516,7 @@ namespace FDAInterface
                 // default to the 'FDA Status Unknown' red icon until we get a status update from the FDA
                 notifyIcon.Icon = Properties.Resources.ManagerGray;
 
-                MQTT.Subscribe(new string[] { "FDA/runstatus" }, new byte[] { 0 });
+                //MQTT.Subscribe(new string[] { "FDA/runstatus" }, new byte[] { 0 });
                 MQTT.Subscribe(new string[] { "FDA/identifier" }, new byte[] { 0 });
 
 
@@ -543,8 +550,17 @@ namespace FDAInterface
 
 
         }
+        private static void WaitForResponse(NetworkStream stream, int limit)
+        {
+            int wait = 0;
+            while (!stream.DataAvailable && wait < limit)
+            {
+                Thread.Sleep(50);
+                wait += 50;
+            }
+        }
 
-        private static void ControllerPing(object state)
+        private static void PingController(object state)
         {
             ControllerPinger.Change(Timeout.Infinite, Timeout.Infinite);
             bool connected = true;
@@ -584,7 +600,59 @@ namespace FDAInterface
                     bg_ControllerConnect.RunWorkerAsync(new string[] { Host, FDAName, "True" });
             }
             else
+            {
+                // controller is connected, ask it for the FDA status
+                string statusJson = SendCommandToFDAController("FDASTATUS\0");
+                Status = FDAStatus.Deserialize(statusJson);
+
+                // and update the GUI, if it's open
+                _mainForm?.SetFDAStatus(Status);
+                
+                //if (Status.RunStatus == "Running")
+                //{
+                //    _mainForm?.SetFDAStatus("Normal");
+                    
+                //    // get the FDA Run time
+                //    string ticksString = SendCommandToFDAController("RUNTIME\0");
+                //    long ticks;
+
+                //    if (long.TryParse(ticksString, out ticks))
+                //    {
+                //        _FDARuntime = ticks;
+                //        _mainForm?.SetRunTime(ticks);
+                //    }
+
+                //    //Thread.Sleep(1000);
+                //    // and the DBType (if we don't already know it)
+                //    if (_FDADBType == "")
+                //    {
+                //        _FDADBType = SendCommandToFDAController("DBTYPE\0");
+                //        if (_FDADBType != "")
+                //            _mainForm?.SetDBType(_FDADBType);
+                //    }
+
+                //    // and the version number (if we don't already know it)
+                //    if (_FDAVersion == "")
+                //    {
+                //        _FDAVersion = SendCommandToFDAController("VERSION\0");
+                //        if (_FDAVersion != "")
+                //            _mainForm?.SetVersion(_FDAVersion);
+                //    }
+
+                  
+
+                //}
+                //else 
+                //{
+                //    _mainForm?.SetFDAStatus("Stopped");
+                //    _FDARuntime = 0;
+                //    _FDAVersion = "";
+                //    _FDADBType = "";
+                //}
+
+                // reset the ping timer
                 ControllerPinger.Change(ControllerPingRate, ControllerPingRate);
+            }
         }
 
         private static void MQTT_ConnectionClosed(object sender, EventArgs e)
@@ -638,10 +706,11 @@ namespace FDAInterface
                         case "STARTCONSOLE": HandleStartCommand(command[1],true); break;
                     }
                     break;
-                case "FDA/runstatus":
-                    if (e.Message.Length > 0)
-                        UpdateFDAStatusIcon(Encoding.UTF8.GetString(e.Message));
-                    break;
+                // not through MQTT anymore
+                //case "FDA/runstatus":
+                //    if (e.Message.Length > 0)
+                //        UpdateFDAStatusIcon(Encoding.UTF8.GetString(e.Message));
+                //    break;
                 case "FDA/identifier":
                     _FDAName = Encoding.UTF8.GetString(e.Message);
                     break;
@@ -737,7 +806,7 @@ namespace FDAInterface
         }
 
 
-        internal static void SendCommandToFDAController(string command)
+        internal static string SendCommandToFDAController(string command)
         {
             try
             {
@@ -745,27 +814,47 @@ namespace FDAInterface
                 {
                     if (FDAControllerClient.Connected)
                     {
+                        NetworkStream stream = FDAControllerClient.GetStream();
+                        stream.ReadTimeout = 1000;
+                        stream.WriteTimeout = 1000;
                         byte[] toSend = Encoding.UTF8.GetBytes(command);
-                        FDAControllerClient.GetStream().Write(toSend, 0, toSend.Length);
+                        stream.Write(toSend, 0, toSend.Length);
+
+                        WaitForResponse(stream, 1000);
 
                         // read any response
                         byte[] response = new byte[1000];
-                        int readsize = FDAControllerClient.GetStream().Read(response, 0, 1000);
+
+                       
+                        if (FDAControllerClient.GetStream().DataAvailable)
+                        {
+                            int readsize = FDAControllerClient.GetStream().Read(response, 0, 1000);
+                            return Encoding.UTF8.GetString(response, 0, readsize);
+                        }
+                        else
+                            return "";
+                       
                     }
                     else
+                    {
                         MessageBox.Show("Unable to send the command because the FDA controller service at " + Host + " is not connected");
+                        return "";
+                    }
                 }
                 else
+                {
                     MessageBox.Show("Unable to send the command because the FDA controller service at " + Host + " is not connected");
+                    return "";
+                }
             }
             catch (Exception ex)
             {
                 MessageBox.Show("Error while attempting to send the command to the FDA controller service at " + Host + " : " + ex.Message);
             }
+
+            return "";
         }
 
-
-    
 
 
         private static void HandleStartCommand(string FDA_ID,bool consolemode)
@@ -812,6 +901,11 @@ namespace FDAInterface
 
 
                 _mainForm.Show();
+                _mainForm.SetFDAStatus(Status);
+
+                //_mainForm.SetVersion(_FDAVersion);
+                //_mainForm.SetDBType(_FDADBType);
+                //_mainForm.SetRunTime(_FDARuntime);
 
                 //if (bg_MQTTConnect != null)
                 //{
@@ -835,7 +929,7 @@ namespace FDAInterface
             }
             
             
-            _mainForm.SetFDAStatus(_FDAStatus);
+            _mainForm.SetFDAStatus(Status);
            
         }
 
@@ -898,6 +992,40 @@ namespace FDAInterface
             Application.Exit();
         }
 
+        public class FDAStatus
+        {
+            public TimeSpan UpTime { get; set; }
+            public String RunStatus { get; set; }
+            public String Version { get; set; }
+            public String DB { get; set; }
+
+            public String RunMode { get; set; }
+
+            public int TotalQueueCount { get; set; }
+            public string JSON()
+            {
+                return JsonSerializer.Serialize<FDAStatus>(this);
+            }
+
+            public static FDAStatus Deserialize(string json)
+            {
+                FDAStatus status;
+                try
+                {
+                    status = JsonSerializer.Deserialize<FDAStatus>(json);
+                }
+                catch
+                {
+                    return new FDAStatus();
+                }
+
+                return status;
+            }
+
+
+
+        }
+          
     }
 
    
