@@ -8,6 +8,7 @@ using System.Threading;
 using uPLibrary.Networking.M2Mqtt;
 using Support;
 using Scripting;
+using System.Threading.Tasks;
 
 namespace FDA
 {
@@ -1512,12 +1513,19 @@ namespace FDA
             }
 
             // dispose connections and then clear the connections dictionary
+            List<Task> disposalTasks = new List<Task>();
             if (_connectionsDictionary != null)
             {
                 foreach (ConnectionManager conn in _connectionsDictionary.Values)
                 {
-                     conn.Dispose();
+                    // dispose of the connections in parallel to reduce shutdown time
+                    Task task = Task.Factory.StartNew(conn.Dispose);
                 }
+
+                // wait for all connection disposal tasks to complete
+                Task.WaitAll(disposalTasks.ToArray());
+                
+                // clear the connections dictionary
                 _connectionsDictionary.Clear();
             }
 
