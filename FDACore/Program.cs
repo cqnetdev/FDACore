@@ -231,8 +231,8 @@ namespace FDAApp
                 Globals.FDAIsElevated = false;
                 Globals.FDAIsElevated = MQTTUtils.ThisProcessIsAdmin();
 
-               
 
+ 
                 // start the FDASystemManager
                 FDASystemManager systemManager;
                 switch (DBType.ToUpper())
@@ -516,7 +516,7 @@ namespace FDAApp
                 switch (topic[0].ToUpper())
                 {
                     case "CONNECTION":
-                        ConnectionManager conn = _dataAquisitionManager.GetDataConnection(objectID);
+                        RRConnectionManager conn = _dataAquisitionManager.GetDataConnection(objectID);
                         if (conn != null)
                             conn.MQTTEnabled = enabled;
                         break;

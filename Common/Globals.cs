@@ -31,7 +31,10 @@ namespace Common
             public long TimeStamp_FileTimeTicks { get{return TimeHigh * 4294967296 + TimeLow; } }     // ticks since 1-Jan-1601 (1 tick = 100 nanosecs). 4294967296 = 2^32
             public DateTime Timestamp {get{ return new DateTime(TimeStamp_FileTimeTicks + FILETIME_TO_DATETIMETICKS); } }
         }
-       
+
+        public enum ConnStatus { Disconnected, ConnectionRetry_Delay, Connected_Ready, Connecting, Connected_Delayed }
+
+
         public readonly static List<string> SupportedProtocols = new List<string>(new string[] { "ROC", "MODBUS","MODBUSTCP","ENRONMODBUS","BSAP","BSAPUDP"});
         public static bool RunConsoleCommand(string command, string args, string workingDir = "")
         {
@@ -107,22 +110,7 @@ namespace Common
 
         public static int UTCOffset = 0;
 
-        public enum RequesterType { Schedule, Demand, System };
-
-        /*
-        private static void ReportFDAStatus(AppState status)
-        {
-            // publish the FDAStatus
-            if (Globals.MQTT != null)
-            {
-                if (Globals.MQTT.IsConnected)
-                {
-                    Globals.MQTT.Publish("FDA/runstatus", Encoding.UTF8.GetBytes(FDAStatus.ToString()), 0, true);
-                }
-            }
-
-        }
-        */
+        public enum RequesterType { Schedule, Demand, System }
 
         [Serializable]
         // a serializable structure containing the information about a connection
@@ -253,13 +241,6 @@ namespace Common
             }
         }
         
-
-        /*
-        public static DateTime GetOffsetUTC()
-        {
-            return DateTime.UtcNow.AddHours(UTCOffset);
-        }
-        */
     }
 
     public class CustomJsonConvert : JsonConverter

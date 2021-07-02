@@ -14,7 +14,7 @@ namespace FDA
 {
     public class DataAcqManager : IDisposable
     {
-        public static Dictionary<Guid, ConnectionManager> _connectionsDictionary;
+        public static Dictionary<Guid, RRConnectionManager> _connectionsDictionary;
         private Dictionary<Guid,FDAScheduler> _schedulersDictionary;
         private string _dbConnectionString;
         private readonly DBManager _dbManager;
@@ -43,7 +43,7 @@ namespace FDA
             ExecutionID = executionID;
 
             _schedulersDictionary = new Dictionary<Guid, FDAScheduler>();
-            _connectionsDictionary = new Dictionary<Guid, ConnectionManager>();
+            _connectionsDictionary = new Dictionary<Guid, RRConnectionManager>();
 
             try
             {
@@ -78,7 +78,7 @@ namespace FDA
         public int GetTotalQueueCounts()
         {
             int count = 0;
-            foreach (ConnectionManager mgr in _connectionsDictionary.Values)
+            foreach (RRConnectionManager mgr in _connectionsDictionary.Values)
                 count += mgr.TotalQueueCount;
             
             return count;
@@ -103,18 +103,7 @@ namespace FDA
 
                 Globals.DBManager = _dbManager;
                
-                
-                //DynamicCodeManager.Instance.NameSpaces = new string[] {"System","System.Collections.Generic","Common","FDA" };
-                //DynamicCodeManager.Instance.IncludeDlls = new string[] {
-                //        MiscHelpers.FindDll(typeof(Tag)),
-                //        MiscHelpers.FindDll(typeof(ConnectionManager)) };
-                //DynamicCodeManager.Instance.Tags = ((DBManager)Globals.DBManager).GetAllTagDefs();
-                //DynamicCodeManager.Instance.ConnMgrs = _connectionsDictionary;
-                //DynamicCodeManager.Instance.UserMethodExecuted += DynamicCodeManager_UserMethodExecuted;
-                //DynamicCodeManager.Instance.UserMethodRuntimeError += DynamicCodeManager_UserMethodRuntimeError;
-
-
-
+         
                 // apply any app configuration options
                 HandleAppConfigChanges();
 
@@ -126,98 +115,12 @@ namespace FDA
                 // create connection objects for each DSSourceConnection            
                 List<FDASourceConnection> ConnectionList = _dbManager.GetAllConnectionconfigs();
 
-                string[] connDetails;
+          
                 foreach (FDASourceConnection connectionconfig in ConnectionList)
                 {
-                    // separate the hostname from the port
-                    connDetails = connectionconfig.SCDetail01.Split(':');
-
-                    // create a new connection manager
-                    ConnectionManager newConn = null;
-                    bool success = true;
-                    try
-                    {
-                        switch (connectionconfig.SCType.ToUpper())
-                        {
-                            case "ETHERNET":
-                                newConn = new ConnectionManager(connectionconfig.SCUID, connectionconfig.Description,
-                                connDetails[0],              // IP Address 
-                                int.Parse(connDetails[1]));   // Port Number
-                       
-                                break;
-                            case "ETHERNETUDP":
-                                newConn = new ConnectionManager(connectionconfig.SCUID, connectionconfig.Description, "", int.Parse(connDetails[0]), "UDP");
-                                break;
-                            case "SERIAL":
-                                string comPort = connDetails[0];
-                                Parity parity = (connDetails[3].ToUpper()) switch
-                                {
-                                    "N" => Parity.None,
-                                    "E" => Parity.Even,
-                                    "O" => Parity.Odd,
-                                    "S" => Parity.Space,
-                                    _ => throw new FormatException("unrecognized serial parity option '" + connDetails[3] + "'. Valid options are N, E, O, or S"),
-                                };
-                                StopBits stopBits = (connDetails[4].ToUpper()) switch
-                                {
-                                    "N" => StopBits.None,
-                                    "1" => StopBits.One,
-                                    "1.5" => StopBits.OnePointFive,
-                                    "2" => StopBits.Two,
-                                    _ => throw new FormatException("unrecognized serial stop bits option '" + connDetails[4] + "'. Valid options are N,1,1.5, or 2"),
-                                };
-
-                                newConn = new ConnectionManager(connectionconfig.SCUID, connectionconfig.Description)
-                                {
-                                    SerialPortName = comPort,                                            
-                                    SerialBaudRate = int.Parse(connDetails[1]),                                 
-                                    SerialParity = parity,
-                                    SerialDataBits = int.Parse(connDetails[2]),      
-                                    SerialStopBits = stopBits,
-                                    SerialHandshake = Handshake.None};              // handshaking (hard coded to "none")
-                                break;
-                        }
-                        newConn.RequestRetryDelay = connectionconfig.RequestRetryDelay;
-                        newConn.SocketConnectionAttemptTimeout = connectionconfig.SocketConnectionAttemptTimeout;
-                        newConn.MaxSocketConnectionAttempts = connectionconfig.MaxSocketConnectionAttempts;
-                        newConn.SocketConnectionRetryDelay = connectionconfig.SocketConnectionRetryDelay;
-                        newConn.PostConnectionCommsDelay = connectionconfig.PostConnectionCommsDelay;
-                        newConn.InterRequestDelay = connectionconfig.InterRequestDelay;
-                        newConn.MaxRequestAttempts = connectionconfig.MaxRequestAttempts;
-                        newConn.RequestResponseTimeout = connectionconfig.RequestResponseTimeout;
-                        newConn.CommsLogEnabled = connectionconfig.CommsLogEnabled;
-                        newConn.MQTTEnabled = false; // connectionconfig.MQTTEnabled;
-                        newConn.ConnDetails = connectionconfig.SCDetail01;
-                    }
-                    catch (Exception ex)
-                    {
-                        Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Error occurred while creating connection object " + connectionconfig.SCUID);
-                        success = false;
-                    }
-
-                    if (success)
-                    {
-                        try
-                        {
-                            // add it to our dictionary
-                            _connectionsDictionary.Add(connectionconfig.SCUID, newConn);
-
-                            // subscribe to "transaction complete" events from it
-                            newConn.TransactionComplete += TransactionCompleteHandler;
-
-                            // enable it (if configured to be enabled)
-                            newConn.CommunicationsEnabled = connectionconfig.CommunicationsEnabled;
-                            newConn.ConnectionEnabled = connectionconfig.ConnectionEnabled;
-                        }
-                        catch (Exception ex)
-                        {
-                            Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Error while preparing the connection for use: " + connectionconfig.SCUID + " (" + connectionconfig.Description + ")");
-                            newConn.ConnectionEnabled = false;
-                            newConn.Dispose();
-                            newConn = null;
-                        }
-                    }
+                    CreateConnectionMgr(connectionconfig);
                 }
+
 
 
                 // start the database config change monitors (not needed, SQLTableDependency doesn't support postgres)
@@ -284,6 +187,97 @@ namespace FDA
         }
 
       
+        private void CreateConnectionMgr(FDASourceConnection connectionconfig)
+        {
+            string[] connDetails = connectionconfig.SCDetail01.Split(':');  // separate the hostname from the port
+   
+            // create a new connection manager
+            RRConnectionManager newConn = null;
+            bool success = true;
+            try
+            {
+                switch (connectionconfig.SCType.ToUpper())
+                {
+                    case "ETHERNET":
+                        newConn = new RRConnectionManager(connectionconfig.SCUID, connectionconfig.Description,
+                        connDetails[0],              // IP Address 
+                        int.Parse(connDetails[1]));   // Port Number
+
+                        break;
+                    case "ETHERNETUDP":
+                        newConn = new RRConnectionManager(connectionconfig.SCUID, connectionconfig.Description, "", int.Parse(connDetails[0]), "UDP");
+                        break;
+                    case "SERIAL":
+                        string comPort = connDetails[0];
+                        Parity parity = (connDetails[3].ToUpper()) switch
+                        {
+                            "N" => Parity.None,
+                            "E" => Parity.Even,
+                            "O" => Parity.Odd,
+                            "S" => Parity.Space,
+                            _ => throw new FormatException("unrecognized serial parity option '" + connDetails[3] + "'. Valid options are N, E, O, or S"),
+                        };
+                        StopBits stopBits = (connDetails[4].ToUpper()) switch
+                        {
+                            "N" => StopBits.None,
+                            "1" => StopBits.One,
+                            "1.5" => StopBits.OnePointFive,
+                            "2" => StopBits.Two,
+                            _ => throw new FormatException("unrecognized serial stop bits option '" + connDetails[4] + "'. Valid options are N,1,1.5, or 2"),
+                        };
+
+                        newConn = new RRConnectionManager(connectionconfig.SCUID, connectionconfig.Description)
+                        {
+                            SerialPortName = comPort,
+                            SerialBaudRate = int.Parse(connDetails[1]),
+                            SerialParity = parity,
+                            SerialDataBits = int.Parse(connDetails[2]),
+                            SerialStopBits = stopBits,
+                            SerialHandshake = Handshake.None
+                        };              // handshaking (hard coded to "none")
+                        break;
+                }
+                newConn.RequestRetryDelay = connectionconfig.RequestRetryDelay;
+                newConn.SocketConnectionAttemptTimeout = connectionconfig.SocketConnectionAttemptTimeout;
+                newConn.MaxSocketConnectionAttempts = connectionconfig.MaxSocketConnectionAttempts;
+                newConn.SocketConnectionRetryDelay = connectionconfig.SocketConnectionRetryDelay;
+                newConn.PostConnectionCommsDelay = connectionconfig.PostConnectionCommsDelay;
+                newConn.InterRequestDelay = connectionconfig.InterRequestDelay;
+                newConn.MaxRequestAttempts = connectionconfig.MaxRequestAttempts;
+                newConn.RequestResponseTimeout = connectionconfig.RequestResponseTimeout;
+                newConn.CommsLogEnabled = connectionconfig.CommsLogEnabled;
+                newConn.MQTTEnabled = false; // connectionconfig.MQTTEnabled;
+                newConn.ConnDetails = connectionconfig.SCDetail01;
+            }
+            catch (Exception ex)
+            {
+                Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Error occurred while creating connection object " + connectionconfig.SCUID);
+                success = false;
+            }
+
+            if (success)
+            {
+                try
+                {
+                    // add it to our dictionary
+                    _connectionsDictionary.Add(connectionconfig.SCUID, newConn);
+
+                    // subscribe to "transaction complete" events from it
+                    newConn.TransactionComplete += TransactionCompleteHandler;
+
+                    // enable it (if configured to be enabled)
+                    newConn.CommunicationsEnabled = connectionconfig.CommunicationsEnabled;
+                    newConn.ConnectionEnabled = connectionconfig.ConnectionEnabled;
+                }
+                catch (Exception ex)
+                {
+                    Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Error while preparing the connection for use: " + connectionconfig.SCUID + " (" + connectionconfig.Description + ")");
+                    newConn.ConnectionEnabled = false;
+                    newConn.Dispose();
+                    newConn = null;
+                }
+            }
+        }
 
         private void LoadUserScripts()
         {
@@ -327,7 +321,7 @@ namespace FDA
             ushort[] Qcounts;
             if (_connectionsDictionary != null)
             {
-                foreach (KeyValuePair<Guid, ConnectionManager> kvp in DataAcqManager._connectionsDictionary)
+                foreach (KeyValuePair<Guid, RRConnectionManager> kvp in DataAcqManager._connectionsDictionary)
                 {
                     sb.Append(kvp.Value.ConnectionStatus.ToString());
                     sb.Append(".");
@@ -358,7 +352,7 @@ namespace FDA
             Globals.MQTT.Publish("FDA/connectionlist", Encoding.UTF8.GetBytes(sb.ToString()), 0, true);
         }
 
-        private void TransactionCompleteHandler(object sender, ConnectionManager.TransactionEventArgs e)
+        private void TransactionCompleteHandler(object sender, RRConnectionManager.TransactionEventArgs e)
         {
 
             if (e.RequestRef.Status != DataRequest.RequestStatus.Success && e.RequestRef.Status != DataRequest.RequestStatus.PartialSuccess)
@@ -609,7 +603,7 @@ namespace FDA
                         return;
                     if (_connectionsDictionary.ContainsKey((Guid)e.ID))
                     {
-                        ConnectionManager conn = _connectionsDictionary[(Guid)e.ID];
+                        RRConnectionManager conn = _connectionsDictionary[(Guid)e.ID];
 
                         // get the connection configuration object that was updated from the database manager
                         FDASourceConnection updatedConfig = _dbManager.GetConnectionConfig((Guid)e.ID);
@@ -618,7 +612,7 @@ namespace FDA
                         {
                             try
                             {
-                                conn.ConnectionType = (ConnectionManager.ConnType)Enum.Parse(typeof(ConnectionManager.ConnType), updatedConfig.SCType);
+                                conn.ConnectionType = (RRConnectionManager.ConnType)Enum.Parse(typeof(RRConnectionManager.ConnType), updatedConfig.SCType);
                             }
                             catch (Exception ex)
                             {
@@ -633,17 +627,17 @@ namespace FDA
                         switch (conn.ConnectionType)
                         {
                             // Ethernet specific configuration
-                            case ConnectionManager.ConnType.Ethernet:
+                            case RRConnectionManager.ConnType.Ethernet:
                                 if (conn.RemoteIPAddress != connParams[0]) conn.RemoteIPAddress = connParams[0];
                                 int newPort;
                                 newPort = int.Parse(connParams[1]);
                                 if (conn.PortNumber != newPort) conn.PortNumber = newPort;
                                 break;
-                            case ConnectionManager.ConnType.EthernetUDP:
+                            case RRConnectionManager.ConnType.EthernetUDP:
                                 newPort = int.Parse(connParams[0]);
                                 if (conn.PortNumber != newPort) conn.PortNumber = newPort;
                                 break;
-                            case ConnectionManager.ConnType.Serial:
+                            case RRConnectionManager.ConnType.Serial:
                                 // Serial specific configuration
                                 Parity parity = Parity.None;
                                 switch (connParams[3])
@@ -696,7 +690,7 @@ namespace FDA
                 {
                     if (_connectionsDictionary.ContainsKey((Guid)e.ID))
                     {
-                        ConnectionManager connToDelete = _connectionsDictionary[(Guid)e.ID];
+                        RRConnectionManager connToDelete = _connectionsDictionary[(Guid)e.ID];
                         connToDelete.TransactionComplete -= TransactionCompleteHandler;
 
                         // remove the doomed connection object from the dictionary
@@ -723,11 +717,11 @@ namespace FDA
                     string[] connDetails = connConfig.SCDetail01.Split(':');
 
                     // create the new connection
-                    ConnectionManager newConn = null;
+                    RRConnectionManager newConn = null;
                     bool success = true;
                     try
                     {
-                        newConn = new ConnectionManager(connConfig.SCUID, connConfig.Description, connDetails[0], int.Parse(connDetails[1]))
+                        newConn = new RRConnectionManager(connConfig.SCUID, connConfig.Description, connDetails[0], int.Parse(connDetails[1]))
                         {
                             RequestRetryDelay = (short)connConfig.RequestRetryDelay,
                             SocketConnectionAttemptTimeout = connConfig.SocketConnectionAttemptTimeout,
@@ -750,7 +744,7 @@ namespace FDA
                     {
                         try
                         {
-                            newConn.ConnectionType = (ConnectionManager.ConnType)Enum.Parse(typeof(ConnectionManager.ConnType), connConfig.SCType);
+                            newConn.ConnectionType = (RRConnectionManager.ConnType)Enum.Parse(typeof(RRConnectionManager.ConnType), connConfig.SCType);
                             newConn.TransactionComplete += TransactionCompleteHandler;
                             // add it to our dictionary
                             _connectionsDictionary.Add((Guid)e.ID, newConn);
@@ -1483,12 +1477,12 @@ namespace FDA
 
         }
 
-        public void AddDataConnection(ConnectionManager connection)
+        public void AddDataConnection(RRConnectionManager connection)
         {
             _connectionsDictionary.Add(connection.ConnectionID, connection);
         }
 
-        public ConnectionManager GetDataConnection(Guid connectionID)
+        public RRConnectionManager GetDataConnection(Guid connectionID)
         {
             if (_connectionsDictionary.ContainsKey(connectionID))
                 return _connectionsDictionary[connectionID];
@@ -1516,7 +1510,7 @@ namespace FDA
             List<Task> disposalTasks = new List<Task>();
             if (_connectionsDictionary != null)
             {
-                foreach (ConnectionManager conn in _connectionsDictionary.Values)
+                foreach (RRConnectionManager conn in _connectionsDictionary.Values)
                 {
                     // dispose of the connections in parallel to reduce shutdown time
                     Task task = Task.Factory.StartNew(conn.Dispose);

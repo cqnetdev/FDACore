@@ -137,7 +137,7 @@ namespace Common
             private static Dictionary<Type, int> DataTypes;
             private Dictionary<string,PropertyInfo> propertyDictionary;
 
-            public SubscribeableObject()
+            public SubscribeableObject(string id,string description)
             {
                 // get the derived type and properties and store them for later use (reflection is expensive, just do it once at object initialization)
                 _derivedType = GetType();

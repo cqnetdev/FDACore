@@ -11,10 +11,10 @@ namespace FDA
 
     public class ScriptableConnection : ScriptableObject
     {
-        public static List<ScriptableConnection> WrapConn(Dictionary<Guid, ConnectionManager> toWrap)
+        public static List<ScriptableConnection> WrapConn(Dictionary<Guid, RRConnectionManager> toWrap)
         {
             List<ScriptableConnection> output = new List<ScriptableConnection>();
-            foreach (ConnectionManager connMgr in toWrap.Values)
+            foreach (RRConnectionManager connMgr in toWrap.Values)
             {
                 output.Add(new ScriptableConnection(connMgr));
             }
@@ -22,14 +22,14 @@ namespace FDA
             return output;
         }
 
-        private ConnectionManager _connMgr;
+        private RRConnectionManager _connMgr;
 
         public bool ConnectionEnabled { get => _connMgr.ConnectionEnabled; set { _connMgr.ConnectionEnabled = value; OnPropertyChanged(); } }
         public bool CommsEnabled { get => _connMgr.CommunicationsEnabled; set { _connMgr.CommunicationsEnabled = value; OnPropertyChanged(); } }
 
         public override event PropertyChangedEventHandler PropertyChanged;
 
-        public ScriptableConnection(ConnectionManager connMgr) : base(connMgr.ID)
+        public ScriptableConnection(RRConnectionManager connMgr) : base(connMgr.ID)
         {
             _connMgr = connMgr;
             _connMgr.PropertyChanged += ConnMgr_PropertyChanged;

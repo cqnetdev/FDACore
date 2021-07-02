@@ -31,7 +31,9 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FDAControllerGUI", "FDACont
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Scripting", "Scripting\Scripting.csproj", "{635C52A9-2565-4781-A72E-C1B65BA3E755}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FDAScripter", "FDAScripter\FDAScripter.csproj", "{20BEB115-BE31-4D08-92C0-7F6F9D19951E}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FDAScripter", "FDAScripter\FDAScripter.csproj", "{20BEB115-BE31-4D08-92C0-7F6F9D19951E}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OPC", "OPC\OPC.csproj", "{ECD6CAC8-60BC-4D8D-A37D-41C306F10817}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -99,6 +101,10 @@ Global
 		{20BEB115-BE31-4D08-92C0-7F6F9D19951E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{20BEB115-BE31-4D08-92C0-7F6F9D19951E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{20BEB115-BE31-4D08-92C0-7F6F9D19951E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{ECD6CAC8-60BC-4D8D-A37D-41C306F10817}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{ECD6CAC8-60BC-4D8D-A37D-41C306F10817}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{ECD6CAC8-60BC-4D8D-A37D-41C306F10817}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{ECD6CAC8-60BC-4D8D-A37D-41C306F10817}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
