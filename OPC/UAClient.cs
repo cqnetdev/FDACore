@@ -8,24 +8,29 @@ namespace OPC
 {
     public class UAClient: Client
     {
+
         /// <summary>
         /// Create an OPC UA Client
         /// </summary>
         /// <param name="host">The hostname or IP Address of the OPC UA server</param>
         /// <param name="port">The port to use for connecting to the OPC UA Server</param>
         public UAClient(string host, int port)
-        {        
-            _client = new OpcClient("opc.tcp://" + host + ":" + port);
+        {
+            _connectionString = "opc.tcp://" + host + ":" + port;
+            _client = new OpcClient(_connectionString);
+            base.RegisterForClientEvents();
         }
 
-        public override void Subscribe(string node)
+     
+
+        public override void Subscribe(string node,int ns)
         {
-            OpcSubscription sub = _client.SubscribeDataChange(node, base.DataChangeReceived);
+            OpcSubscription sub = _client.SubscribeDataChange("ns=" + ns + ";s=" + node, base.DataChangeReceived);
         }
 
-        public override OpcValue Read(string node)
+        public override OpcValue Read(string node,int ns)
         {
-            OpcValue value = _client.ReadNode(node);
+            OpcValue value = _client.ReadNode("ns=" + ns + ";s=" + node);
             return value;
         }
     }

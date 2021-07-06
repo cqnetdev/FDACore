@@ -10,6 +10,14 @@ using System.Threading.Tasks;
 namespace Common
 {
 
+    public class DataSubscription
+    {
+        public Guid source_connection_ref { get; set; }
+        public Guid datapoint_definition_ref { get; set; }
+        public string subscription_path { get; set; }
+
+        public string destination_table { get; set; }
+    }
 
     public class FDADataBlockRequestGroup : ICloneable
     {
@@ -215,7 +223,6 @@ namespace Common
         public FDADataPointDefinitionStructure()
         {
             base.ObjectType = "Tag";
-
             _lastread = Datapoint.Empty;
         }
 

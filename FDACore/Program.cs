@@ -446,9 +446,9 @@ namespace FDAApp
         {
              if (_dataAquisitionManager != null)
             {
-                if (DataAcqManager._connectionsDictionary != null)
+                if (DataAcqManager._RRconnectionsDictionary != null)
                 {
-                    foreach (SubscriptionManager.SubscribeableObject connection in DataAcqManager._connectionsDictionary.Values)
+                    foreach (SubscriptionManager.SubscribeableObject connection in DataAcqManager._RRconnectionsDictionary.Values)
                     {
                         if (connection.MQTTEnabled)
                             connection.PublishAll();  // PublishAll checks if the MQTT enabled flag is set

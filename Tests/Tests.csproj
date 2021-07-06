@@ -21,8 +21,10 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Common\Common.csproj" />
+    <ProjectReference Include="..\ConnectionManager\ConnectionManager.csproj" />
     <ProjectReference Include="..\DBManager\DBManager.csproj" />
     <ProjectReference Include="..\Modbus\Modbus.csproj" />
+    <ProjectReference Include="..\OPC\OPC.csproj" />
   </ItemGroup>
 
 </Project>

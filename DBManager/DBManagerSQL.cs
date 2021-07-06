@@ -22,6 +22,7 @@ namespace FDA
         SqlTableDependency<FDADevice> _deviceDefMonitor;
         SqlTableDependency<FDATask> _taskDefMonitor;
         SqlTableDependency<UserScriptDefinition> _scriptMonitor;
+      
 
         public DBManagerSQL(string connString) : base(connString)
         {

@@ -9,11 +9,17 @@ namespace OPC
   
     public abstract class Client : IDisposable
     {
+        protected string _connectionString;
         protected OpcClient _client;
         protected List<OpcSubscription> _subscriptions;
 
-        public delegate void DataChangeHandler(string NodeID, dynamic value);
+        public delegate void DataChangeHandler(string NodeID, int ns, OpcValue value);
         public event DataChangeHandler DataChange;
+
+        public delegate void StateChangeHandler(string state);
+        public event StateChangeHandler StateChange;
+
+        public bool Connected = false;
 
       public Client ()
         {
@@ -25,8 +31,20 @@ namespace OPC
             bool result = true;
             try { _client.Connect(); } catch { result = false; }
 
+            Connected = result;
             return result;
 
+        }
+
+        protected void RegisterForClientEvents()
+        {
+            _client.StateChanged += _client_StateChanged;
+        }
+
+        private void _client_StateChanged(object sender, OpcClientStateChangedEventArgs e)
+        {
+            if (e.NewState == OpcClientState.Disconnected)
+                StateChange?.Invoke(e.NewState.ToString());
         }
 
         public void Disconnect()
@@ -54,22 +72,19 @@ namespace OPC
         }
 
 
-        public abstract OpcValue Read(string node);
+        public abstract OpcValue Read(string node,int ns);
 
     
 
-        public abstract void Subscribe(string node);
+        public abstract void Subscribe(string node,int ns);
 
-        public void Subscribe(List<string> nodes)
-        {
-            foreach (string node in nodes)
-                Subscribe(node);
-        }
+      
 
         protected void DataChangeReceived(object sender, OpcDataChangeReceivedEventArgs e)
         {
+            
             OpcMonitoredItem item = (OpcMonitoredItem)sender;
-            DataChange?.Invoke(item.NodeId.ValueAsString, e.Item.Value);
+            DataChange?.Invoke(item.NodeId.ValueAsString,item.NodeId.NamespaceIndex,e.Item.Value);
         }
 
         public void Dispose()

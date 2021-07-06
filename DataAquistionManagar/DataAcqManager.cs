@@ -14,7 +14,8 @@ namespace FDA
 {
     public class DataAcqManager : IDisposable
     {
-        public static Dictionary<Guid, RRConnectionManager> _connectionsDictionary;
+        public static Dictionary<Guid, RRConnectionManager> _RRconnectionsDictionary;
+        public static Dictionary<Guid, PubSubConnectionManager> _PubSubConnectionsDictionary;
         private Dictionary<Guid,FDAScheduler> _schedulersDictionary;
         private string _dbConnectionString;
         private readonly DBManager _dbManager;
@@ -43,7 +44,8 @@ namespace FDA
             ExecutionID = executionID;
 
             _schedulersDictionary = new Dictionary<Guid, FDAScheduler>();
-            _connectionsDictionary = new Dictionary<Guid, RRConnectionManager>();
+            _RRconnectionsDictionary = new Dictionary<Guid, RRConnectionManager>();
+            _PubSubConnectionsDictionary = new Dictionary<Guid, PubSubConnectionManager>();
 
             try
             {
@@ -78,7 +80,7 @@ namespace FDA
         public int GetTotalQueueCounts()
         {
             int count = 0;
-            foreach (RRConnectionManager mgr in _connectionsDictionary.Values)
+            foreach (RRConnectionManager mgr in _RRconnectionsDictionary.Values)
                 count += mgr.TotalQueueCount;
             
             return count;
@@ -94,10 +96,12 @@ namespace FDA
         {
             try // general error catching for the start() function
             {
-                // load the initial configuration
-                _dbManager.LoadConfig();
 
+                // this was after loadconfig...move it back there if putting it first causes some problem
                 _dbManager.Initialize();
+
+                // load the initial configuration
+                _dbManager.LoadConfig();          
 
                 Globals.SystemManager.LogApplicationEvent(this, "", "FDA initialization complete");
 
@@ -115,11 +119,31 @@ namespace FDA
                 // create connection objects for each DSSourceConnection            
                 List<FDASourceConnection> ConnectionList = _dbManager.GetAllConnectionconfigs();
 
-          
+
                 foreach (FDASourceConnection connectionconfig in ConnectionList)
                 {
-                    CreateConnectionMgr(connectionconfig);
+                    string sctype = connectionconfig.SCType.ToUpper();
+
+                    if (sctype == "ETHERNET" || sctype == "ETHERNETUDP" || sctype == "SERIAL")
+                        CreateRRConnectionMgr(connectionconfig);
+                    
+                    if (sctype == "OPCDA" || sctype == "OPCUA" || sctype == "MQTT")
+                    {
+                        Globals.SystemManager.LogApplicationEvent(this, "", "Creating connection mananger '" + connectionconfig.Description + "'");
+                        // create the pubsub connection mananger
+                        CreatePubSubConnectionMgr(connectionconfig);
+
+                        // apply any subscriptions
+                        List<DataSubscription> connectionSubs = _dbManager.GetSubscriptions(connectionconfig.SCUID);
+                        foreach (DataSubscription sub in connectionSubs)
+                        {
+                            Globals.SystemManager.LogApplicationEvent(this, "", "adding subscription to '" + sub.subscription_path + ", for connection '" + connectionconfig.Description + "'");
+                            _PubSubConnectionsDictionary[connectionconfig.SCUID].Subscribe(sub);
+                        }
+
+                    }
                 }
+
 
 
 
@@ -175,7 +199,7 @@ namespace FDA
                 Scripter.ScriptTriggered += HandleUserScriptExecutedEvent;
                 Scripter.RunTimeError += HandleUserScriptRuntimeError;
                 Scripter.CompileError += HandleUserScriptCompileError;
-                Scripter.AddScriptableObject(ScriptableConnection.WrapConn(_connectionsDictionary));
+                Scripter.AddScriptableObject(ScriptableConnection.WrapConn(_RRconnectionsDictionary));
                 Scripter.AddScriptableObject(ScriptableTag.WrapDPD(_dbManager.GetAllTagDefs()));
                 LoadUserScripts();
                 Scripter.Enabled = true;
@@ -186,8 +210,58 @@ namespace FDA
             }     
         }
 
+        private void CreatePubSubConnectionMgr(FDASourceConnection connectionconfig)
+        {
+            string[] connDetails;
+            PubSubConnectionManager newConn = null;
+            switch (connectionconfig.SCType.ToUpper())
+            {
+                case "OPCUA": // SCDetail01 format is  host:port
+                    connDetails = connectionconfig.SCDetail01.Split(':');  // separate the hostname from the port
+                    newConn = new PubSubConnectionManager(connectionconfig.SCUID, connectionconfig.Description)
+                    {
+                        MaxSocketConnectionAttempts = connectionconfig.MaxSocketConnectionAttempts,
+                        SocketConnectionRetryDelay = connectionconfig.SocketConnectionRetryDelay,
+                        PostConnectionCommsDelay = connectionconfig.PostConnectionCommsDelay,
+                        CommsLogEnabled = connectionconfig.CommsLogEnabled,
+                        MQTTEnabled = false // connectionconfig.MQTTEnabled;
+                    };
+                    
+                    newConn.ConfigureAsOPCUA(
+                        connDetails[0],             // host
+                        int.Parse(connDetails[1])); // port
+
+                    break;
+                case "OPCDA": // SCDetail01 format is  host:ProgID:ClassID
+                    connDetails = connectionconfig.SCDetail01.Split(':');  // separate the hostname from the port
+                    newConn = new PubSubConnectionManager(connectionconfig.SCUID, connectionconfig.Description)
+                    {
+                        MaxSocketConnectionAttempts = connectionconfig.MaxSocketConnectionAttempts,
+                        SocketConnectionRetryDelay = connectionconfig.SocketConnectionRetryDelay,
+                        PostConnectionCommsDelay = connectionconfig.PostConnectionCommsDelay,
+                        CommsLogEnabled = connectionconfig.CommsLogEnabled,
+                        MQTTEnabled = false // connectionconfig.MQTTEnabled;
+                    };
+
+                    newConn.ConfigureAsOPCDA(
+                        connDetails[0],             // Host
+                        connDetails[1],             // ProgID
+                        connDetails[2]);            // ClassID
+
+                
+                    break;
+            }
+
+            newConn.CommunicationsEnabled = connectionconfig.CommunicationsEnabled;
+            newConn.ConnectionEnabled = connectionconfig.ConnectionEnabled;
+
+            // subscribe to "transaction complete" events from it
+            newConn.DataUpdate += TransactionCompleteHandler;
+
+            _PubSubConnectionsDictionary.Add(newConn.ConnectionID,newConn);
+        }
       
-        private void CreateConnectionMgr(FDASourceConnection connectionconfig)
+        private void CreateRRConnectionMgr(FDASourceConnection connectionconfig)
         {
             string[] connDetails = connectionconfig.SCDetail01.Split(':');  // separate the hostname from the port
    
@@ -260,7 +334,7 @@ namespace FDA
                 try
                 {
                     // add it to our dictionary
-                    _connectionsDictionary.Add(connectionconfig.SCUID, newConn);
+                    _RRconnectionsDictionary.Add(connectionconfig.SCUID, newConn);
 
                     // subscribe to "transaction complete" events from it
                     newConn.TransactionComplete += TransactionCompleteHandler;
@@ -319,9 +393,9 @@ namespace FDA
         {
             StringBuilder sb = new StringBuilder();
             ushort[] Qcounts;
-            if (_connectionsDictionary != null)
+            if (_RRconnectionsDictionary != null)
             {
-                foreach (KeyValuePair<Guid, RRConnectionManager> kvp in DataAcqManager._connectionsDictionary)
+                foreach (KeyValuePair<Guid, RRConnectionManager> kvp in DataAcqManager._RRconnectionsDictionary)
                 {
                     sb.Append(kvp.Value.ConnectionStatus.ToString());
                     sb.Append(".");
@@ -352,7 +426,7 @@ namespace FDA
             Globals.MQTT.Publish("FDA/connectionlist", Encoding.UTF8.GetBytes(sb.ToString()), 0, true);
         }
 
-        private void TransactionCompleteHandler(object sender, RRConnectionManager.TransactionEventArgs e)
+        private void TransactionCompleteHandler(object sender, TransactionEventArgs e)
         {
 
             if (e.RequestRef.Status != DataRequest.RequestStatus.Success && e.RequestRef.Status != DataRequest.RequestStatus.PartialSuccess)
@@ -430,7 +504,7 @@ namespace FDA
                                  tag.Timestamp,
                                  e.RequestRef.Destination,
                                  tag.ProtocolDataType,
-                                  e.RequestRef.DBWriteMode
+                                 e.RequestRef.DBWriteMode
                                 );
 
                         }
@@ -598,12 +672,12 @@ namespace FDA
                 string changeType = e.ChangeType;
                 if (changeType == "UPDATE")
                 {
-                    // get the connection object from the dictionary
-                    if (_connectionsDictionary == null)
+                    if (_RRconnectionsDictionary == null)
                         return;
-                    if (_connectionsDictionary.ContainsKey((Guid)e.ID))
+
+                    if (_RRconnectionsDictionary.ContainsKey((Guid)e.ID))
                     {
-                        RRConnectionManager conn = _connectionsDictionary[(Guid)e.ID];
+                        RRConnectionManager conn = _RRconnectionsDictionary[(Guid)e.ID];
 
                         // get the connection configuration object that was updated from the database manager
                         FDASourceConnection updatedConfig = _dbManager.GetConnectionConfig((Guid)e.ID);
@@ -688,13 +762,13 @@ namespace FDA
 
                 if (changeType == "DELETE")
                 {
-                    if (_connectionsDictionary.ContainsKey((Guid)e.ID))
+                    if (_RRconnectionsDictionary.ContainsKey((Guid)e.ID))
                     {
-                        RRConnectionManager connToDelete = _connectionsDictionary[(Guid)e.ID];
+                        RRConnectionManager connToDelete = _RRconnectionsDictionary[(Guid)e.ID];
                         connToDelete.TransactionComplete -= TransactionCompleteHandler;
 
                         // remove the doomed connection object from the dictionary
-                        _connectionsDictionary.Remove((Guid)e.ID);
+                        _RRconnectionsDictionary.Remove((Guid)e.ID);
 
                         // disable it, and dispose of it
                         connToDelete.CommunicationsEnabled = false;
@@ -747,7 +821,7 @@ namespace FDA
                             newConn.ConnectionType = (RRConnectionManager.ConnType)Enum.Parse(typeof(RRConnectionManager.ConnType), connConfig.SCType);
                             newConn.TransactionComplete += TransactionCompleteHandler;
                             // add it to our dictionary
-                            _connectionsDictionary.Add((Guid)e.ID, newConn);
+                            _RRconnectionsDictionary.Add((Guid)e.ID, newConn);
 
                             // enable it (if configured to be enabled)
                             newConn.CommunicationsEnabled = connConfig.CommunicationsEnabled;
@@ -951,6 +1025,7 @@ namespace FDA
 
                 if (e.TableName == Globals.SystemManager.GetTableName("FDASourceConnections"))
                 {
+                    
                     HandleConnectionChanges(e);
                     return;
                 }
@@ -1254,7 +1329,7 @@ namespace FDA
                
 
                 // connection reference is good
-                if (!_connectionsDictionary.ContainsKey(group.ConnectionID))
+                if (!_RRconnectionsDictionary.ContainsKey(group.ConnectionID))
                 {
                     Globals.SystemManager.LogApplicationEvent(this, "", "The DataBlockRequestGroup '" + group.Description + "' (" + group.ID + ") requested by " + requestor + " references a connection that does not exist (" + group.ConnectionID + "). This group will not be processed",true);
                     if (badGroups == null)
@@ -1416,11 +1491,11 @@ namespace FDA
         private void SendToConnectionManager(RequestGroup group)
         {
 
-            if (_connectionsDictionary.ContainsKey(group.ConnectionID))
+            if (_RRconnectionsDictionary.ContainsKey(group.ConnectionID))
             {
                 if (group.RequesterType == Globals.RequesterType.System)
                 {
-                    _connectionsDictionary[group.ConnectionID].QueueTransactionGroup(group);
+                    _RRconnectionsDictionary[group.ConnectionID].QueueTransactionGroup(group);
                 }
                 else
                 {
@@ -1428,7 +1503,7 @@ namespace FDA
                     if (groupConfig != null)
                     {
                         if (groupConfig.DRGEnabled)
-                            _connectionsDictionary[group.ConnectionID].QueueTransactionGroup(group);
+                            _RRconnectionsDictionary[group.ConnectionID].QueueTransactionGroup(group);
                     }
                 }
 
@@ -1479,13 +1554,13 @@ namespace FDA
 
         public void AddDataConnection(RRConnectionManager connection)
         {
-            _connectionsDictionary.Add(connection.ConnectionID, connection);
+            _RRconnectionsDictionary.Add(connection.ConnectionID, connection);
         }
 
         public RRConnectionManager GetDataConnection(Guid connectionID)
         {
-            if (_connectionsDictionary.ContainsKey(connectionID))
-                return _connectionsDictionary[connectionID];
+            if (_RRconnectionsDictionary.ContainsKey(connectionID))
+                return _RRconnectionsDictionary[connectionID];
             else
                 return null;
         }
@@ -1508,9 +1583,9 @@ namespace FDA
 
             // dispose connections and then clear the connections dictionary
             List<Task> disposalTasks = new List<Task>();
-            if (_connectionsDictionary != null)
+            if (_RRconnectionsDictionary != null)
             {
-                foreach (RRConnectionManager conn in _connectionsDictionary.Values)
+                foreach (RRConnectionManager conn in _RRconnectionsDictionary.Values)
                 {
                     // dispose of the connections in parallel to reduce shutdown time
                     Task task = Task.Factory.StartNew(conn.Dispose);
@@ -1520,7 +1595,7 @@ namespace FDA
                 Task.WaitAll(disposalTasks.ToArray());
                 
                 // clear the connections dictionary
-                _connectionsDictionary.Clear();
+                _RRconnectionsDictionary.Clear();
             }
 
             _dbManager?.Dispose();

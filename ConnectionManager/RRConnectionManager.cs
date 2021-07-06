@@ -154,28 +154,7 @@ namespace FDA
         //public event PropertyChangedEventHandler PropertyChanged;
 
 
-        public class TransactionEventArgs : EventArgs
-        {
-            private readonly DataRequest _requestRef;
-
-            internal TransactionEventArgs(DataRequest request)
-            {
-                _requestRef = request;
-            }
-
-            public DataRequest RequestRef
-            {
-                get { return _requestRef; }
-            }
-
-
-
-            public string Message
-            {
-                get { return Message; }
-            }
-
-        }
+ 
         #endregion
 
         #region constructors
@@ -183,6 +162,8 @@ namespace FDA
         // constructor code that is common to TCP,UDP, and Serial connections
         private void CommonConstructor(Guid ID, string description)
         {
+            base.ID = ID.ToString();
+            base.ObjectType = "connection";
            
             // set all properties to be retained in MQTT except for the queue counts
             string[] MQTTRetainProperties = new string[]
@@ -377,7 +358,7 @@ namespace FDA
         }
 
         // constructor for serial connections
-        public RRConnectionManager(Guid ID, string description) : base(ID.ToString(),description) //,string ComPort,int baud,Parity parity,int dataBits,StopBits stopbits,Handshake handshake)
+        public RRConnectionManager(Guid ID, string description)  //,string ComPort,int baud,Parity parity,int dataBits,StopBits stopbits,Handshake handshake)
         {
             CommonConstructor(ID, description);
 
@@ -391,7 +372,7 @@ namespace FDA
         }
 
         // constructor for TCP or UDP connections
-        public RRConnectionManager(Guid ID, string description, string host, int port,string protocol = "TCP") : base(ID.ToString(),description)
+        public RRConnectionManager(Guid ID, string description, string host, int port,string protocol = "TCP")
         {
             CommonConstructor(ID, description);
             RemoteIPAddress = host;
@@ -1465,7 +1446,7 @@ namespace FDA
                         TCPRemoteConnected = false;
                         ConnectionStatus = Globals.ConnStatus.Disconnected;
                         LogCommsEvent(initTime.Add(runTime.Elapsed),"Connection: " + Description + " Initiating reconnection delay of " + SocketConnectionRetryDelay + " second(s)");
-                        //Thread.Sleep(SocketConnectionRetryDelay * 1000);
+                        Thread.Sleep(SocketConnectionRetryDelay * 1000);
                     }
                 }
                 catch (Exception ex)

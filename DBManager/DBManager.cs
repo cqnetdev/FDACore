@@ -21,6 +21,7 @@ namespace FDA
         protected Dictionary<Guid, FDADevice> _deviceConfig;
         protected Dictionary<Guid, FDATask> _taskConfig;
         protected Dictionary<string, UserScriptDefinition> _scriptsConfig;
+        protected Dictionary<Guid, List<DataSubscription>> _dataSubscriptionsConfig;  // List of subscriptions, keyed by connection ID
 
         protected Queue<DataRequest> _writeQueue;
         protected BackgroundWorker _dataWriter;
@@ -59,6 +60,7 @@ namespace FDA
         protected bool _devicesTableExists = false;
         protected bool _tasksTableExists;
         protected bool _scriptsTableExists = false;
+        protected bool _datasubscriptionsTableExists = false;
 
 
         protected Timer _keepAliveTimer;
@@ -82,6 +84,7 @@ namespace FDA
             _deviceConfig = new Dictionary<Guid, FDADevice>();
             _taskConfig = new Dictionary<Guid, FDATask>();
             _scriptsConfig = new Dictionary<string, UserScriptDefinition>();
+            _dataSubscriptionsConfig = new Dictionary<Guid, List<DataSubscription>>();
 
             //_derivedTagConfig = new Dictionary<Guid, DerivedTag>();
 
@@ -127,6 +130,9 @@ namespace FDA
             // check if scripts table exists
             _scriptsTableExists = ((int)ExecuteScalar("SELECT cast(count(1) as integer) from information_schema.tables where table_name = '" + Globals.SystemManager.GetTableName("fda_scripts") + "';") > 0);
 
+
+            // check if subscriptions table exists
+            _datasubscriptionsTableExists = (int)ExecuteScalar("SELECT cast(count(1) as integer) from information_schema.tables where table_name = '" + Globals.SystemManager.GetTableName("FDASubscriptions") + "';") > 0;
 
             _writeQueue = new Queue<DataRequest>();
 
@@ -256,6 +262,14 @@ namespace FDA
         public List<FDARequestGroupScheduler> GetAllSched()
         {
             return _schedConfig.Values.ToList();
+        }
+
+        public List<DataSubscription> GetSubscriptions(Guid connectionID)
+        {
+            if (_dataSubscriptionsConfig.ContainsKey(connectionID))
+                return _dataSubscriptionsConfig[connectionID];
+            else
+                return new List<DataSubscription>();
         }
 
         public FDARequestGroupScheduler GetSched(Guid ID)
@@ -1002,6 +1016,7 @@ namespace FDA
             lock (_taskConfig) { _taskConfig.Clear(); }
             lock (_deviceConfig) { _deviceConfig.Clear(); }
             lock (_scriptsConfig) { _scriptsConfig.Clear(); }
+            lock (_dataSubscriptionsConfig) { _dataSubscriptionsConfig.Clear(); }
             //lock (_derivedTagConfig) { _derivedTagConfig.Clear(); }
 
 
@@ -1395,6 +1410,31 @@ namespace FDA
                 }
             }
 
+
+            // load data subscriptions
+            if (_datasubscriptionsTableExists)
+            {
+                tableName = Globals.SystemManager.GetTableName("FDASubscriptions");
+                query = "select source_connection_ref,datapoint_definition_ref,subscription_path,destination_table from " + tableName + ";";
+
+                table = ExecuteQuery(query);
+                DataSubscription sub;
+                foreach (DataRow row in table.Rows)
+                {
+                    sub = new DataSubscription()
+                    {
+                        source_connection_ref = (Guid)row["source_connection_ref"],
+                        datapoint_definition_ref = (Guid)row["datapoint_definition_ref"],
+                        subscription_path = row["subscription_path"].ToString(),
+                        destination_table = row["destination_table"].ToString()
+                    };
+
+                    if (!_dataSubscriptionsConfig.ContainsKey(sub.source_connection_ref))
+                        _dataSubscriptionsConfig.Add(sub.source_connection_ref, new List<DataSubscription>());
+
+                    _dataSubscriptionsConfig[sub.source_connection_ref].Add(sub);
+                }
+            }
 
 
             // load user scripts
