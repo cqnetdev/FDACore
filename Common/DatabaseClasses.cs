@@ -12,11 +12,12 @@ namespace Common
 
     public class DataSubscription
     {
+        public Guid subscription_id { get; set; }
         public Guid source_connection_ref { get; set; }
         public Guid datapoint_definition_ref { get; set; }
         public string subscription_path { get; set; }
-
         public string destination_table { get; set; }
+        public bool enabled { get; set; }
     }
 
     public class FDADataBlockRequestGroup : ICloneable

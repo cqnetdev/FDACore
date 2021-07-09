@@ -11,19 +11,23 @@ namespace OPC
     {
         protected string _connectionString;
         protected OpcClient _client;
-        protected List<OpcSubscription> _subscriptions;
+
+        public OpcSubscriptionReadOnlyCollection Subscriptions { get { if (_client != null) return _client.Subscriptions; else return new OpcSubscriptionReadOnlyCollection(new List<OpcSubscription>()); } }
 
         public delegate void DataChangeHandler(string NodeID, int ns, OpcValue value);
         public event DataChangeHandler DataChange;
 
-        public delegate void StateChangeHandler(string state);
-        public event StateChangeHandler StateChange;
+        public delegate void BreakDetectedHandler();
+        public event BreakDetectedHandler BreakDetected;
+
+        private bool _breakDetectionArmed = false;
+
 
         public bool Connected = false;
 
-      public Client ()
+        public Client ()
         {
-            _subscriptions = new List<OpcSubscription>();
+
         }
 
         public bool Connect()
@@ -32,20 +36,36 @@ namespace OPC
             try { _client.Connect(); } catch { result = false; }
 
             Connected = result;
+
+            if (Connected)
+                _breakDetectionArmed = true;
+
             return result;
 
         }
 
         protected void RegisterForClientEvents()
         {
-            _client.StateChanged += _client_StateChanged;
+            _client.KeepAlive.Updated += KeepAlive_Updated;
+            //_client.UseBreakDetection = true;
+            //_client.BreakDetected += _client_BreakDetected;
         }
 
-        private void _client_StateChanged(object sender, OpcClientStateChangedEventArgs e)
+        private void KeepAlive_Updated(object sender, EventArgs e)
         {
-            if (e.NewState == OpcClientState.Disconnected)
-                StateChange?.Invoke(e.NewState.ToString());
+            if (_client.KeepAlive.ServerState != OpcServerState.Running && _breakDetectionArmed)
+            {
+                _breakDetectionArmed = false;
+                BreakDetected?.Invoke();
+            }
         }
+
+        //private void _client_BreakDetected(object sender, EventArgs e)
+        //{
+        //    BreakDetected?.Invoke();
+        //}
+
+    
 
         public void Disconnect()
         {
@@ -73,12 +93,10 @@ namespace OPC
 
 
         public abstract OpcValue Read(string node,int ns);
+  
 
-    
+        public abstract OpcSubscription Subscribe(string node,int ns);
 
-        public abstract void Subscribe(string node,int ns);
-
-      
 
         protected void DataChangeReceived(object sender, OpcDataChangeReceivedEventArgs e)
         {

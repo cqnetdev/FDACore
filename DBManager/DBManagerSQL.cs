@@ -22,6 +22,7 @@ namespace FDA
         SqlTableDependency<FDADevice> _deviceDefMonitor;
         SqlTableDependency<FDATask> _taskDefMonitor;
         SqlTableDependency<UserScriptDefinition> _scriptMonitor;
+        SqlTableDependency<DataSubscription> _subscriptionMonitor;
       
 
         public DBManagerSQL(string connString) : base(connString)
@@ -51,6 +52,9 @@ namespace FDA
 
                 if (_scriptsTableExists)
                     _scriptMonitor = new SqlTableDependency<UserScriptDefinition>(ConnectionString, Globals.SystemManager.GetTableName("fda_scripts"));
+
+                if (_datasubscriptionsTableExists)
+                    _subscriptionMonitor = new SqlTableDependency<DataSubscription>(ConnectionString, Globals.SystemManager.GetTableName("FDASubscriptions"));
 
                 //----------------------verbose messaging for the SQLTableDependency Objects------------------------------------------
                 //_schedMonitor.TraceLevel = System.Diagnostics.TraceLevel.Verbose;
@@ -143,6 +147,13 @@ namespace FDA
                     _scriptMonitor = null;
                 }
 
+                if (_subscriptionMonitor != null)
+                {
+                    _subscriptionMonitor.Stop();
+                    _subscriptionMonitor.Dispose();
+                    _subscriptionMonitor = null;
+                }
+
                 return;
             }
 
@@ -159,6 +170,8 @@ namespace FDA
                 _taskDefMonitor.OnChanged += _taskDefMonitor_OnChanged; 
             if (_scriptMonitor != null)
                 _scriptMonitor.OnChanged += _scriptMonitor_OnChanged;
+            if (_subscriptionMonitor != null)
+                _subscriptionMonitor.OnChanged += _subscriptionMonitor_OnChanged;
 
             _schedMonitor.OnStatusChanged += SchedMonitor_OnStatusChanged;
             _demandMonitor.OnStatusChanged += DemandMonitor_OnStatusChanged;
@@ -168,6 +181,7 @@ namespace FDA
             if (_deviceDefMonitor != null) _deviceDefMonitor.OnStatusChanged += _deviceDefMonitor_OnStatusChanged;
             if (_taskDefMonitor != null) _taskDefMonitor.OnStatusChanged += _taskDefMonitor_OnStatusChanged;
             if (_scriptMonitor != null) _scriptMonitor.OnStatusChanged += _scriptMonitor_OnStatusChanged;
+            if (_subscriptionMonitor != null) _subscriptionMonitor.OnStatusChanged += _subscriptionMonitor_OnStatusChanged;
 
             _schedMonitor.OnError += SchedMonitor_OnError;
             _demandMonitor.OnError += DemandMonitor_OnError; ;
@@ -177,10 +191,15 @@ namespace FDA
             if (_deviceDefMonitor != null) _deviceDefMonitor.OnError += _deviceDefMonitor_OnError;
             if (_taskDefMonitor != null) _taskDefMonitor.OnError += _taskDefMonitor_OnError;
             if (_scriptMonitor != null) _scriptMonitor.OnError += _scriptMonitor_OnError;
+            if (_subscriptionMonitor != null) _subscriptionMonitor.OnError += _subscriptionMonitor_OnError; 
             StartChangeMonitoring();
         }
 
-   
+     
+
+      
+
+    
 
         protected new bool PreReqCheck()
         {
@@ -219,7 +238,7 @@ namespace FDA
             _connectionDefMonitor.Stop();
             _deviceDefMonitor.Stop();
             _taskDefMonitor.Stop();
-
+            _subscriptionMonitor.Stop();
             Globals.SystemManager.LogApplicationEvent(this, "", "Database change monitoring stopped");
         }
 
@@ -233,6 +252,7 @@ namespace FDA
             _deviceDefMonitor?.Start();
             _taskDefMonitor?.Start();
             _scriptMonitor?.Start();
+            _subscriptionMonitor?.Start();
             Globals.SystemManager.LogApplicationEvent(this, "", "Database change monitoring started");
         }
 
@@ -471,6 +491,12 @@ namespace FDA
             base.SourceConnectionMonitorNotification(changeType, e.Entity);
         }
 
+        private void _subscriptionMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<DataSubscription> e)
+        {
+            string changeType = e.ChangeType.ToString().ToUpper();
+            base.SubscriptionChangeNotification(changeType, e.Entity);
+        }
+
         private void ConnectionDefMonitor_OnError(object sender, TableDependency.SqlClient.Base.EventArgs.ErrorEventArgs e)
         {
             if (_connectionDefMonitor != null)
@@ -481,6 +507,18 @@ namespace FDA
                 _connectionDefMonitor = null;
             }
             HandleTableMonitorError("ConnectionDef", e);
+        }
+
+        private void _subscriptionMonitor_OnError(object sender, TableDependency.SqlClient.Base.EventArgs.ErrorEventArgs e)
+        {
+            if (_subscriptionMonitor != null)
+            {
+                _subscriptionMonitor.OnChanged -= _subscriptionMonitor_OnChanged;
+                _subscriptionMonitor.OnStatusChanged -= _subscriptionMonitor_OnStatusChanged;
+                _subscriptionMonitor.OnError -= _subscriptionMonitor_OnError;
+                _subscriptionMonitor = null;
+            }
+            HandleTableMonitorError("Subscriptions", e);
         }
 
 
@@ -580,6 +618,10 @@ namespace FDA
             LogMonitorStatusChangeEvent("DemandMonitor", e);
         }
 
+        private void _subscriptionMonitor_OnStatusChanged(object sender, TableDependency.SqlClient.Base.EventArgs.StatusChangedEventArgs e)
+        {
+            LogMonitorStatusChangeEvent("SubscriptionsMonitor", e);
+        }
 
         private void ConnectionDefMonitor_OnStatusChanged(object sender, TableDependency.SqlClient.Base.EventArgs.StatusChangedEventArgs e)
         {
@@ -664,6 +706,7 @@ namespace FDA
             _requestGroupDefMonitor?.Stop();
             _connectionDefMonitor?.Stop();
             _scriptMonitor?.Stop();
+            _subscriptionMonitor?.Stop();
 
             _demandMonitor?.Dispose();
             _schedMonitor?.Dispose();
@@ -671,6 +714,7 @@ namespace FDA
             _requestGroupDefMonitor?.Dispose();
             _connectionDefMonitor?.Dispose();
             _scriptMonitor?.Dispose();
+            _subscriptionMonitor?.Dispose();
 
             // general disposal
             base.Dispose();

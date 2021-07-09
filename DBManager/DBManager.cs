@@ -21,7 +21,7 @@ namespace FDA
         protected Dictionary<Guid, FDADevice> _deviceConfig;
         protected Dictionary<Guid, FDATask> _taskConfig;
         protected Dictionary<string, UserScriptDefinition> _scriptsConfig;
-        protected Dictionary<Guid, List<DataSubscription>> _dataSubscriptionsConfig;  // List of subscriptions, keyed by connection ID
+        protected Dictionary<Guid, DataSubscription> _dataSubscriptionsConfig;  
 
         protected Queue<DataRequest> _writeQueue;
         protected BackgroundWorker _dataWriter;
@@ -84,7 +84,7 @@ namespace FDA
             _deviceConfig = new Dictionary<Guid, FDADevice>();
             _taskConfig = new Dictionary<Guid, FDATask>();
             _scriptsConfig = new Dictionary<string, UserScriptDefinition>();
-            _dataSubscriptionsConfig = new Dictionary<Guid, List<DataSubscription>>();
+            _dataSubscriptionsConfig = new Dictionary<Guid, DataSubscription>();
 
             //_derivedTagConfig = new Dictionary<Guid, DerivedTag>();
 
@@ -132,7 +132,8 @@ namespace FDA
 
 
             // check if subscriptions table exists
-            _datasubscriptionsTableExists = (int)ExecuteScalar("SELECT cast(count(1) as integer) from information_schema.tables where table_name = '" + Globals.SystemManager.GetTableName("FDASubscriptions") + "';") > 0;
+            string sql = "SELECT cast(count(1) as integer) from information_schema.tables where table_name = '" + Globals.SystemManager.GetTableName("fdasubscriptions") + "';";
+            _datasubscriptionsTableExists = (int)ExecuteScalar(sql) > 0;
 
             _writeQueue = new Queue<DataRequest>();
 
@@ -266,10 +267,9 @@ namespace FDA
 
         public List<DataSubscription> GetSubscriptions(Guid connectionID)
         {
-            if (_dataSubscriptionsConfig.ContainsKey(connectionID))
-                return _dataSubscriptionsConfig[connectionID];
-            else
-                return new List<DataSubscription>();
+            List<DataSubscription> _subsForConnection = _dataSubscriptionsConfig.Values.Where(e => e.source_connection_ref == connectionID).ToList();
+
+            return _subsForConnection;
         }
 
         public FDARequestGroupScheduler GetSched(Guid ID)
@@ -885,10 +885,10 @@ namespace FDA
         }
 
 
-        protected void RaiseConfigChangeEvent(string type, string table, object itemref)
+        protected void RaiseConfigChangeEvent(string type, string table, object itemref,object olditemref=null)
         {
             //Globals.SystemManager.LogApplicationEvent(this, "", table + " table changed (" + type + "), ID = " + item.ToString());
-            ConfigChange?.Invoke(this, new ConfigEventArgs(type, table, itemref));
+            ConfigChange?.Invoke(this, new ConfigEventArgs(type, table, itemref,olditemref));
         }
 
 
@@ -1415,7 +1415,7 @@ namespace FDA
             if (_datasubscriptionsTableExists)
             {
                 tableName = Globals.SystemManager.GetTableName("FDASubscriptions");
-                query = "select source_connection_ref,datapoint_definition_ref,subscription_path,destination_table from " + tableName + ";";
+                query = "select subscription_id,enabled,source_connection_ref,datapoint_definition_ref,subscription_path,destination_table from " + tableName + ";";
 
                 table = ExecuteQuery(query);
                 DataSubscription sub;
@@ -1423,16 +1423,16 @@ namespace FDA
                 {
                     sub = new DataSubscription()
                     {
+                        subscription_id = (Guid)row["subscription_id"],
+                        enabled = (bool)row["enabled"],
                         source_connection_ref = (Guid)row["source_connection_ref"],
                         datapoint_definition_ref = (Guid)row["datapoint_definition_ref"],
                         subscription_path = row["subscription_path"].ToString(),
                         destination_table = row["destination_table"].ToString()
                     };
 
-                    if (!_dataSubscriptionsConfig.ContainsKey(sub.source_connection_ref))
-                        _dataSubscriptionsConfig.Add(sub.source_connection_ref, new List<DataSubscription>());
-
-                    _dataSubscriptionsConfig[sub.source_connection_ref].Add(sub);
+  
+                    _dataSubscriptionsConfig.Add(sub.subscription_id,sub);
                 }
             }
 
@@ -1730,6 +1730,62 @@ namespace FDA
             Globals.SystemManager.LogApplicationEvent(this, "", "task_id  " + task.TASK_ID + " " + action);
 
             RaiseConfigChangeEvent(changeType.ToString(), Globals.SystemManager.GetTableName("FDATasks"), task.TASK_ID);
+        }
+
+        protected void SubscriptionChangeNotification(string changeType, DataSubscription subscription)
+        {
+            // check for nulls
+            string[] nulls = FindNulls(subscription);
+            if (nulls.Length > 0)
+            {
+                Globals.SystemManager.LogApplicationEvent(this, "", "The subscription " + subscription.subscription_path + " " + changeType.ToString().ToLower() + " was rejected, null values in field(s) " + string.Join(",", nulls));
+                return;
+            }
+
+            string action = "";
+            DataSubscription olditem = null;
+            switch (changeType)
+            {
+                case "INSERT":
+                    _dataSubscriptionsConfig.Add(subscription.subscription_id, subscription);
+                    action = "inserted";
+                    break;
+
+                case "DELETE":
+                    if (_dataSubscriptionsConfig.ContainsKey(subscription.subscription_id))
+                    {
+                        _dataSubscriptionsConfig.Remove(subscription.subscription_id); 
+                        action = "deleted"; 
+                    }
+                    else
+                    {
+                        action = "deleted from the database but was not found in the FDA, so no action was taken";
+                    }
+                    action = "deleted";
+                    break;
+                case "UPDATE":
+                    if (_dataSubscriptionsConfig.ContainsKey(subscription.subscription_id))
+                    {
+                        olditem = _dataSubscriptionsConfig[subscription.subscription_id];
+                        _dataSubscriptionsConfig[subscription.subscription_id] = subscription;
+                        action = "updated";
+                    }                  
+                    else
+                    {
+                        _dataSubscriptionsConfig.Add(subscription.subscription_id,subscription);
+                        action = "not found, adding it as a new subscription";
+                    }
+                    
+
+                    break;
+                default: action = "<action>"; break;
+            }
+
+            Globals.SystemManager.LogApplicationEvent(this, "", "Data subscription '" + subscription.subscription_path + "' was " + action);
+
+            RaiseConfigChangeEvent(changeType, "FDASubscriptions", subscription, olditem);
+
+
         }
 
         protected void UserScriptChangeNotification(string changeType, UserScriptDefinition scriptModule)

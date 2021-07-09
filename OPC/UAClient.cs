@@ -23,10 +23,12 @@ namespace OPC
 
      
 
-        public override void Subscribe(string node,int ns)
+        public override OpcSubscription Subscribe(string node,int ns)
         {
-            OpcSubscription sub = _client.SubscribeDataChange("ns=" + ns + ";s=" + node, base.DataChangeReceived);
+            return _client.SubscribeDataChange("ns=" + ns + ";s=" + node, DataChangeReceived);
         }
+
+
 
         public override OpcValue Read(string node,int ns)
         {

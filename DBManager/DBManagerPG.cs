@@ -17,7 +17,7 @@ namespace FDA
         PostgreSQLListener<FDASourceConnection> _connectionDefMonitor;
         PostgreSQLListener<FDADevice> _deviceDefMonitor;
         PostgreSQLListener<FDATask> _taskDefMonitor;
-
+        PostgreSQLListener<DataSubscription> _datasubscriptionMonitor;
 
         // constructor
         public DBManagerPG(string connString) : base(connString)
@@ -218,16 +218,18 @@ namespace FDA
             _connectionDefMonitor = new PostgreSQLListener<FDASourceConnection>(ConnectionString, Globals.SystemManager.GetTableName("FDASourceConnections"));
             if (_devicesTableExists)
                 _deviceDefMonitor = new PostgreSQLListener<FDADevice>(ConnectionString, Globals.SystemManager.GetTableName("FDADevices"));
-
             if (_tasksTableExists)
                 _taskDefMonitor = new PostgreSQLListener<FDATask>(ConnectionString, Globals.SystemManager.GetTableName("FDATasks"));
+            if (_datasubscriptionsTableExists)
+                _datasubscriptionMonitor = new PostgreSQLListener<DataSubscription>(ConnectionString, Globals.SystemManager.GetTableName("FDASubscriptions"));
 
             _demandMonitor.Notification += _demandMonitor_Notification;
             _schedMonitor.Notification += _schedMonitor_Notification;
             _requestGroupDefMonitor.Notification += _requestGroupDefMonitor_Notification;
             _connectionDefMonitor.Notification += _connectionDefMonitor_Notification;
-            _dataPointDefMonitor.Notification += _dataPointDefMonitor_Notification;
-
+            _dataPointDefMonitor.Notification += _dataPointDefMonitor_Notification; 
+            if (_datasubscriptionMonitor != null)
+                _datasubscriptionMonitor.Notification += _datasubscriptionMonitor_Notification;
             if (_deviceDefMonitor != null)
                 _deviceDefMonitor.Notification += _deviceDefMonitor_Notification;
             if (_taskDefMonitor != null)
@@ -242,6 +244,8 @@ namespace FDA
                 _deviceDefMonitor.Error += _PostgresSQLMonitor_Error;
             if (_taskDefMonitor != null)
                 _taskDefMonitor.Error += _PostgresSQLMonitor_Error;
+            if (_datasubscriptionMonitor != null)
+                _datasubscriptionMonitor.Error += _PostgresSQLMonitor_Error;
 
             StartChangeMonitoring();
 
@@ -250,6 +254,9 @@ namespace FDA
             
 
         }
+
+    
+
 
         private void _PostgresSQLMonitor_Error(object sender,Exception e)
         {
@@ -306,6 +313,8 @@ namespace FDA
                     _deviceDefMonitor?.StartListening();
                 if (_tasksTableExists)
                     _taskDefMonitor?.StartListening();
+                if (_datasubscriptionsTableExists)
+                    _datasubscriptionMonitor?.StartListening();
             }
             catch (Exception ex)
             {
@@ -326,6 +335,8 @@ namespace FDA
                 _deviceDefMonitor?.StopListening();
             if (_tasksTableExists)
                 _deviceDefMonitor?.StopListening();
+            if (_datasubscriptionsTableExists)
+                _datasubscriptionMonitor?.StopListening();
             Globals.SystemManager.LogApplicationEvent(this, "", "Database change monitoring stopped");
         }
 
@@ -338,7 +349,15 @@ namespace FDA
             FDATask task = notifyEvent.Notification.row;
             TaskMonitorNotification(changeType, task);
         }
-    
+
+
+        private void _datasubscriptionMonitor_Notification(object sender, PostgreSQLListener<DataSubscription>.PostgreSQLNotification notifyEvent)
+        {
+            string changeType = notifyEvent.Notification.operation;
+            DataSubscription sub = notifyEvent.Notification.row;
+            SubscriptionChangeNotification(changeType, sub);
+            
+        }
 
         private void _deviceDefMonitor_Notification(object sender, PostgreSQLListener<FDADevice>.PostgreSQLNotification notifyEvent)
         {
@@ -393,21 +412,23 @@ namespace FDA
         #region IDisposable Support
          public override void Dispose()
         { 
-                    // postgreSQL specific disposal
-                    _demandMonitor?.StopListening();
-                    _schedMonitor?.StopListening();
-                    _dataPointDefMonitor?.StopListening();
-                    _requestGroupDefMonitor?.StopListening();
-                    _connectionDefMonitor?.StopListening();
+            // postgreSQL specific disposal
+            _demandMonitor?.StopListening();
+            _schedMonitor?.StopListening();
+            _dataPointDefMonitor?.StopListening();
+            _requestGroupDefMonitor?.StopListening();
+            _connectionDefMonitor?.StopListening();
+            _datasubscriptionMonitor?.StopListening();
 
-                    _demandMonitor?.Dispose();
-                    _schedMonitor?.Dispose();
-                    _dataPointDefMonitor?.Dispose();
-                    _requestGroupDefMonitor?.Dispose();
-                    _connectionDefMonitor?.Dispose();
+            _demandMonitor?.Dispose();
+            _schedMonitor?.Dispose();
+            _dataPointDefMonitor?.Dispose();
+            _requestGroupDefMonitor?.Dispose();
+            _connectionDefMonitor?.Dispose();
+            _datasubscriptionMonitor?.Dispose();
 
-                    // general disposal
-                    base.Dispose();
+            // general disposal
+            base.Dispose();
 
         }
         #endregion

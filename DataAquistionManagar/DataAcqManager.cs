@@ -133,13 +133,13 @@ namespace FDA
                         // create the pubsub connection mananger
                         CreatePubSubConnectionMgr(connectionconfig);
 
-                        // apply any subscriptions
-                        List<DataSubscription> connectionSubs = _dbManager.GetSubscriptions(connectionconfig.SCUID);
-                        foreach (DataSubscription sub in connectionSubs)
-                        {
-                            Globals.SystemManager.LogApplicationEvent(this, "", "adding subscription to '" + sub.subscription_path + ", for connection '" + connectionconfig.Description + "'");
-                            _PubSubConnectionsDictionary[connectionconfig.SCUID].Subscribe(sub);
-                        }
+                        //// apply any subscriptions
+                        //List<DataSubscription> connectionSubs = _dbManager.GetSubscriptions(connectionconfig.SCUID);
+                        //foreach (DataSubscription sub in connectionSubs)
+                        //{
+                        //    Globals.SystemManager.LogApplicationEvent(this, "", "adding subscription to '" + sub.subscription_path + ", for connection '" + connectionconfig.Description + "'");
+                        //    _PubSubConnectionsDictionary[connectionconfig.SCUID].Subscribe(sub);
+                        //}
 
                     }
                 }
@@ -231,6 +231,10 @@ namespace FDA
                         connDetails[0],             // host
                         int.Parse(connDetails[1])); // port
 
+                    // subscribe to any configured data points
+                    List<DataSubscription> subs = _dbManager.GetSubscriptions(connectionconfig.SCUID);
+                    foreach (DataSubscription sub in subs)
+                        newConn.Subscribe(sub);
                     break;
                 case "OPCDA": // SCDetail01 format is  host:ProgID:ClassID
                     connDetails = connectionconfig.SCDetail01.Split(':');  // separate the hostname from the port
@@ -252,6 +256,7 @@ namespace FDA
                     break;
             }
 
+            newConn.ConnDetails = connectionconfig.SCDetail01;
             newConn.CommunicationsEnabled = connectionconfig.CommunicationsEnabled;
             newConn.ConnectionEnabled = connectionconfig.ConnectionEnabled;
 
@@ -569,19 +574,19 @@ namespace FDA
 
         private void HandleSchedulerChanges(ConfigEventArgs e)
         {
-                FDARequestGroupScheduler SchedulerConfig = _dbManager.GetSched((Guid)e.ID);
+                FDARequestGroupScheduler SchedulerConfig = _dbManager.GetSched((Guid)e.Item);
                 switch (e.ChangeType)
                 {
                     case "UPDATE":
                         // find the existing schedule
                         FDAScheduler oldScheduler = null;
-                        if (_schedulersDictionary.ContainsKey((Guid)e.ID))
+                        if (_schedulersDictionary.ContainsKey((Guid)e.Item))
                         {
-                            oldScheduler = _schedulersDictionary[(Guid)e.ID];
+                            oldScheduler = _schedulersDictionary[(Guid)e.Item];
                         }
                         else
                         {
-                            Globals.SystemManager.LogApplicationEvent(this, "", "Schedule ID " + e.ID + " was updated in the database, but was not found in the FDA. Creating a new schedule with this ID");
+                            Globals.SystemManager.LogApplicationEvent(this, "", "Schedule ID " + e.Item + " was updated in the database, but was not found in the FDA. Creating a new schedule with this ID");
                         }
 
                         // build a new one
@@ -605,7 +610,7 @@ namespace FDA
                             case "MONTHLY": newScheduler = new FDASchedulerMonthly(SchedulerConfig.FRGSUID, SchedulerConfig.Description, SchedulerConfig.RequestGroups, SchedulerConfig.Tasks, new DateTime(SchedulerConfig.Year, SchedulerConfig.Month, SchedulerConfig.Day, SchedulerConfig.Hour, SchedulerConfig.Minute, SchedulerConfig.Second)); break;
                             case "ONSTARTUP": newScheduler = new FDASchedulerOnshot(SchedulerConfig.FRGSUID, SchedulerConfig.Description, SchedulerConfig.RequestGroups, SchedulerConfig.Tasks, true); break;
                             default:
-                                Globals.SystemManager.LogApplicationEvent(this, "", "Schedule ID " + e.ID + " has unrecognized schedule type '" + SchedulerConfig.FRGSType.ToString() + "'");
+                                Globals.SystemManager.LogApplicationEvent(this, "", "Schedule ID " + e.Item + " has unrecognized schedule type '" + SchedulerConfig.FRGSType.ToString() + "'");
                                 break;
                         }
 
@@ -619,12 +624,12 @@ namespace FDA
                         {
                             oldScheduler.Enabled = false;
                             oldScheduler.TimerElapsed -= ScheduleTickHandler;
-                            if (_schedulersDictionary.ContainsKey((Guid)e.ID))
+                            if (_schedulersDictionary.ContainsKey((Guid)e.Item))
                             {
                                 lock (_schedulersDictionary)
                                 {
 
-                                    _schedulersDictionary.Remove((Guid)e.ID);
+                                    _schedulersDictionary.Remove((Guid)e.Item);
                                 }
                             }
                             oldScheduler = null;
@@ -641,9 +646,9 @@ namespace FDA
                         break;
 
                     case "DELETE":
-                        _schedulersDictionary[(Guid)e.ID].Enabled = false;
-                        _schedulersDictionary[(Guid)e.ID].TimerElapsed -= ScheduleTickHandler;
-                        lock (_schedulersDictionary) { _schedulersDictionary.Remove((Guid)e.ID); }
+                        _schedulersDictionary[(Guid)e.Item].Enabled = false;
+                        _schedulersDictionary[(Guid)e.Item].TimerElapsed -= ScheduleTickHandler;
+                        lock (_schedulersDictionary) { _schedulersDictionary.Remove((Guid)e.Item); }
                         break;
 
                     case "INSERT":
@@ -657,7 +662,7 @@ namespace FDA
                                 case "MONTHLY": _schedulersDictionary.Add(SchedulerConfig.FRGSUID, new FDASchedulerMonthly(SchedulerConfig.FRGSUID, SchedulerConfig.Description, SchedulerConfig.RequestGroups, SchedulerConfig.Tasks, new DateTime(SchedulerConfig.Year, SchedulerConfig.Month, SchedulerConfig.Day, SchedulerConfig.Hour, SchedulerConfig.Minute, SchedulerConfig.Second))); break;
                                 case "ONSTARTUP": _schedulersDictionary.Add(SchedulerConfig.FRGSUID, new FDASchedulerOnshot(SchedulerConfig.FRGSUID, SchedulerConfig.Description, SchedulerConfig.RequestGroups, SchedulerConfig.Tasks, true)); break;
                                 default:
-                                    Globals.SystemManager.LogApplicationEvent(this, "", "Schedule ID " + e.ID + " has unrecognized schedule type '" + SchedulerConfig.FRGSType.ToString() + "'");
+                                    Globals.SystemManager.LogApplicationEvent(this, "", "Schedule ID " + e.Item + " has unrecognized schedule type '" + SchedulerConfig.FRGSType.ToString() + "'");
                                     break;
                             }
                         }
@@ -666,188 +671,150 @@ namespace FDA
                 } 
         }
 
+
         private void HandleConnectionChanges(ConfigEventArgs e)
         {
- 
-                string changeType = e.ChangeType;
-                if (changeType == "UPDATE")
+            string changeType = e.ChangeType.ToUpper();
+
+            if (changeType == "UPDATE")
+            {
+                bool found = false;
+                if (_RRconnectionsDictionary != null)
                 {
-                    if (_RRconnectionsDictionary == null)
-                        return;
-
-                    if (_RRconnectionsDictionary.ContainsKey((Guid)e.ID))
+                    if (_RRconnectionsDictionary.ContainsKey((Guid)e.Item))
                     {
-                        RRConnectionManager conn = _RRconnectionsDictionary[(Guid)e.ID];
+                        found = true;
+                        // get the connection object to be modified
+                        RRConnectionManager conn = _RRconnectionsDictionary[(Guid)e.Item];
 
-                        // get the connection configuration object that was updated from the database manager
-                        FDASourceConnection updatedConfig = _dbManager.GetConnectionConfig((Guid)e.ID);
+                        // get the updated connection configuration
+                        FDASourceConnection updatedConfig = _dbManager.GetConnectionConfig((Guid)e.Item);
 
-                        if (conn.ConnectionType.ToString().ToUpper() != updatedConfig.SCType.ToUpper())
-                        {
-                            try
-                            {
-                                conn.ConnectionType = (RRConnectionManager.ConnType)Enum.Parse(typeof(RRConnectionManager.ConnType), updatedConfig.SCType);
-                            }
-                            catch (Exception ex)
-                            {
-                                Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "unrecognized connection type '" + updatedConfig.SCType.ToString() + "' in connection " + updatedConfig.SCUID.ToString());
-                            }
-                        }
-
-                        conn.ConnDetails = updatedConfig.SCDetail01;
-                        string[] connParams = updatedConfig.SCDetail01.Split(':');
-
-
-                        switch (conn.ConnectionType)
-                        {
-                            // Ethernet specific configuration
-                            case RRConnectionManager.ConnType.Ethernet:
-                                if (conn.RemoteIPAddress != connParams[0]) conn.RemoteIPAddress = connParams[0];
-                                int newPort;
-                                newPort = int.Parse(connParams[1]);
-                                if (conn.PortNumber != newPort) conn.PortNumber = newPort;
-                                break;
-                            case RRConnectionManager.ConnType.EthernetUDP:
-                                newPort = int.Parse(connParams[0]);
-                                if (conn.PortNumber != newPort) conn.PortNumber = newPort;
-                                break;
-                            case RRConnectionManager.ConnType.Serial:
-                                // Serial specific configuration
-                                Parity parity = Parity.None;
-                                switch (connParams[3])
-                                {
-                                    case "N": parity = Parity.None; break;
-                                    case "E": parity = Parity.Even; break;
-                                    case "M": parity = Parity.Mark; break;
-                                    case "O": parity = Parity.Odd; break;
-                                    case "S": parity = Parity.Space; break;
-                                }
-
-                                StopBits stopBits = StopBits.None;
-                                switch (connParams[4])
-                                {
-                                    case "N": stopBits = StopBits.None; break;
-                                    case "1": stopBits = StopBits.One; break;
-                                    case "1.5": stopBits = StopBits.OnePointFive; break;
-                                    case "2": stopBits = StopBits.Two; break;
-                                }
-
-
-                                if (conn.SerialPortName != connParams[0]) conn.SerialPortName = "COM" + connParams[0];
-                                if (conn.SerialBaudRate != int.Parse(connParams[1])) conn.SerialBaudRate = int.Parse(connParams[1]);
-                                if (conn.SerialDataBits != int.Parse(connParams[2])) conn.SerialDataBits = int.Parse(connParams[2]);
-                                if (conn.SerialParity != parity) conn.SerialParity = parity;
-                                if (conn.SerialStopBits != stopBits) conn.SerialStopBits = stopBits;
-                                break;
-                        }
-
-                        if (conn.Description != updatedConfig.Description) conn.Description = updatedConfig.Description;
-                        if (conn.MaxRequestAttempts != updatedConfig.MaxRequestAttempts) conn.MaxRequestAttempts = updatedConfig.MaxRequestAttempts;
-                        if (conn.MaxSocketConnectionAttempts != updatedConfig.MaxSocketConnectionAttempts) conn.MaxSocketConnectionAttempts = updatedConfig.MaxSocketConnectionAttempts;
-                        if (conn.PostConnectionCommsDelay != updatedConfig.PostConnectionCommsDelay) conn.PostConnectionCommsDelay = updatedConfig.PostConnectionCommsDelay;
-                        if (conn.RequestResponseTimeout != updatedConfig.RequestResponseTimeout) conn.RequestResponseTimeout = updatedConfig.RequestResponseTimeout;
-                        if (conn.RequestRetryDelay != updatedConfig.RequestRetryDelay) conn.RequestRetryDelay = updatedConfig.RequestRetryDelay;
-                        if (conn.SocketConnectionAttemptTimeout != updatedConfig.SocketConnectionAttemptTimeout) conn.SocketConnectionAttemptTimeout = updatedConfig.SocketConnectionAttemptTimeout;
-                        if (conn.SocketConnectionRetryDelay != updatedConfig.SocketConnectionRetryDelay) conn.SocketConnectionRetryDelay = updatedConfig.SocketConnectionRetryDelay;
-                        if (conn.CommunicationsEnabled != updatedConfig.CommunicationsEnabled) conn.CommunicationsEnabled = updatedConfig.CommunicationsEnabled;
-                        if (conn.ConnectionEnabled != updatedConfig.ConnectionEnabled) conn.ConnectionEnabled = updatedConfig.ConnectionEnabled;
-                        if (conn.CommsLogEnabled != updatedConfig.CommsLogEnabled) conn.CommsLogEnabled = updatedConfig.CommsLogEnabled;
-                        if (conn.InterRequestDelay != updatedConfig.InterRequestDelay) conn.InterRequestDelay = updatedConfig.InterRequestDelay;
-                        //if (conn.MQTTEnabled != connConfig.MQTTEnabled) conn.MQTTEnabled = connConfig.MQTTEnabled;
+                        UpdateRRConnection(conn, updatedConfig);
+                        
                     }
-                    else
-                        changeType = "Insert"; // this was an update but no connection object with this ID was found, change it to an insert instead (will be processed as an insert below)
-
                 }
 
-                if (changeType == "DELETE")
+                if (_PubSubConnectionsDictionary != null)
                 {
-                    if (_RRconnectionsDictionary.ContainsKey((Guid)e.ID))
+                    if (_PubSubConnectionsDictionary.ContainsKey((Guid)e.Item))
                     {
-                        RRConnectionManager connToDelete = _RRconnectionsDictionary[(Guid)e.ID];
-                        connToDelete.TransactionComplete -= TransactionCompleteHandler;
+                        found = true;
+                        // get the connection object to be modified
+                        PubSubConnectionManager conn = _PubSubConnectionsDictionary[(Guid)e.Item];
 
-                        // remove the doomed connection object from the dictionary
-                        _RRconnectionsDictionary.Remove((Guid)e.ID);
+                        // get the updated connection configuration
+                        FDASourceConnection updatedConfig = _dbManager.GetConnectionConfig((Guid)e.Item);
 
-                        // disable it, and dispose of it
-                        connToDelete.CommunicationsEnabled = false;
-                        connToDelete.ConnectionEnabled = false;
-                        connToDelete.Dispose();
-                        connToDelete = null;
-
-                        //PublishUpdatedConnectionsList();
+                        UpdatePubSubConnection(conn, updatedConfig);
                     }
-
-                    // connection deletion may cause previously valid request groups to become invalid, mark all valid groups for re-validation
-                    RevalidateRequestGroups(1);
                 }
 
-                if (changeType == "INSERT")
+
+                 if (!found)
+                    changeType = "INSERT"; // this was an update but no connection object with this ID was found, change it to an insert instead (will be processed as an insert below)
+            }
+
+            if (changeType == "DELETE")
+            {
+                // Delete from RRConnections
+                if (_RRconnectionsDictionary != null)
                 {
-                    FDASourceConnection connConfig = _dbManager.GetConnectionConfig((Guid)e.ID);
-
-                    // separate the hostname from the port
-                    string[] connDetails = connConfig.SCDetail01.Split(':');
-
-                    // create the new connection
-                    RRConnectionManager newConn = null;
-                    bool success = true;
-                    try
+                    if (_RRconnectionsDictionary.ContainsKey((Guid)e.Item))
                     {
-                        newConn = new RRConnectionManager(connConfig.SCUID, connConfig.Description, connDetails[0], int.Parse(connDetails[1]))
-                        {
-                            RequestRetryDelay = (short)connConfig.RequestRetryDelay,
-                            SocketConnectionAttemptTimeout = connConfig.SocketConnectionAttemptTimeout,
-                            MaxSocketConnectionAttempts = connConfig.MaxSocketConnectionAttempts,
-                            SocketConnectionRetryDelay = connConfig.SocketConnectionRetryDelay,
-                            PostConnectionCommsDelay = connConfig.PostConnectionCommsDelay,
-                            InterRequestDelay = connConfig.InterRequestDelay,
-                            MaxRequestAttempts = connConfig.MaxRequestAttempts,
-                            RequestResponseTimeout = connConfig.RequestResponseTimeout,
-                            CommsLogEnabled = connConfig.CommsLogEnabled
-                        };
+                        DeleteRRConnection((Guid)e.Item);
                     }
-                    catch (Exception ex)
-                    {
-                        Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Error occurred while creating connection object " + connConfig.SCUID);
-                        success = false;
-                    }
-
-                    if (success)
-                    {
-                        try
-                        {
-                            newConn.ConnectionType = (RRConnectionManager.ConnType)Enum.Parse(typeof(RRConnectionManager.ConnType), connConfig.SCType);
-                            newConn.TransactionComplete += TransactionCompleteHandler;
-                            // add it to our dictionary
-                            _RRconnectionsDictionary.Add((Guid)e.ID, newConn);
-
-                            // enable it (if configured to be enabled)
-                            newConn.CommunicationsEnabled = connConfig.CommunicationsEnabled;
-                            newConn.ConnectionEnabled = connConfig.ConnectionEnabled;
-
-                            //PublishUpdatedConnectionsList();
-                        }
-                        catch (Exception ex)
-                        {
-                            Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "unrecognized connection type '" + connConfig.SCType.ToString() + "' in connection " + connConfig.SCUID.ToString());
-                            newConn.ConnectionEnabled = false;
-                            newConn.Dispose();
-                            newConn = null;
-                        }
-                    }
-
-                    // adding a new connection may cause previously invalid groups to become valid, mark all invalid groups for revalidation
-                    RevalidateRequestGroups(2);
                 }
 
-                if (Globals.MQTTEnabled)
+                // Delete from PubSub Connections
+                if (_PubSubConnectionsDictionary != null)
                 {
-                    PublishUpdatedConnectionsList();
+                    if (_PubSubConnectionsDictionary.ContainsKey((Guid)e.Item))
+                    {
+                        DeletePubSubConnection((Guid)e.Item);
+                    }
                 }
+               
+
+                // connection deletion may cause previously valid request groups to become invalid, mark all valid groups for re-validation
+                RevalidateRequestGroups(1);
+            }
+
+            if (changeType == "INSERT")
+            {
+                FDASourceConnection connConfig = _dbManager.GetConnectionConfig((Guid)e.Item);
+                string connType = connConfig.SCType.ToUpper();
+
+                if (connType == "ETHERNET" || connType == "ETHERNETUDP" || connType == "SERIAL")
+                    CreateRRConnectionMgr(connConfig);
+
+                if (connType == "OPCDA" || connType == "OPCUA" || connType == "MQTT")
+                    CreatePubSubConnectionMgr(connConfig);
+
+                // this stuff all covered in CreateRRConnectionManager() now
+                //-------------------------------------------------------------------
+                //// separate the connection details
+                //string[] connDetails = connConfig.SCDetail01.Split(':');
+
+                //// create the new connection
+                //RRConnectionManager newConn = null;
+                //bool success = true;
+                //try
+                //{
+                //    newConn = new RRConnectionManager(connConfig.SCUID, connConfig.Description, connDetails[0], int.Parse(connDetails[1]))
+                //    {
+                //        RequestRetryDelay = (short)connConfig.RequestRetryDelay,
+                //        SocketConnectionAttemptTimeout = connConfig.SocketConnectionAttemptTimeout,
+                //        MaxSocketConnectionAttempts = connConfig.MaxSocketConnectionAttempts,
+                //        SocketConnectionRetryDelay = connConfig.SocketConnectionRetryDelay,
+                //        PostConnectionCommsDelay = connConfig.PostConnectionCommsDelay,
+                //        InterRequestDelay = connConfig.InterRequestDelay,
+                //        MaxRequestAttempts = connConfig.MaxRequestAttempts,
+                //        RequestResponseTimeout = connConfig.RequestResponseTimeout,
+                //        CommsLogEnabled = connConfig.CommsLogEnabled
+                //    };
+                //}
+                //catch (Exception ex)
+                //{
+                //    Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Error occurred while creating connection object " + connConfig.SCUID);
+                //    success = false;
+                //}
+
+                //if (success)
+                //{
+                //    try
+                //    {
+                //        newConn.ConnectionType = (RRConnectionManager.ConnType)Enum.Parse(typeof(RRConnectionManager.ConnType), connConfig.SCType);
+                //        newConn.TransactionComplete += TransactionCompleteHandler;
+                //        // add it to our dictionary
+                //        _RRconnectionsDictionary.Add((Guid)e.ID, newConn);
+
+                //        // enable it (if configured to be enabled)
+                //        newConn.CommunicationsEnabled = connConfig.CommunicationsEnabled;
+                //        newConn.ConnectionEnabled = connConfig.ConnectionEnabled;
+
+                //        //PublishUpdatedConnectionsList();
+                //    }
+                //    catch (Exception ex)
+                //    {
+                //        Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "unrecognized connection type '" + connConfig.SCType.ToString() + "' in connection " + connConfig.SCUID.ToString());
+                //        newConn.ConnectionEnabled = false;
+                //        newConn.Dispose();
+                //        newConn = null;
+                //    }
+                //}
+
+                // adding a new connection may cause previously invalid groups to become valid, mark all invalid groups for revalidation
+                RevalidateRequestGroups(2);
+            }
+
+            if (Globals.MQTTEnabled)
+            {
+                PublishUpdatedConnectionsList();
+            }
             
         }
+
 
         private void HandleRequestGroupChanges(ConfigEventArgs e)
         {
@@ -855,7 +822,7 @@ namespace FDA
                 if (e.ChangeType == "UPDATE")
                 {
                     // get the updated group config from the database
-                    FDADataBlockRequestGroup updatedGroupConfig = _dbManager.GetRequestGroup((Guid)e.ID);
+                    FDADataBlockRequestGroup updatedGroupConfig = _dbManager.GetRequestGroup((Guid)e.Item);
 
                     // find any schedulers that reference this group
                     foreach (FDAScheduler scheduler in _schedulersDictionary.Values)
@@ -884,11 +851,11 @@ namespace FDA
                 {
                     foreach (FDAScheduler scheduler in _schedulersDictionary.Values)
                     {
-                        RequestGroup deletedGroup = scheduler.RequestGroupList.Find(group => group.ID == (Guid)e.ID);
+                        RequestGroup deletedGroup = scheduler.RequestGroupList.Find(group => group.ID == (Guid)e.Item);
                         while (deletedGroup != null)
                         {
                             scheduler.RequestGroupList.Remove(deletedGroup);
-                            deletedGroup = scheduler.RequestGroupList.Find(group => group.ID == (Guid)e.ID);
+                            deletedGroup = scheduler.RequestGroupList.Find(group => group.ID == (Guid)e.Item);
                         }
                     }
                 }
@@ -897,7 +864,7 @@ namespace FDA
                 {
                     // check if the new group is referenced by any scheduler configs
                     List<FDARequestGroupScheduler> schedConfigList = _dbManager.GetAllSched();
-                    FDADataBlockRequestGroup groupConfig = _dbManager.GetRequestGroup((Guid)e.ID);
+                    FDADataBlockRequestGroup groupConfig = _dbManager.GetRequestGroup((Guid)e.Item);
                     int idx = -1;
                     int separatorIdx;
                     int length;
@@ -906,7 +873,7 @@ namespace FDA
                     foreach (FDARequestGroupScheduler sched in schedConfigList)
                     {
 
-                        idx = sched.RequestGroupList.IndexOf(e.ID.ToString().ToUpper());
+                        idx = sched.RequestGroupList.IndexOf(e.Item.ToString().ToUpper());
                         if (idx > -1)  // the group ID was found in the scheduler's configured RequestGroupList
                         {
                             separatorIdx = sched.RequestGroupList.IndexOf('|', idx);
@@ -941,7 +908,7 @@ namespace FDA
             if (e.ChangeType == "UPDATE")
             {
                 // get the updated task definition from the database manager
-                FDATask updatedTask = _dbManager.GetTask((Guid)e.ID);
+                FDATask updatedTask = _dbManager.GetTask((Guid)e.Item);
 
                 // find any schedulers that reference this group
                 foreach (FDAScheduler scheduler in _schedulersDictionary.Values)
@@ -959,11 +926,11 @@ namespace FDA
             {
                 foreach (FDAScheduler scheduler in _schedulersDictionary.Values)
                 {
-                    FDATask deletedTask = scheduler.TasksList.Find(task => task.TASK_ID == (Guid)e.ID);
+                    FDATask deletedTask = scheduler.TasksList.Find(task => task.TASK_ID == (Guid)e.Item);
                     while (deletedTask != null)
                     {
                         scheduler.TasksList.Remove(deletedTask);
-                        deletedTask = scheduler.TasksList.Find(task => task.TASK_ID == (Guid)e.ID);
+                        deletedTask = scheduler.TasksList.Find(task => task.TASK_ID == (Guid)e.Item);
                     }
                 }
             }
@@ -983,10 +950,10 @@ namespace FDA
 
         private void HandleScriptChanges(ConfigEventArgs e)
         {
-            UserScriptDefinition scriptdef = _dbManager.GetUserScript((string)e.ID);
+            UserScriptDefinition scriptdef = _dbManager.GetUserScript((string)e.Item);
             if (e.ChangeType == "INSERT")
             {
-                if (Scripter.GetScript(e.ID.ToString()) == null) // check if a script with this ID already exists
+                if (Scripter.GetScript(e.Item.ToString()) == null) // check if a script with this ID already exists
                 {
                     Scripter.LoadScript(scriptdef.script_name, scriptdef.script, scriptdef.enabled, scriptdef.run_spec);
                 }
@@ -995,7 +962,7 @@ namespace FDA
 
             if (e.ChangeType == "UPDATE")
             {
-                UserScript scriptToUpdate = Scripter.GetScript(e.ID.ToString());
+                UserScript scriptToUpdate = Scripter.GetScript(e.Item.ToString());
 
                 if (scriptToUpdate != null)
                 {
@@ -1007,7 +974,7 @@ namespace FDA
 
             if (e.ChangeType == "DELETE")
             {
-                Scripter.UnloadScript(e.ID.ToString());
+                Scripter.UnloadScript(e.Item.ToString());
             }
           
             
@@ -1024,9 +991,8 @@ namespace FDA
                 }
 
                 if (e.TableName == Globals.SystemManager.GetTableName("FDASourceConnections"))
-                {
-                    
-                    HandleConnectionChanges(e);
+                {                  
+                    HandleConnectionChanges(e);  
                     return;
                 }
 
@@ -1059,16 +1025,79 @@ namespace FDA
                     HandleAppConfigChanges();
                     return;
                 }
+
+                if (e.TableName == "FDASubscriptions")
+                {
+                    HandleSubscriptionChanges(e);
+                    return;
+                }
                 
             } catch (Exception ex)
             {
-                Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Error occurred while handling a database event (insert,delete, or update) in table " + e.TableName + ", item ID " + e.ID);
+                Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Error occurred while handling a database event (insert,delete, or update) in table " + e.TableName + ", item ID " + e.Item);
             }
+        }      
+
+        public void HandleSubscriptionChanges(ConfigEventArgs e)
+        {
+            DataSubscription sub = (DataSubscription)e.Item;
+
+            if (e.ChangeType == "UPDATE")
+            {
+                DataSubscription oldSub = (DataSubscription)e.OldItem;
+
+                if (_PubSubConnectionsDictionary.ContainsKey(sub.source_connection_ref))
+                {
+                   // did the connection reference change? will need to unsubscribe from the old connection and subscribe with the new connection
+                   if (sub.source_connection_ref != oldSub.source_connection_ref)
+                    {
+                        if (_PubSubConnectionsDictionary.ContainsKey(oldSub.source_connection_ref))
+                            _PubSubConnectionsDictionary[oldSub.source_connection_ref].UnSubscribe(oldSub);
+
+                        if (_PubSubConnectionsDictionary.ContainsKey(sub.source_connection_ref))
+                            _PubSubConnectionsDictionary[sub.source_connection_ref].Subscribe(sub);
+                    }
+
+
+                    // did the tag path change? // unsubscribe from the old path, subscribe to the new path
+                    if (sub.subscription_path != oldSub.subscription_path)
+                    {
+                        if (_PubSubConnectionsDictionary.ContainsKey(sub.source_connection_ref))
+                            _PubSubConnectionsDictionary[sub.source_connection_ref].UnSubscribe(oldSub);
+
+                        if (_PubSubConnectionsDictionary.ContainsKey(sub.source_connection_ref))
+                            _PubSubConnectionsDictionary[sub.source_connection_ref].Subscribe(sub);
+                    }
+
+                    // did  the enabled status change?
+                    if (sub.enabled != oldSub.enabled)
+                    {
+                        _PubSubConnectionsDictionary[sub.source_connection_ref].UpdateSubEnabledStatus(sub);
+                    }
+
+                    // no action required for changes to datapoint reference or destination table
+
+                }
+
+            }
+
+            if (e.ChangeType == "INSERT")
+            {
+                if (_PubSubConnectionsDictionary.ContainsKey(sub.source_connection_ref))
+                {
+                    _PubSubConnectionsDictionary[sub.source_connection_ref].Subscribe(sub);
+                }
+            }
+
+            if (e.ChangeType == "DELETE")
+            {
+                if (_PubSubConnectionsDictionary.ContainsKey(sub.source_connection_ref))
+                {
+                    _PubSubConnectionsDictionary[sub.source_connection_ref].UnSubscribe(sub);
+                }
+            }
+
         }
-        
-                
-        
-        
 
         private void HandleAppConfigChanges()
         {
@@ -1171,6 +1200,207 @@ namespace FDA
                 MQTTEnableStatusChanged?.Invoke(this, new BoolEventArgs(mqttEnb));
             }
 
+        }
+
+
+        private void DeletePubSubConnection(Guid ID)
+        {
+            PubSubConnectionManager connToDelete = _PubSubConnectionsDictionary[ID];
+            connToDelete.DataUpdate -= TransactionCompleteHandler;
+            // remove the doomed connection object from the dictionary
+            _PubSubConnectionsDictionary.Remove(ID);
+
+            // disable it, and dispose of it
+            connToDelete.CommunicationsEnabled = false;
+            connToDelete.ConnectionEnabled = false;
+            connToDelete.Dispose();
+            connToDelete = null;
+        }
+
+        private void DeleteRRConnection(Guid ID)
+        {
+            RRConnectionManager connToDelete = _RRconnectionsDictionary[ID];
+            connToDelete.TransactionComplete -= TransactionCompleteHandler;
+
+            // remove the doomed connection object from the dictionary
+            _RRconnectionsDictionary.Remove(ID);
+
+            // disable it, and dispose of it
+            connToDelete.CommunicationsEnabled = false;
+            connToDelete.ConnectionEnabled = false;
+            connToDelete.Dispose();
+            connToDelete = null;
+
+            //PublishUpdatedConnectionsList();
+        }
+        private void UpdatePubSubConnection(PubSubConnectionManager conn, FDASourceConnection updatedConfig)
+        {
+            // ---------------------------------- Handle SCType changes ----------------------------------
+            bool isValidConnType = true;
+            if (conn.ConnectionType.ToString().ToUpper() != updatedConfig.SCType.ToUpper())
+            {
+                object connType;
+                isValidConnType = Enum.TryParse(typeof(PubSubConnectionManager.ConnType), updatedConfig.SCType, out connType);
+
+                if (isValidConnType)
+                {
+                    conn.ConnectionType = (PubSubConnectionManager.ConnType)connType;
+                }
+                else
+                {
+                    // check if its a valid conn type for an RR connection
+                    object RRconnType;
+                    isValidConnType = Enum.TryParse(typeof(RRConnectionManager.ConnType), updatedConfig.SCType, out RRconnType);
+
+                    if (isValidConnType)
+                    {
+                        // we've switched from a PubSub connection to a RR connection
+
+                        // so delete the PubSub connection
+                        DeletePubSubConnection(conn.ConnectionID);
+
+                        // and create a new RRConnection
+                        CreateRRConnectionMgr(updatedConfig);
+                        return;
+                    }
+                    else
+                        Globals.SystemManager.LogApplicationEvent(this, "", "Invalid SCType value '" + updatedConfig.SCType.ToString() + "' for connection '" + updatedConfig.Description + "'(" + updatedConfig.SCUID + ")");
+
+                }
+            }
+
+            //------------------------------ Handle connection details changes (ip/port/ProgID/ClassID) ---------------------------------------
+            if (conn.ConnDetails != updatedConfig.SCDetail01)
+            {
+                conn.ConnDetails = updatedConfig.SCDetail01;
+                string[] connParams = updatedConfig.SCDetail01.Split(':');
+
+                switch (conn.ConnectionType)
+                {
+                    case PubSubConnectionManager.ConnType.OPCUA:
+                        if (conn.Host != connParams[0]) conn.Host = connParams[0];
+
+                        int newPort;
+                        newPort = int.Parse(connParams[1]);
+                        if (conn.Port != newPort) conn.Port = newPort;
+
+                        conn.ResetConnection();
+                        break;
+                    case PubSubConnectionManager.ConnType.OPCDA:
+                        if (conn.Host != connParams[0]) conn.Host = connParams[0];
+                        if (conn.ProgID != connParams[1]) conn.ProgID = connParams[1];
+                        if (conn.ClassID != connParams[1]) conn.ClassID = connParams[1];
+
+                        conn.ResetConnection();
+                        break;
+
+                }
+            }
+
+            //--------------------------------- Handle all other changes -----------------------------
+            if (conn.Description != updatedConfig.Description) conn.Description = updatedConfig.Description;
+            if (conn.MaxSocketConnectionAttempts != updatedConfig.MaxSocketConnectionAttempts) conn.MaxSocketConnectionAttempts = updatedConfig.MaxSocketConnectionAttempts;
+            if (conn.PostConnectionCommsDelay != updatedConfig.PostConnectionCommsDelay) conn.PostConnectionCommsDelay = updatedConfig.PostConnectionCommsDelay;
+            if (conn.SocketConnectionRetryDelay != updatedConfig.SocketConnectionRetryDelay) conn.SocketConnectionRetryDelay = updatedConfig.SocketConnectionRetryDelay;
+            if (conn.CommunicationsEnabled != updatedConfig.CommunicationsEnabled) conn.CommunicationsEnabled = updatedConfig.CommunicationsEnabled;
+            if (conn.ConnectionEnabled != updatedConfig.ConnectionEnabled) conn.ConnectionEnabled = updatedConfig.ConnectionEnabled;
+            if (conn.CommsLogEnabled != updatedConfig.CommsLogEnabled) conn.CommsLogEnabled = updatedConfig.CommsLogEnabled;
+        }
+        private void UpdateRRConnection(RRConnectionManager conn,FDASourceConnection updatedConfig)
+        {
+            // SCType has changed
+            bool isValidConnType = true;
+            if (conn.ConnectionType.ToString().ToUpper() != updatedConfig.SCType.ToUpper())
+            {
+                object connType;
+                isValidConnType = Enum.TryParse(typeof(RRConnectionManager.ConnType), updatedConfig.SCType, out connType);
+
+                if (isValidConnType)
+                {
+                    conn.ConnectionType = (RRConnectionManager.ConnType)connType;
+                }
+                else
+                {
+                    // check if its a valid conn type for a PubSub connection
+                    object PubSubconnType;
+                    isValidConnType = Enum.TryParse(typeof(PubSubConnectionManager.ConnType), updatedConfig.SCType, out PubSubconnType);
+
+                    if (isValidConnType)
+                    {
+                        // we've switched from a RR connection to a PubSub connection
+
+                        // so delete the RR connection
+                        DeleteRRConnection(conn.ConnectionID);
+
+                        // and create a new PubSubConnection
+                        CreatePubSubConnectionMgr(updatedConfig);
+                        return;
+                    }
+                    else
+                        Globals.SystemManager.LogApplicationEvent(this, "", "Invalid SCType value '" + updatedConfig.SCType.ToString() + "' for connection '" + updatedConfig.Description + "'(" + updatedConfig.SCUID + ")");
+                }
+            }
+
+            conn.ConnDetails = updatedConfig.SCDetail01;
+            string[] connParams = updatedConfig.SCDetail01.Split(':');
+
+
+            switch (conn.ConnectionType)
+            {
+                // Ethernet specific configuration
+                case RRConnectionManager.ConnType.Ethernet:
+                    if (conn.RemoteIPAddress != connParams[0]) conn.RemoteIPAddress = connParams[0];
+                    int newPort;
+                    newPort = int.Parse(connParams[1]);
+                    if (conn.PortNumber != newPort) conn.PortNumber = newPort;
+                    break;
+                case RRConnectionManager.ConnType.EthernetUDP:
+                    newPort = int.Parse(connParams[0]);
+                    if (conn.PortNumber != newPort) conn.PortNumber = newPort;
+                    break;
+                case RRConnectionManager.ConnType.Serial:
+                    // Serial specific configuration
+                    Parity parity = Parity.None;
+                    switch (connParams[3])
+                    {
+                        case "N": parity = Parity.None; break;
+                        case "E": parity = Parity.Even; break;
+                        case "M": parity = Parity.Mark; break;
+                        case "O": parity = Parity.Odd; break;
+                        case "S": parity = Parity.Space; break;
+                    }
+
+                    StopBits stopBits = StopBits.None;
+                    switch (connParams[4])
+                    {
+                        case "N": stopBits = StopBits.None; break;
+                        case "1": stopBits = StopBits.One; break;
+                        case "1.5": stopBits = StopBits.OnePointFive; break;
+                        case "2": stopBits = StopBits.Two; break;
+                    }
+
+
+                    if (conn.SerialPortName != connParams[0]) conn.SerialPortName = "COM" + connParams[0];
+                    if (conn.SerialBaudRate != int.Parse(connParams[1])) conn.SerialBaudRate = int.Parse(connParams[1]);
+                    if (conn.SerialDataBits != int.Parse(connParams[2])) conn.SerialDataBits = int.Parse(connParams[2]);
+                    if (conn.SerialParity != parity) conn.SerialParity = parity;
+                    if (conn.SerialStopBits != stopBits) conn.SerialStopBits = stopBits;
+                    break;
+            }
+
+            if (conn.Description != updatedConfig.Description) conn.Description = updatedConfig.Description;
+            if (conn.MaxRequestAttempts != updatedConfig.MaxRequestAttempts) conn.MaxRequestAttempts = updatedConfig.MaxRequestAttempts;
+            if (conn.MaxSocketConnectionAttempts != updatedConfig.MaxSocketConnectionAttempts) conn.MaxSocketConnectionAttempts = updatedConfig.MaxSocketConnectionAttempts;
+            if (conn.PostConnectionCommsDelay != updatedConfig.PostConnectionCommsDelay) conn.PostConnectionCommsDelay = updatedConfig.PostConnectionCommsDelay;
+            if (conn.RequestResponseTimeout != updatedConfig.RequestResponseTimeout) conn.RequestResponseTimeout = updatedConfig.RequestResponseTimeout;
+            if (conn.RequestRetryDelay != updatedConfig.RequestRetryDelay) conn.RequestRetryDelay = updatedConfig.RequestRetryDelay;
+            if (conn.SocketConnectionAttemptTimeout != updatedConfig.SocketConnectionAttemptTimeout) conn.SocketConnectionAttemptTimeout = updatedConfig.SocketConnectionAttemptTimeout;
+            if (conn.SocketConnectionRetryDelay != updatedConfig.SocketConnectionRetryDelay) conn.SocketConnectionRetryDelay = updatedConfig.SocketConnectionRetryDelay;
+            if (conn.CommunicationsEnabled != updatedConfig.CommunicationsEnabled) conn.CommunicationsEnabled = updatedConfig.CommunicationsEnabled;
+            if (conn.ConnectionEnabled != updatedConfig.ConnectionEnabled) conn.ConnectionEnabled = updatedConfig.ConnectionEnabled;
+            if (conn.CommsLogEnabled != updatedConfig.CommsLogEnabled) conn.CommsLogEnabled = updatedConfig.CommsLogEnabled;
+            if (conn.InterRequestDelay != updatedConfig.InterRequestDelay) conn.InterRequestDelay = updatedConfig.InterRequestDelay;
+            //if (conn.MQTTEnabled != connConfig.MQTTEnabled) conn.MQTTEnabled = connConfig.MQTTEnabled;
         }
 
         private void DemandRequestHandler(object sender, DBManagerPG.DemandEventArgs e)
