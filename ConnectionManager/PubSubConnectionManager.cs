@@ -31,6 +31,10 @@ namespace FDA
         public int Port { get => _port; set => _port = value; }
         public string ProgID { get => _progID; set => _progID = value; }
         public string ClassID { get => _classID; set => _classID = value; }
+        public int Priority0Count { get => _priority0Count; set { if (value != _priority0Count) { _priority0Count = value; HandlePropertyChanged("Priority0Count", Globals.FDANow().Ticks); } } }
+        public int Priority1Count { get => _priority1Count; set { if (value != _priority1Count) { _priority1Count = value; HandlePropertyChanged("Priority1Count", Globals.FDANow().Ticks); } } }
+        public int Priority2Count { get => _priority2Count; set { if (value != _priority2Count) { _priority2Count = value; HandlePropertyChanged("Priority2Count", Globals.FDANow().Ticks); } } }
+        public int Priority3Count { get => _priority3Count; set { if (value != _priority3Count) { _priority3Count = value; HandlePropertyChanged("Priority3Count", Globals.FDANow().Ticks); } } }
 
 
         // public events
@@ -61,7 +65,15 @@ namespace FDA
         private Dictionary<string, DataSubscription> _subscriptions = new Dictionary<string,DataSubscription>();
         private Guid _connectionID;
         private string _description;
-       
+        private QueueManager _queueManager;
+        private Task _DemandHandlerTask;
+        private CancellationTokenSource _DemandHandlerCancellationToken;
+        private int _priority0Count;
+        private int _priority1Count;
+        private int _priority2Count;
+        private int _priority3Count;
+
+
         // OPC specific member variables
         private OPC.Client _OPCClient;
         private string _progID;  // OPC DA only;
@@ -78,6 +90,8 @@ namespace FDA
             _description = description;
             //_connectionCancel = new CancellationTokenSource();
             //_connectionTask = new Task(new Action(DoConnect), _connectionCancel.Token);
+
+            _queueManager = new QueueManager(this, 4);
         }
 
         public void ConfigureAsOPCUA(string host,int port)
@@ -179,8 +193,23 @@ namespace FDA
 
             }
 
-      
+            if (ConnectionStatus == ConnStatus.Connected_Ready && _queueManager.TotalQueueCount > 0)
+            {
+                bool isAlreadyRunning = false;
+                if (_connectionTask != null)
+                {
+                    if (_connectionTask.Status == TaskStatus.Running)
+                    {
+                        isAlreadyRunning = true;
+                    }
+                }
 
+                if (!isAlreadyRunning)
+                {
+                     _DemandHandlerCancellationToken = new CancellationTokenSource();
+                    _connectionTask = Task.Factory.StartNew(new Action(HandleOnDemandRequests), _DemandHandlerCancellationToken.Token);
+                }
+            }
         }
 
         private void _OPCClient_BreakDetected()
@@ -194,6 +223,7 @@ namespace FDA
             }
         }
 
+
         private void _OPCClient_DataChange(string NodeID,int ns, OpcValue opcvalue)
         {
             DateTime data_timestamp = Globals.FDANow();
@@ -203,6 +233,9 @@ namespace FDA
 
             DataSubscription sub = _subscriptions[NodeID + ";" + ns];
 
+            DataRequest request = CreateReadDataRequest(data_timestamp, sub.subscription_path, sub.datapoint_definition_ref,sub.destination_table, opcvalue);
+
+            /*
             DataRequest request = new DataRequest()
             {
                 Protocol = "OPC",
@@ -241,6 +274,8 @@ namespace FDA
 
             request.TagList.Add(thisTag);
 
+            */
+
             TransactionLogItem logItem = new TransactionLogItem(request, 1, this.ConnectionID,Guid.Empty, 1,"1", "");
             Globals.SystemManager.LogCommsEvent(logItem);
             Thread.Sleep(1);
@@ -248,6 +283,46 @@ namespace FDA
 
             TransactionEventArgs eventArgs = new TransactionEventArgs(request);
             DataUpdate?.Invoke(this, eventArgs);
+        }
+
+        private DataRequest CreateReadDataRequest(DateTime timestamp,string path, Guid tagID,string destTable,OpcValue readResult)
+        {
+            DataRequest request = new DataRequest()
+            {
+                Protocol = "OPC",
+                ConnectionID = _connectionID,
+                MessageType = DataRequest.RequestType.Read,
+                Destination = destTable,
+                DBWriteMode = DataRequest.WriteMode.Insert,
+                GroupID = Guid.Empty,
+                RequestBytes = new byte[] { },
+                ResponseBytes = new byte[] { },
+                RequestTimestamp = timestamp,
+                ResponseTimestamp = timestamp,
+                ErrorMessage = "",
+                NodeID = path
+            };
+
+            if (readResult.Status.IsGood)
+                request.SetStatus(DataRequest.RequestStatus.Success);
+            else
+                request.SetStatus(DataRequest.RequestStatus.Error);
+
+            Tag thisTag = new Tag(tagID)
+            {
+                Value = Convert.ToDouble(readResult.Value),
+                Timestamp = (DateTime)readResult.SourceTimestamp,
+                ProtocolDataType = DataType.UNKNOWN
+            };
+
+            if (readResult.Status.IsGood)
+                thisTag.Quality = 192;
+            else
+                thisTag.Quality = 0;
+
+            request.TagList.Add(thisTag);
+
+            return request;
         }
 
         private void Disconnect()
@@ -392,6 +467,77 @@ namespace FDA
             }
         }
 
+
+        public void QueueTransactionGroup(Common.RequestGroup requestGroup)
+        {
+            _queueManager.QueueTransactionGroup(requestGroup);
+            bool isAlreadyRunning = false;
+            if (_DemandHandlerTask != null)
+            {
+                if (_DemandHandlerTask.Status == TaskStatus.Running)
+                {
+                    isAlreadyRunning = true;
+                }
+            }
+
+            if (!isAlreadyRunning)
+            {
+                _DemandHandlerCancellationToken = new CancellationTokenSource();
+                _connectionTask = Task.Factory.StartNew(new Action(HandleOnDemandRequests), _DemandHandlerCancellationToken.Token);
+            }
+
+        }
+
+
+        private void HandleOnDemandRequests()
+        {
+            while (_queueManager.TotalQueueCount > 0 && !_DemandHandlerCancellationToken.IsCancellationRequested)
+            {
+                // get the next request group
+                RequestGroup reqGroup = _queueManager.GetNextRequestGroup();
+
+                // break into individual requests
+                string[] requests = reqGroup.DBGroupRequestConfig.DataPointBlockRequestListVals.Split("$", StringSplitOptions.RemoveEmptyEntries);
+
+                string[] requestParts;
+                int ns = 0;
+                string path = "";
+                OpcValue returnedResult = null;
+                Guid tagID = Guid.Empty;
+                DataRequest dataRequest = null;
+                int reqIdx = 0;
+                foreach (string request in requests)
+                {
+                    reqIdx++;
+                    if (_DemandHandlerCancellationToken.IsCancellationRequested) return;
+
+                    // break into the individual parameters of the request
+                    requestParts = request.Split(":", StringSplitOptions.RemoveEmptyEntries);
+
+                    if (_connType == ConnType.OPCDA || _connType == ConnType.OPCUA)
+                    {
+                        ns = int.Parse(requestParts[0]);
+                        path = requestParts[1];
+                        tagID = Guid.Parse(requestParts[2]);
+
+                        // read the tag
+                        returnedResult = _OPCClient.Read(path, ns);
+                        
+                        // Create a DataRequest object to pass back as the result
+                        dataRequest = CreateReadDataRequest(Globals.FDANow(), path + ";" + ns, tagID, reqGroup.DestinationID, returnedResult);
+                    }
+
+                    TransactionLogItem logItem = new TransactionLogItem(dataRequest, 1, this.ConnectionID, reqGroup.ID, requests.Length, reqIdx.ToString(), "");
+                    Globals.SystemManager.LogCommsEvent(logItem);
+                    Thread.Sleep(1);
+
+                    TransactionEventArgs eventArgs = new TransactionEventArgs(dataRequest);
+                    DataUpdate?.Invoke(this, eventArgs);
+                }
+            }
+
+        }
+
         public void ResetConnection()
         {
             Disconnect();
@@ -414,6 +560,26 @@ namespace FDA
         public void Dispose()
         {
             Disconnect();
+
+            // cancel the connection task, if running
+            if (_connectionTask != null)
+                if (_connectionTask.Status == TaskStatus.Running)
+                {
+                    _connectionCancel.Cancel();
+                    //_connectionTask.Wait();
+                }
+
+            // cancel the DemandHandler task, if running
+            if (_DemandHandlerTask != null)
+                if (_DemandHandlerTask.Status == TaskStatus.Running)
+                {
+                    _DemandHandlerCancellationToken.Cancel();
+                }
+
+            // wait for both tasks to exit
+            Task.WaitAll(new Task[] { _connectionTask, _DemandHandlerTask });
+  
+
             _OPCClient?.Dispose();
         }
     }

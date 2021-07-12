@@ -1559,7 +1559,7 @@ namespace FDA
                
 
                 // connection reference is good
-                if (!_RRconnectionsDictionary.ContainsKey(group.ConnectionID))
+                if ( !(_RRconnectionsDictionary.ContainsKey(group.ConnectionID) || _PubSubConnectionsDictionary.ContainsKey(group.ConnectionID)))
                 {
                     Globals.SystemManager.LogApplicationEvent(this, "", "The DataBlockRequestGroup '" + group.Description + "' (" + group.ID + ") requested by " + requestor + " references a connection that does not exist (" + group.ConnectionID + "). This group will not be processed",true);
                     if (badGroups == null)
@@ -1613,6 +1613,7 @@ namespace FDA
                                 case "ENRONMODBUS": goodRequestString = Modbus.ModbusProtocol.ValidateRequestString(this, group.ID.ToString(), requestor, request, _dbManager.GetAllTagDefs()); break;
                                 case "BSAP": goodRequestString = BSAP.BSAPProtocol.ValidateRequestString(this, group.ID.ToString(), requestor, request, _dbManager.GetAllTagDefs(),_dbManager.GetAllDevices(),false); break;
                                 case "BSAPUDP": goodRequestString = BSAP.BSAPProtocol.ValidateRequestString(this, group.ID.ToString(), requestor, request, _dbManager.GetAllTagDefs(), _dbManager.GetAllDevices(),true); break;
+                                case "OPC": goodRequestString = OPC.OPCProtocol.ValidateRequestString(request,_dbManager.GetAllTagDefs(),group.ID.ToString(),requestor); break;
                             }
 
                             if (!goodRequestString)
@@ -1679,6 +1680,7 @@ namespace FDA
                 }
        
                 // send the group to the protocol to identify write requests and create a list of tags that need to have values looked up
+
                 switch (clonedGroup.Protocol.ToUpper())
                 {
                     case "ROC": ROC.ROCProtocol.IdentifyWrites(clonedGroup); break;
@@ -1687,6 +1689,7 @@ namespace FDA
                     case "ENRONMODBUS":  Modbus.ModbusProtocol.IdentifyWrites(clonedGroup); break;
                     case "BSAP": BSAP.BSAPProtocol.IdentifyWrites(clonedGroup); break;
                     case "BSAPUDP": BSAP.BSAPProtocol.IdentifyWrites(clonedGroup); break;
+                    case "OPC": break; // TODO: writes for OPC
                     default:
                         Globals.SystemManager.LogApplicationEvent(this, "", "unrecognized protocol '" + clonedGroup.Protocol + "' in group '" + clonedGroup.Description + "' (" + clonedGroup.ID + ")");
                         continue;
@@ -1736,10 +1739,29 @@ namespace FDA
                             _RRconnectionsDictionary[group.ConnectionID].QueueTransactionGroup(group);
                     }
                 }
+            }
+
+            if (_PubSubConnectionsDictionary.ContainsKey(group.ConnectionID))
+            {
+                if (group.RequesterType == Globals.RequesterType.System)
+                {
+                    _PubSubConnectionsDictionary[group.ConnectionID].QueueTransactionGroup(group);
+                }
+                else
+                {
+                    FDADataBlockRequestGroup groupConfig = _dbManager.GetRequestGroup(group.ID);
+                    if (groupConfig != null)
+                    {
+                        if (groupConfig.DRGEnabled)
+                            _PubSubConnectionsDictionary[group.ConnectionID].QueueTransactionGroup(group);
+                    }
+                }
 
 
             }
         }
+
+
 
         private void GetValuesToWriteFromDB(RequestGroup group)
         {

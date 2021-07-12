@@ -35,7 +35,7 @@ namespace Common
         public enum ConnStatus { Disconnected, ConnectionRetry_Delay, Connected_Ready, Connecting, Connected_Delayed }
 
 
-        public readonly static List<string> SupportedProtocols = new List<string>(new string[] { "ROC", "MODBUS","MODBUSTCP","ENRONMODBUS","BSAP","BSAPUDP"});
+        public readonly static List<string> SupportedProtocols = new List<string>(new string[] { "ROC", "MODBUS","MODBUSTCP","ENRONMODBUS","BSAP","BSAPUDP","OPC"});
         public static bool RunConsoleCommand(string command, string args, string workingDir = "")
         {
             try

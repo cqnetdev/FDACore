@@ -33,7 +33,7 @@ namespace FDA
 
         private List<Dictionary<Guid,RequestGroup>> _queuedGroups; 
 
-        private RRConnectionManager _owner;
+        private dynamic _owner;
         private List<Queue<RequestGroup>> _queues;
         //private List<CircularBuffer<RequestGroup>> _recentDequeues;
         private RequestGroup superPriorityGroup;
@@ -46,7 +46,7 @@ namespace FDA
         public delegate void QueueEmptyHandler(object sender, QueueCountEventArgs e);
         public event QueueEmptyHandler QueueEmpty;
 
-        public QueueManager(RRConnectionManager caller,int priorityCount)
+        public QueueManager(dynamic caller,int priorityCount)
         {
             _owner = caller;
             _queues = new List<Queue<RequestGroup>>();
