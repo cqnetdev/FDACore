@@ -25,10 +25,28 @@ namespace OPC
         }
 
 
-        public override OpcSubscription Subscribe(string node,int ns)
-        {
-            return _client.SubscribeDataChange("ns=" + ns + ";s=0:" + node, DataChangeReceived);
-        }
+        //public override OpcSubscription Subscribe(Common.DataSubscription subscriptionDef)
+        //{
+        //    string[] nodes = subscriptionDef.monitored_items.Split("$");
+        //    string[] nodeparts;
+        //    int ns;
+        //    string path;
+        //    List<OpcSubscribeNode> nodesList = new List<OpcSubscribeNode>();
+
+        //    foreach (string node in nodes)
+        //    {
+        //        nodeparts = node.Split(":");
+        //        ns = int.Parse(nodeparts[0]);
+        //        path = nodeparts[1];
+        //        nodesList.Add(new OpcSubscribeNode(path, ns));
+        //    }
+
+        //    OpcSubscription sub = _client.SubscribeNodes(nodesList);
+
+        //    return sub;
+
+        //    return _client.SubscribeDataChange("ns=" + ns + ";s=0:" + node, DataChangeReceived);
+        //}
 
         public override OpcValue Read(string node, int ns)
         {

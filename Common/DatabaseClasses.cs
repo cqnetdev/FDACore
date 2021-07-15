@@ -14,10 +14,26 @@ namespace Common
     {
         public Guid subscription_id { get; set; }
         public Guid source_connection_ref { get; set; }
-        public Guid datapoint_definition_ref { get; set; }
-        public string subscription_path { get; set; }
+        public Guid datapoint_definition_ref { get; set;  }
+        public string monitored_items { get { return _monitored_items; } set { _monitored_items = value; BuildDataPointLookup(value); } }
         public string destination_table { get; set; }
         public bool enabled { get; set; }
+
+        private string _monitored_items;
+
+        public Dictionary<string, Guid> datapoint_lookup = new Dictionary<string, Guid>();
+
+        private void BuildDataPointLookup(string datapointsdef)
+        {
+            string[] datapoints = datapointsdef.Split("$", StringSplitOptions.RemoveEmptyEntries);
+            string[] datapointParts;
+            foreach (string datapoint in datapoints)
+            {
+                datapointParts = datapoint.Split(":");
+                datapoint_lookup.Add(datapointParts[0] + ":" + datapointParts[1], Guid.Parse(datapointParts[2])); // lookup key is "ns:tagpath", value is Guid of datapointdefinition
+            }
+        }
+
     }
 
     public class FDADataBlockRequestGroup : ICloneable

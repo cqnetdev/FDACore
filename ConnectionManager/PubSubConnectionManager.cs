@@ -62,7 +62,7 @@ namespace FDA
         private ConnStatus _connStatus = ConnStatus.Disconnected;
         private CancellationTokenSource _connectionCancel;
         private Task _connectionTask;
-        private Dictionary<string, DataSubscription> _subscriptions = new Dictionary<string,DataSubscription>();
+        private Dictionary<Guid, DataSubscription> _subscriptions = new Dictionary<Guid,DataSubscription>();
         private Guid _connectionID;
         private string _description;
         private QueueManager _queueManager;
@@ -78,7 +78,7 @@ namespace FDA
         private OPC.Client _OPCClient;
         private string _progID;  // OPC DA only;
         private string _classID; // OPC DA only;
-        private Dictionary<string, OpcSubscription> _OpcSubLookup = new Dictionary<string, OpcSubscription>();
+        private Dictionary<Guid, OpcSubscription> _OpcSubLookup = new Dictionary<Guid, OpcSubscription>();
 
      
         public PubSubConnectionManager(Guid id, string description) 
@@ -88,8 +88,6 @@ namespace FDA
 
             _connectionID = id;
             _description = description;
-            //_connectionCancel = new CancellationTokenSource();
-            //_connectionTask = new Task(new Action(DoConnect), _connectionCancel.Token);
 
             _queueManager = new QueueManager(this, 4);
         }
@@ -112,6 +110,7 @@ namespace FDA
 
         private void ConnectAsync()
         {
+            Globals.SystemManager.LogApplicationEvent(this,"","Starting ansyc connection process");
             _connectionCancel = new CancellationTokenSource();
             _connectionTask = Task.Factory.StartNew(new Action(DoConnect), _connectionCancel.Token);
         }
@@ -149,7 +148,13 @@ namespace FDA
                     while (!result && attemptCount < MaxSocketConnectionAttempts && !_connectionCancel.IsCancellationRequested)
                     {                       
                         ConnectionStatus = ConnStatus.Connecting;
-                        result = _OPCClient.Connect();
+                        try
+                        {
+                            result = _OPCClient.Connect();
+                        } catch (Exception ex)
+                        {
+                            LogConnectionCommsEvent(attemptCount, Globals.FDANow(), connectionTimer.Elapsed, 0, "Connection '" + Description + "' failed to connect: " + ex.Message);
+                        }
                         attemptCount++;
                     }
 
@@ -182,8 +187,7 @@ namespace FDA
                         _OPCClient.DataChange += _OPCClient_DataChange;
                         _OPCClient.BreakDetected += _OPCClient_BreakDetected;
 
-                        // apply subscriptions
-                  
+                        // apply subscriptions                  
                         foreach (DataSubscription sub in _subscriptions.Values)
                         {
                             ApplySubscription(sub);
@@ -223,60 +227,32 @@ namespace FDA
             }
         }
 
-
-        private void _OPCClient_DataChange(string NodeID,int ns, OpcValue opcvalue)
+        private void _OPCClient_DataChange(OpcMonitoredItem item)//(string NodeID,int ns, OpcValue opcvalue)
         {
             DateTime data_timestamp = Globals.FDANow();
-            
-            if (!_subscriptions.ContainsKey(NodeID + ";" + ns))
+            int ns = item.NodeId.NamespaceIndex;
+            string tagpath = ns + ":" + item.NodeId.ValueAsString;
+
+            DataSubscription subscriptionInfo = (DataSubscription)item.Subscription.Tag;
+
+            Guid datapoint_reference = Guid.Empty;
+            if (subscriptionInfo.datapoint_lookup.ContainsKey(tagpath))
+            {
+                datapoint_reference = subscriptionInfo.datapoint_lookup[tagpath];
+            }
+            else
+            {
+                Globals.SystemManager.LogApplicationEvent(this, Description, "Received an OPC update for an unexpected tag '" + tagpath + "', ignoring it");
                 return;
+            }
+            DataRequest request = CreateReadDataRequest(
+                data_timestamp,
+                new List<OpcValue> { item.LastDataChange.Value },
+                new List<Guid> { datapoint_reference },
+                subscriptionInfo.destination_table
+                );
 
-            DataSubscription sub = _subscriptions[NodeID + ";" + ns];
-
-            DataRequest request = CreateReadDataRequest(data_timestamp, sub.subscription_path, sub.datapoint_definition_ref,sub.destination_table, opcvalue);
-
-            /*
-            DataRequest request = new DataRequest()
-            {
-                Protocol = "OPC",
-                ConnectionID = _connectionID,
-                MessageType = DataRequest.RequestType.Read,
-                Destination = sub.destination_table,
-                DBWriteMode = DataRequest.WriteMode.Insert,
-                GroupID = Guid.Empty,
-                RequestBytes = new byte[] { },
-                ResponseBytes = new byte[] { },
-                RequestTimestamp = data_timestamp,
-                ResponseTimestamp = data_timestamp,
-                ErrorMessage = "",
-                NodeID = sub.subscription_path
-            };
-
-            if (opcvalue.Status.IsGood)
-                request.SetStatus(DataRequest.RequestStatus.Success);
-            else
-                request.SetStatus(DataRequest.RequestStatus.Error);
-
-
-            Guid tagID = sub.datapoint_definition_ref;
-
-            Tag thisTag = new Tag(tagID)
-            {
-                Value = Convert.ToDouble(opcvalue.Value),
-                Timestamp = (DateTime)opcvalue.SourceTimestamp,
-                ProtocolDataType = DataType.UNKNOWN
-            };
-
-            if (opcvalue.Status.IsGood)
-                thisTag.Quality = 192;
-            else
-                thisTag.Quality = 0;
-
-            request.TagList.Add(thisTag);
-
-            */
-
-            TransactionLogItem logItem = new TransactionLogItem(request, 1, this.ConnectionID,Guid.Empty, 1,"1", "");
+            TransactionLogItem logItem = new TransactionLogItem(request, 1, this.ConnectionID, Guid.Empty, 1, "1", "");
             Globals.SystemManager.LogCommsEvent(logItem);
             Thread.Sleep(1);
 
@@ -285,7 +261,7 @@ namespace FDA
             DataUpdate?.Invoke(this, eventArgs);
         }
 
-        private DataRequest CreateReadDataRequest(DateTime timestamp,string path, Guid tagID,string destTable,OpcValue readResult)
+        private DataRequest CreateReadDataRequest(DateTime timestamp,List<OpcValue> readResult, List<Guid> tagID,string destTable)
         {
             DataRequest request = new DataRequest()
             {
@@ -300,27 +276,39 @@ namespace FDA
                 RequestTimestamp = timestamp,
                 ResponseTimestamp = timestamp,
                 ErrorMessage = "",
-                NodeID = path
             };
 
-            if (readResult.Status.IsGood)
-                request.SetStatus(DataRequest.RequestStatus.Success);
-            else
-                request.SetStatus(DataRequest.RequestStatus.Error);
+            request.SetStatus(DataRequest.RequestStatus.Pending);
 
-            Tag thisTag = new Tag(tagID)
+            for (int i = 0;i<readResult.Count;i++)
             {
-                Value = Convert.ToDouble(readResult.Value),
-                Timestamp = (DateTime)readResult.SourceTimestamp,
-                ProtocolDataType = DataType.UNKNOWN
-            };
+                Tag thisTag = new Tag(tagID[i])
+                {
+                    Value = Convert.ToDouble(readResult[i].Value),
+                    Timestamp = (DateTime)readResult[i].SourceTimestamp,
+                    ProtocolDataType = DataType.UNKNOWN
+                };
 
-            if (readResult.Status.IsGood)
-                thisTag.Quality = 192;
-            else
-                thisTag.Quality = 0;
+                if (readResult[i].Status.IsGood)
+                {
+                    thisTag.Quality = 192;
+                    if (request.Status != DataRequest.RequestStatus.Error)
+                        request.SetStatus(DataRequest.RequestStatus.Success);
+                    else
+                        request.SetStatus(DataRequest.RequestStatus.PartialSuccess);
+                }
+                else
+                {
+                    thisTag.Quality = 0;
+                    if (request.Status != DataRequest.RequestStatus.Success)
+                        request.SetStatus(DataRequest.RequestStatus.Error);
+                    else
+                        request.SetStatus(DataRequest.RequestStatus.PartialSuccess);
+                }
 
-            request.TagList.Add(thisTag);
+                request.TagList.Add(thisTag);
+            }
+
 
             return request;
         }
@@ -343,7 +331,7 @@ namespace FDA
                 if (_OPCClient.Connected)
                     _OPCClient.Disconnect();
 
-                _OPCClient.DataChange -= _OPCClient_DataChange;
+                //_OPCClient.DataChange -= _OPCClient_DataChange;
                 _OPCClient.Dispose();
                 _OpcSubLookup.Clear();
                 //_subscriptions.Clear();
@@ -356,72 +344,112 @@ namespace FDA
 
         public void Subscribe(DataSubscription sub) 
         {
-            _subscriptions.Add(sub.subscription_path,sub);
+            _subscriptions.Add(sub.subscription_id,sub);
 
             if (ConnectionStatus == ConnStatus.Connected_Ready)
                 ApplySubscription(sub);         
         }
 
-        
 
-        public void UnSubscribe(DataSubscription sub)
+        public void UnSubscribe(DataSubscription subdef)
         {
             if (_connType == ConnType.OPCUA || _connType == ConnType.OPCDA)
             {
-                if (_OpcSubLookup.ContainsKey(sub.subscription_path))
+                foreach (OpcSubscription opcsub in _OPCClient.Subscriptions)
                 {
-                    _OpcSubLookup[sub.subscription_path].Unsubscribe();
-                    _OpcSubLookup.Remove(sub.subscription_path);
-                    _subscriptions.Remove(sub.subscription_path);
-                    LogCommsEvent(Globals.FDANow(), "Unsubscribed from OPC tag '" + sub.subscription_path + "'");
-                }
+                    if (((DataSubscription)opcsub.Tag).subscription_id == subdef.subscription_id)
+                    {
+                        opcsub.Unsubscribe();
+                        _subscriptions.Remove(subdef.subscription_id);
+                        LogCommsEvent(Globals.FDANow(), "OPC Subscription ID " + subdef.subscription_id + " un-subscribed");
+                        return;
+                    }
+                }           
             }
         }
 
-        public void UpdateSubEnabledStatus(DataSubscription sub)
+        public void UpdateSubscription(DataSubscription subdef)
+        {
+            OpcSubscription targetSub = GetSubscription(subdef.subscription_id);
+            DataSubscription oldSubDef = null;
+            if (targetSub != null)
+            {
+                oldSubDef = (DataSubscription)targetSub.Tag;
+
+                // did the monitored items list change? // unsubscribe and re-subscribe
+                if (subdef.monitored_items != oldSubDef.monitored_items)
+                {
+                    UnSubscribe(oldSubDef);
+                    Subscribe(subdef);
+                }
+
+                // did  the subscription enabled status change?
+                if (subdef.enabled != oldSubDef.enabled)
+                {
+                   UpdateSubEnabledStatus(subdef);
+                }
+
+                // update the subscription info 
+                targetSub.Tag = subdef;
+                _subscriptions[subdef.subscription_id] = subdef;
+            }
+        }
+        
+
+        private OpcSubscription GetSubscription(Guid subID)
+        {
+            OpcSubscription targetsub = null;
+            foreach (OpcSubscription opcsub in _OPCClient.Subscriptions)
+            {
+                if (((DataSubscription)opcsub.Tag).subscription_id == subID)
+                {
+                    targetsub = opcsub;
+                    break;
+                }
+            }
+
+            return targetsub;
+        }
+
+        public void UpdateSubEnabledStatus(DataSubscription subdef)
         {
             string action = "";
+
             if (_connType == ConnType.OPCUA || _connType == ConnType.OPCDA)
             {
-                if (_OpcSubLookup.ContainsKey(sub.subscription_path))
+                OpcSubscription targetSub = GetSubscription(subdef.subscription_id);
+                if (targetSub != null)
                 {
-                    if (sub.enabled)
+                    if (subdef.enabled)
                     {
-                        _OpcSubLookup[sub.subscription_path].ChangeMonitoringMode(OpcMonitoringMode.Reporting);
+                        targetSub.ChangeMonitoringMode(OpcMonitoringMode.Reporting);
                         action = " enabled";
                     }
                     else
                     {
-                        _OpcSubLookup[sub.subscription_path].ChangeMonitoringMode(OpcMonitoringMode.Disabled);
+                        targetSub.ChangeMonitoringMode(OpcMonitoringMode.Disabled);
                         action = "disabled";
                     }
-                    LogCommsEvent(Globals.FDANow(), "OPC tag '" + sub.subscription_path + "' " + action);
+
+                    LogCommsEvent(Globals.FDANow(),"OPC Subscription ID " + subdef.subscription_id + " " + action);
                 }
             }
         }
 
-        private void ApplySubscription(DataSubscription sub)
+        private void ApplySubscription(DataSubscription subdef)
         {
             if (_connType == ConnType.OPCUA || _connType == ConnType.OPCDA)
             {
-    
-                string[] tagParts = sub.subscription_path.Split(";", StringSplitOptions.RemoveEmptyEntries);
-                int ns;
-                if (tagParts.Length > 1)
+                OpcSubscription opcSub = _OPCClient.Subscribe(subdef);
+                opcSub.Tag = subdef; 
+                if (subdef.enabled)
                 {
-                    if (int.TryParse(tagParts[1], out ns))
-                    {
-                        OpcSubscription opcsub = _OPCClient.Subscribe(tagParts[0], ns);
-
-                        // if the subscription is disabled, or communications are disabled at the connection level, set the subscription monitoring mode to 'disabled'
-                        if (!sub.enabled || !CommunicationsEnabled)
-                            opcsub.ChangeMonitoringMode(OpcMonitoringMode.Disabled);
-
-                       _OpcSubLookup.Add(sub.subscription_path, opcsub);
-                        LogCommsEvent(Globals.FDANow(), "Subscribed to OPC tag '" + sub.subscription_path + "'");
-                    }
+                    opcSub.ChangeMonitoringMode(OpcMonitoringMode.Reporting);
                 }
-                
+                else
+                {
+                    opcSub.ChangeMonitoringMode(OpcMonitoringMode.Disabled);
+                }
             }
         }
 
@@ -447,6 +475,7 @@ namespace FDA
                     if (!CommunicationsEnabled)
                     {
                         if (_connType == ConnType.OPCUA || _connType == ConnType.OPCDA)
+                        
                         // disable all OPC subscriptions
                         foreach (OpcSubscription sub in _OPCClient.Subscriptions)
                         {
@@ -456,12 +485,13 @@ namespace FDA
                     else
                     {
                         if (_connType == ConnType.OPCUA || _connType == ConnType.OPCDA)
-                            // enable all OPC subscriptions
+                            // enable OPC subscriptions that are configured to be enabled
                             foreach (OpcSubscription sub in _OPCClient.Subscriptions)
                             {
-                                sub.ChangeMonitoringMode(OpcMonitoringMode.Reporting);
+                                DataSubscription subinfo = (DataSubscription)sub.Tag;
+                                if (subinfo.enabled)
+                                    sub.ChangeMonitoringMode(OpcMonitoringMode.Reporting);
                             }
-
                     }
                     break;
             }
@@ -491,11 +521,27 @@ namespace FDA
 
         private void HandleOnDemandRequests()
         {
-            while (_queueManager.TotalQueueCount > 0 && !_DemandHandlerCancellationToken.IsCancellationRequested)
+            DataRequest dataRequest = null;
+            while (_queueManager.TotalQueueCount > 0 && !_DemandHandlerCancellationToken.IsCancellationRequested && _OPCClient.Connected)
             {
+
                 // get the next request group
                 RequestGroup reqGroup = _queueManager.GetNextRequestGroup();
+                List<Guid> datapointdefs;
+                List<OpcValue> results = _OPCClient.ReadNodes(reqGroup.DBGroupRequestConfig.DataPointBlockRequestListVals,out datapointdefs);
+ 
 
+                // Create a DataRequest object to pass back as the result
+                dataRequest = CreateReadDataRequest(Globals.FDANow(), results,datapointdefs, reqGroup.DestinationID);
+            
+
+                TransactionLogItem logItem = new TransactionLogItem(dataRequest, 1, this.ConnectionID, reqGroup.ID, results.Count, "1", "");
+                Globals.SystemManager.LogCommsEvent(logItem);
+
+
+                TransactionEventArgs eventArgs = new TransactionEventArgs(dataRequest);
+                DataUpdate?.Invoke(this, eventArgs);
+                /*
                 // break into individual requests
                 string[] requests = reqGroup.DBGroupRequestConfig.DataPointBlockRequestListVals.Split("$", StringSplitOptions.RemoveEmptyEntries);
 
@@ -527,6 +573,7 @@ namespace FDA
                         dataRequest = CreateReadDataRequest(Globals.FDANow(), path + ";" + ns, tagID, reqGroup.DestinationID, returnedResult);
                     }
 
+                   
                     TransactionLogItem logItem = new TransactionLogItem(dataRequest, 1, this.ConnectionID, reqGroup.ID, requests.Length, reqIdx.ToString(), "");
                     Globals.SystemManager.LogCommsEvent(logItem);
                     Thread.Sleep(1);
@@ -534,6 +581,7 @@ namespace FDA
                     TransactionEventArgs eventArgs = new TransactionEventArgs(dataRequest);
                     DataUpdate?.Invoke(this, eventArgs);
                 }
+                */
             }
 
         }

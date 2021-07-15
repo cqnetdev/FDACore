@@ -356,7 +356,6 @@ namespace FDA
             string changeType = notifyEvent.Notification.operation;
             DataSubscription sub = notifyEvent.Notification.row;
             SubscriptionChangeNotification(changeType, sub);
-            
         }
 
         private void _deviceDefMonitor_Notification(object sender, PostgreSQLListener<FDADevice>.PostgreSQLNotification notifyEvent)

@@ -129,7 +129,7 @@ namespace FDA
                     
                     if (sctype == "OPCDA" || sctype == "OPCUA" || sctype == "MQTT")
                     {
-                        Globals.SystemManager.LogApplicationEvent(this, "", "Creating connection mananger '" + connectionconfig.Description + "'");
+                        //Globals.SystemManager.LogApplicationEvent(this, "", "Creating connection mananger '" + connectionconfig.Description + "'");
                         // create the pubsub connection mananger
                         CreatePubSubConnectionMgr(connectionconfig);
 
@@ -212,8 +212,10 @@ namespace FDA
 
         private void CreatePubSubConnectionMgr(FDASourceConnection connectionconfig)
         {
+           Globals.SystemManager.LogApplicationEvent(this,"","CreatePubSubConnectionMgr()");
             string[] connDetails;
             PubSubConnectionManager newConn = null;
+
             switch (connectionconfig.SCType.ToUpper())
             {
                 case "OPCUA": // SCDetail01 format is  host:port
@@ -226,12 +228,12 @@ namespace FDA
                         CommsLogEnabled = connectionconfig.CommsLogEnabled,
                         MQTTEnabled = false // connectionconfig.MQTTEnabled;
                     };
-                    
+                    Globals.SystemManager.LogApplicationEvent(this, "", "Configuring manager as OPCUA " + connDetails[0] + ":" + connDetails[1]);
                     newConn.ConfigureAsOPCUA(
                         connDetails[0],             // host
                         int.Parse(connDetails[1])); // port
 
-                    // subscribe to any configured data points
+                    // subscribe to any configured data points for this connection
                     List<DataSubscription> subs = _dbManager.GetSubscriptions(connectionconfig.SCUID);
                     foreach (DataSubscription sub in subs)
                         newConn.Subscribe(sub);
@@ -252,12 +254,19 @@ namespace FDA
                         connDetails[1],             // ProgID
                         connDetails[2]);            // ClassID
 
-                
+                    // subscribe to any configured data points
+                    subs = _dbManager.GetSubscriptions(connectionconfig.SCUID);
+                    foreach (DataSubscription sub in subs)
+                        newConn.Subscribe(sub);
                     break;
             }
 
             newConn.ConnDetails = connectionconfig.SCDetail01;
             newConn.CommunicationsEnabled = connectionconfig.CommunicationsEnabled;
+
+
+            Globals.SystemManager.LogApplicationEvent(this, "", "Setting connectionenabled = " + connectionconfig.ConnectionEnabled);
+
             newConn.ConnectionEnabled = connectionconfig.ConnectionEnabled;
 
             // subscribe to "transaction complete" events from it
@@ -1041,44 +1050,26 @@ namespace FDA
         public void HandleSubscriptionChanges(ConfigEventArgs e)
         {
             DataSubscription sub = (DataSubscription)e.Item;
+            DataSubscription oldSub = (DataSubscription)e.OldItem;
 
             if (e.ChangeType == "UPDATE")
             {
-                DataSubscription oldSub = (DataSubscription)e.OldItem;
-
-                if (_PubSubConnectionsDictionary.ContainsKey(sub.source_connection_ref))
+                // did the connection reference change? will need to unsubscribe from the old connection and subscribe with the new connection
+                if (sub.source_connection_ref != oldSub.source_connection_ref)
                 {
-                   // did the connection reference change? will need to unsubscribe from the old connection and subscribe with the new connection
-                   if (sub.source_connection_ref != oldSub.source_connection_ref)
-                    {
-                        if (_PubSubConnectionsDictionary.ContainsKey(oldSub.source_connection_ref))
-                            _PubSubConnectionsDictionary[oldSub.source_connection_ref].UnSubscribe(oldSub);
+                    if (_PubSubConnectionsDictionary.ContainsKey(oldSub.source_connection_ref))
+                        _PubSubConnectionsDictionary[oldSub.source_connection_ref].UnSubscribe(oldSub);
 
-                        if (_PubSubConnectionsDictionary.ContainsKey(sub.source_connection_ref))
-                            _PubSubConnectionsDictionary[sub.source_connection_ref].Subscribe(sub);
-                    }
-
-
-                    // did the tag path change? // unsubscribe from the old path, subscribe to the new path
-                    if (sub.subscription_path != oldSub.subscription_path)
-                    {
-                        if (_PubSubConnectionsDictionary.ContainsKey(sub.source_connection_ref))
-                            _PubSubConnectionsDictionary[sub.source_connection_ref].UnSubscribe(oldSub);
-
-                        if (_PubSubConnectionsDictionary.ContainsKey(sub.source_connection_ref))
-                            _PubSubConnectionsDictionary[sub.source_connection_ref].Subscribe(sub);
-                    }
-
-                    // did  the enabled status change?
-                    if (sub.enabled != oldSub.enabled)
-                    {
-                        _PubSubConnectionsDictionary[sub.source_connection_ref].UpdateSubEnabledStatus(sub);
-                    }
-
-                    // no action required for changes to datapoint reference or destination table
-
+                    if (_PubSubConnectionsDictionary.ContainsKey(sub.source_connection_ref))
+                        _PubSubConnectionsDictionary[sub.source_connection_ref].Subscribe(sub);
                 }
-
+                else
+                {   // not a connection change, just update the existing subscription
+                    if (_PubSubConnectionsDictionary.ContainsKey(sub.source_connection_ref))
+                    {
+                        _PubSubConnectionsDictionary[sub.source_connection_ref].UpdateSubscription(sub);
+                    }
+                }
             }
 
             if (e.ChangeType == "INSERT")

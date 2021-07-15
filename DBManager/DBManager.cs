@@ -1415,7 +1415,7 @@ namespace FDA
             if (_datasubscriptionsTableExists)
             {
                 tableName = Globals.SystemManager.GetTableName("FDASubscriptions");
-                query = "select subscription_id,enabled,source_connection_ref,datapoint_definition_ref,subscription_path,destination_table from " + tableName + ";";
+                query = "select subscription_id,enabled,source_connection_ref,datapoint_definition_ref,monitored_items,destination_table from " + tableName + ";";
 
                 table = ExecuteQuery(query);
                 DataSubscription sub;
@@ -1427,7 +1427,7 @@ namespace FDA
                         enabled = (bool)row["enabled"],
                         source_connection_ref = (Guid)row["source_connection_ref"],
                         datapoint_definition_ref = (Guid)row["datapoint_definition_ref"],
-                        subscription_path = row["subscription_path"].ToString(),
+                        monitored_items = row["monitored_items"].ToString(),
                         destination_table = row["destination_table"].ToString()
                     };
 
@@ -1738,7 +1738,7 @@ namespace FDA
             string[] nulls = FindNulls(subscription);
             if (nulls.Length > 0)
             {
-                Globals.SystemManager.LogApplicationEvent(this, "", "The subscription " + subscription.subscription_path + " " + changeType.ToString().ToLower() + " was rejected, null values in field(s) " + string.Join(",", nulls));
+                Globals.SystemManager.LogApplicationEvent(this, "", "The subscription " + subscription.subscription_id + " " + changeType.ToString().ToLower() + " was rejected, null values in field(s) " + string.Join(",", nulls));
                 return;
             }
 
@@ -1754,8 +1754,8 @@ namespace FDA
                 case "DELETE":
                     if (_dataSubscriptionsConfig.ContainsKey(subscription.subscription_id))
                     {
-                        _dataSubscriptionsConfig.Remove(subscription.subscription_id); 
-                        action = "deleted"; 
+                        _dataSubscriptionsConfig.Remove(subscription.subscription_id);
+                        action = "deleted";
                     }
                     else
                     {
@@ -1769,23 +1769,21 @@ namespace FDA
                         olditem = _dataSubscriptionsConfig[subscription.subscription_id];
                         _dataSubscriptionsConfig[subscription.subscription_id] = subscription;
                         action = "updated";
-                    }                  
+                    }
                     else
                     {
-                        _dataSubscriptionsConfig.Add(subscription.subscription_id,subscription);
+                        _dataSubscriptionsConfig.Add(subscription.subscription_id, subscription);
                         action = "not found, adding it as a new subscription";
                     }
-                    
+
 
                     break;
                 default: action = "<action>"; break;
             }
 
-            Globals.SystemManager.LogApplicationEvent(this, "", "Data subscription '" + subscription.subscription_path + "' was " + action);
+            Globals.SystemManager.LogApplicationEvent(this, "", "Data subscription '" + subscription.subscription_id + "' was " + action);
 
             RaiseConfigChangeEvent(changeType, "FDASubscriptions", subscription, olditem);
-
-
         }
 
         protected void UserScriptChangeNotification(string changeType, UserScriptDefinition scriptModule)
