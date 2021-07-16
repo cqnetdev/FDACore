@@ -3,7 +3,7 @@ using Opc.UaFx.Client;
 using System;
 using System.Collections.Generic;
 using System.Text;
-
+using System.Threading.Tasks;
 namespace OPC
 {
   
@@ -33,7 +33,8 @@ namespace OPC
         public bool Connect()
         {
             bool result = true;
-            _client.Connect(); 
+            _client.Connect();
+            _client.SessionTimeout = 120000;
 
             Connected = result;
 
@@ -46,10 +47,7 @@ namespace OPC
         protected void RegisterForClientEvents()
         {
             _client.KeepAlive.Updated += KeepAlive_Updated;
-            _client.DataChangeReceived += DataChangeReceived;
         }
-
-     
 
         private void KeepAlive_Updated(object sender, EventArgs e)
         {
@@ -118,23 +116,59 @@ namespace OPC
             int ns;
             string path;
             List<OpcSubscribeNode> nodesList = new List<OpcSubscribeNode>();
-            OpcSubscribeNode thisNode;
 
+            OpcDataChangeFilter filter;
+            if (subscriptionDef.report_on_timestamp_change)
+                filter = new OpcDataChangeFilter(OpcDataChangeTrigger.StatusValueTimestamp);
+            else
+                filter = new OpcDataChangeFilter(OpcDataChangeTrigger.StatusValue);
+
+            switch (subscriptionDef.deadband_type.ToLower())
+            {
+                case "percent": filter.DeadbandType = OpcDeadbandType.Percent; break;
+                case "absolute": filter.DeadbandType = OpcDeadbandType.Absolute; break;
+                default: filter.DeadbandType = OpcDeadbandType.None; break;
+            }
+            filter.DeadbandValue = subscriptionDef.deadband;
+            
+            // create an empty subscription
+            OpcSubscription sub = _client.SubscribeNodes();
+
+            // create a monitoredItem for each tag to be monitored and add it to the subscription
+            OpcMonitoredItem thisItem;
             foreach (string node in nodes)
             {
                 nodeparts = node.Split(":");
                 ns = int.Parse(nodeparts[0]);
                 path = nodeparts[1];
-                thisNode = new OpcSubscribeNode(path, ns);
-            
-                nodesList.Add(thisNode);
+                thisItem = new OpcMonitoredItem(new OpcNodeId(path, ns),OpcAttribute.Value);
+                thisItem.DataChangeReceived += DataChangeReceived;
+                thisItem.Tag = Guid.Parse(nodeparts[2]);
+                thisItem.Filter = filter;
+                sub.AddMonitoredItem(thisItem);
             }
 
-            OpcSubscription sub = _client.SubscribeNodes(nodesList);
-           
+            //set the interval (milliseconds, 0 = whenever the value changes)
+            sub.PublishingInterval = subscriptionDef.interval;
+            sub.PublishingIsEnabled = true;
+            
+            // make the server aware of the changes to the subscription
+            sub.ApplyChanges();
+
+            // set the Tag property of the subscription to the DataSubscription object that came from the database for later reference
             sub.Tag = subscriptionDef;
+
+            // set the subscription-enabled status
+            if (subscriptionDef.enabled)
+                sub.ChangeMonitoringMode(OpcMonitoringMode.Reporting);
+            else
+                sub.ChangeMonitoringMode(OpcMonitoringMode.Disabled);
+
+            sub.StartPublishing();
+
             return sub;
         }
+
 
         protected void DataChangeReceived(object sender, OpcDataChangeReceivedEventArgs e)
         {

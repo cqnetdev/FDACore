@@ -78,7 +78,7 @@ namespace Common
             PreciseTime ft;
             GetSystemTimePreciseAsFileTime(out ft);
             */
-            return DateTime.Now.AddHours(UTCOffset);
+            return DateTime.UtcNow.AddHours(UTCOffset);
         }
 
         public static bool DetailedMessaging = false;

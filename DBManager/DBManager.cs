@@ -1415,7 +1415,7 @@ namespace FDA
             if (_datasubscriptionsTableExists)
             {
                 tableName = Globals.SystemManager.GetTableName("FDASubscriptions");
-                query = "select subscription_id,enabled,source_connection_ref,datapoint_definition_ref,monitored_items,destination_table from " + tableName + ";";
+                query = "select subscription_id,enabled,source_connection_ref,monitored_items,destination_table,interval,deadband_type,deadband from " + tableName + ";";
 
                 table = ExecuteQuery(query);
                 DataSubscription sub;
@@ -1426,9 +1426,11 @@ namespace FDA
                         subscription_id = (Guid)row["subscription_id"],
                         enabled = (bool)row["enabled"],
                         source_connection_ref = (Guid)row["source_connection_ref"],
-                        datapoint_definition_ref = (Guid)row["datapoint_definition_ref"],
                         monitored_items = row["monitored_items"].ToString(),
-                        destination_table = row["destination_table"].ToString()
+                        destination_table = row["destination_table"].ToString(),
+                        interval = (int)row["interval"],
+                        deadband_type = row["deadband_type"].ToString(),
+                        deadband = (Double)row["deadband"]
                     };
 
   

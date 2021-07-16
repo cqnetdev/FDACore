@@ -235,20 +235,20 @@ namespace FDA
 
             DataSubscription subscriptionInfo = (DataSubscription)item.Subscription.Tag;
 
-            Guid datapoint_reference = Guid.Empty;
-            if (subscriptionInfo.datapoint_lookup.ContainsKey(tagpath))
-            {
-                datapoint_reference = subscriptionInfo.datapoint_lookup[tagpath];
-            }
-            else
-            {
-                Globals.SystemManager.LogApplicationEvent(this, Description, "Received an OPC update for an unexpected tag '" + tagpath + "', ignoring it");
-                return;
-            }
+            Guid datapoint_reference = (Guid)item.Tag;
+            //if (subscriptionInfo.datapoint_lookup.ContainsKey(tagpath))
+            //{
+            //    datapoint_reference = subscriptionInfo.datapoint_lookup[tagpath];
+            //}
+            //else
+            //{
+            //    Globals.SystemManager.LogApplicationEvent(this, Description, "Received an OPC update for an unexpected tag '" + tagpath + "', ignoring it");
+            //    return;
+            //}
             DataRequest request = CreateReadDataRequest(
                 data_timestamp,
                 new List<OpcValue> { item.LastDataChange.Value },
-                new List<Guid> { datapoint_reference },
+                new List<Guid> {datapoint_reference},
                 subscriptionInfo.destination_table
                 );
 
@@ -389,12 +389,49 @@ namespace FDA
                    UpdateSubEnabledStatus(subdef);
                 }
 
+                // did the interval change?
+                if (subdef.interval != oldSubDef.interval)
+                {
+                    targetSub.PublishingInterval = subdef.interval;
+                }
+
+                // did the filter change? (deadband_type, deadband value or trigger type)
+                if (subdef.deadband_type != oldSubDef.deadband_type || subdef.deadband != oldSubDef.deadband || subdef.report_on_timestamp_change != oldSubDef.report_on_timestamp_change)
+                {
+                    OpcDataChangeFilter filter = CreateOpcFilter(subdef);
+
+                    foreach (OpcMonitoredItem item in targetSub.MonitoredItems)
+                        item.Filter = filter;
+                }    
+
                 // update the subscription info 
                 targetSub.Tag = subdef;
                 _subscriptions[subdef.subscription_id] = subdef;
+
+                targetSub.ApplyChanges();
             }
         }
         
+        private OpcDataChangeFilter CreateOpcFilter(DataSubscription subdef)
+        {
+            OpcDataChangeTrigger trigger;
+            if (subdef.report_on_timestamp_change)
+                trigger = OpcDataChangeTrigger.StatusValueTimestamp;
+            else
+                trigger = OpcDataChangeTrigger.StatusValue;
+
+            OpcDataChangeFilter filter = new OpcDataChangeFilter(trigger);
+            switch (subdef.deadband_type.ToLower())
+            {
+                case "percent": filter.DeadbandType = OpcDeadbandType.Percent; break;
+                case "absolute": filter.DeadbandType = OpcDeadbandType.Absolute; break;
+                default: filter.DeadbandType = OpcDeadbandType.None; break;
+            }
+
+            filter.DeadbandValue = subdef.deadband;
+
+            return filter;
+        }
 
         private OpcSubscription GetSubscription(Guid subID)
         {
@@ -420,10 +457,13 @@ namespace FDA
                 OpcSubscription targetSub = GetSubscription(subdef.subscription_id);
                 if (targetSub != null)
                 {
+                    targetSub.PublishingIsEnabled = subdef.enabled;
+                    targetSub.ApplyChanges();
+
                     if (subdef.enabled)
                     {
                         targetSub.ChangeMonitoringMode(OpcMonitoringMode.Reporting);
-                        action = " enabled";
+                        action = "enabled";
                     }
                     else
                     {
@@ -431,8 +471,8 @@ namespace FDA
                         action = "disabled";
                     }
 
-                    LogCommsEvent(Globals.FDANow(),"OPC Subscription ID " + subdef.subscription_id + " " + action);
-                }
+                    LogCommsEvent(Globals.FDANow(), "OPC Subscription ID " + subdef.subscription_id + " " + action);
+                }              
             }
         }
 
@@ -441,15 +481,7 @@ namespace FDA
             if (_connType == ConnType.OPCUA || _connType == ConnType.OPCDA)
             {
                 OpcSubscription opcSub = _OPCClient.Subscribe(subdef);
-                opcSub.Tag = subdef; 
-                if (subdef.enabled)
-                {
-                    opcSub.ChangeMonitoringMode(OpcMonitoringMode.Reporting);
-                }
-                else
-                {
-                    opcSub.ChangeMonitoringMode(OpcMonitoringMode.Disabled);
-                }
+                
             }
         }
 
