@@ -9,31 +9,36 @@ using Common;
 namespace FDA
 {
 
-    public class ScriptableConnection : ScriptableObject
+    public class ScriptablePubSubConnection : ScriptableObject
     {
-        public static List<ScriptableConnection> WrapConn(Dictionary<Guid, RRConnectionManager> toWrap)
+        public static List<ScriptablePubSubConnection> WrapConn(Dictionary<Guid, PubSubConnectionManager> toWrap)
         {
-            List<ScriptableConnection> output = new List<ScriptableConnection>();
-            foreach (RRConnectionManager connMgr in toWrap.Values)
+            List<ScriptablePubSubConnection> output = new List<ScriptablePubSubConnection>();
+            foreach (PubSubConnectionManager connMgr in toWrap.Values)
             {
-                output.Add(new ScriptableConnection(connMgr));
+                output.Add(new ScriptablePubSubConnection(connMgr));
             }
 
             return output;
         }
 
-        private RRConnectionManager _connMgr;
+   
+
+
+        private PubSubConnectionManager _connMgr;
+
 
         public bool ConnectionEnabled { get => _connMgr.ConnectionEnabled; set { _connMgr.ConnectionEnabled = value; OnPropertyChanged(); } }
         public bool CommsEnabled { get => _connMgr.CommunicationsEnabled; set { _connMgr.CommunicationsEnabled = value; OnPropertyChanged(); } }
 
         public override event PropertyChangedEventHandler PropertyChanged;
 
-        public ScriptableConnection(RRConnectionManager connMgr) : base(connMgr.ID)
+        public ScriptablePubSubConnection(PubSubConnectionManager connMgr) : base(connMgr.ID)
         {
             _connMgr = connMgr;
             _connMgr.PropertyChanged += ConnMgr_PropertyChanged;
         }
+
 
         private void ConnMgr_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
@@ -46,3 +51,4 @@ namespace FDA
         }
     }
 }
+

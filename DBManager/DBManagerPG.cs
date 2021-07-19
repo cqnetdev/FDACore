@@ -18,6 +18,7 @@ namespace FDA
         PostgreSQLListener<FDADevice> _deviceDefMonitor;
         PostgreSQLListener<FDATask> _taskDefMonitor;
         PostgreSQLListener<DataSubscription> _datasubscriptionMonitor;
+        PostgreSQLListener<UserScriptDefinition> _userScriptsMonitor;
 
         // constructor
         public DBManagerPG(string connString) : base(connString)
@@ -222,6 +223,8 @@ namespace FDA
                 _taskDefMonitor = new PostgreSQLListener<FDATask>(ConnectionString, Globals.SystemManager.GetTableName("FDATasks"));
             if (_datasubscriptionsTableExists)
                 _datasubscriptionMonitor = new PostgreSQLListener<DataSubscription>(ConnectionString, Globals.SystemManager.GetTableName("FDASubscriptions"));
+            if (_scriptsTableExists)
+                _userScriptsMonitor = new PostgreSQLListener<UserScriptDefinition>(ConnectionString, Globals.SystemManager.GetTableName("fda_scripts"));
 
             _demandMonitor.Notification += _demandMonitor_Notification;
             _schedMonitor.Notification += _schedMonitor_Notification;
@@ -234,6 +237,8 @@ namespace FDA
                 _deviceDefMonitor.Notification += _deviceDefMonitor_Notification;
             if (_taskDefMonitor != null)
                 _taskDefMonitor.Notification += _taskDefMonitor_Notification;
+            if (_userScriptsMonitor != null)
+                _userScriptsMonitor.Notification += _userScriptsMonitor_Notification;
 
             _demandMonitor.Error += _PostgresSQLMonitor_Error;
             _schedMonitor.Error += _PostgresSQLMonitor_Error;
@@ -246,6 +251,8 @@ namespace FDA
                 _taskDefMonitor.Error += _PostgresSQLMonitor_Error;
             if (_datasubscriptionMonitor != null)
                 _datasubscriptionMonitor.Error += _PostgresSQLMonitor_Error;
+            if (_userScriptsMonitor != null)
+                _userScriptsMonitor.Error += _PostgresSQLMonitor_Error;
 
             StartChangeMonitoring();
 
@@ -254,8 +261,6 @@ namespace FDA
             
 
         }
-
-    
 
 
         private void _PostgresSQLMonitor_Error(object sender,Exception e)
@@ -315,6 +320,8 @@ namespace FDA
                     _taskDefMonitor?.StartListening();
                 if (_datasubscriptionsTableExists)
                     _datasubscriptionMonitor?.StartListening();
+                if (_scriptsTableExists)
+                    _userScriptsMonitor?.StartListening();
             }
             catch (Exception ex)
             {
@@ -337,12 +344,25 @@ namespace FDA
                 _deviceDefMonitor?.StopListening();
             if (_datasubscriptionsTableExists)
                 _datasubscriptionMonitor?.StopListening();
+            if (_scriptsTableExists)
+                _userScriptsMonitor?.StopListening();
             Globals.SystemManager.LogApplicationEvent(this, "", "Database change monitoring stopped");
         }
 
 
 
         #region PostgreSQL table change events
+
+
+
+
+        private void _userScriptsMonitor_Notification(object sender, PostgreSQLListener<UserScriptDefinition>.PostgreSQLNotification notifyEvent)
+        {
+            string changeType = notifyEvent.Notification.operation;
+            UserScriptDefinition script = notifyEvent.Notification.row;
+            UserScriptChangeNotification(changeType, script);
+        }
+
         private void _taskDefMonitor_Notification(object sender, PostgreSQLListener<FDATask>.PostgreSQLNotification notifyEvent)
         {
             string changeType = notifyEvent.Notification.operation;
@@ -418,6 +438,8 @@ namespace FDA
             _requestGroupDefMonitor?.StopListening();
             _connectionDefMonitor?.StopListening();
             _datasubscriptionMonitor?.StopListening();
+            _userScriptsMonitor?.StopListening();
+
 
             _demandMonitor?.Dispose();
             _schedMonitor?.Dispose();
@@ -425,6 +447,7 @@ namespace FDA
             _requestGroupDefMonitor?.Dispose();
             _connectionDefMonitor?.Dispose();
             _datasubscriptionMonitor?.Dispose();
+            _userScriptsMonitor?.Dispose();
 
             // general disposal
             base.Dispose();

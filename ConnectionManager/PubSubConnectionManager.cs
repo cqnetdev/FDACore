@@ -339,7 +339,7 @@ namespace FDA
          
             _OPCClient = null;
 
-            ConnectionStatus = ConnStatus.Disconnected;
+            //ConnectionStatus = ConnStatus.Disconnected;
         }
 
         public void Subscribe(DataSubscription sub) 
@@ -487,6 +487,7 @@ namespace FDA
 
         private void HandlePropertyChanged([CallerMemberName] string propertyName = "", long timestamp = 0)
         {
+            
             // raise a property changed event (for property changes that don't require special handling)
             NotifyPropertyChanged(propertyName, timestamp);
 

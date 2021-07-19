@@ -101,7 +101,8 @@ namespace FDA
                 _dbManager.Initialize();
 
                 // load the initial configuration
-                _dbManager.LoadConfig();          
+                _dbManager.LoadConfig();
+
 
                 Globals.SystemManager.LogApplicationEvent(this, "", "FDA initialization complete");
 
@@ -199,7 +200,8 @@ namespace FDA
                 Scripter.ScriptTriggered += HandleUserScriptExecutedEvent;
                 Scripter.RunTimeError += HandleUserScriptRuntimeError;
                 Scripter.CompileError += HandleUserScriptCompileError;
-                Scripter.AddScriptableObject(ScriptableConnection.WrapConn(_RRconnectionsDictionary));
+                Scripter.AddScriptableObject(ScriptableRRConnection.WrapConn(_RRconnectionsDictionary));
+                Scripter.AddScriptableObject(ScriptablePubSubConnection.WrapConn(_PubSubConnectionsDictionary));
                 Scripter.AddScriptableObject(ScriptableTag.WrapDPD(_dbManager.GetAllTagDefs()));
                 LoadUserScripts();
                 Scripter.Enabled = true;
