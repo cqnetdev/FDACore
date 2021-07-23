@@ -1,11 +1,11 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <TargetFramework>net5.0</TargetFramework>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Opc.UaFx.Advanced" Version="2.18.2" />
+    <PackageReference Include="Opc.UaFx.Advanced" Version="2.18.3" />
     <PackageReference Include="OPCFoundation.NetStandard.Opc.Ua" Version="1.4.366.38" />
   </ItemGroup>
 

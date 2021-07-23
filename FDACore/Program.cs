@@ -63,13 +63,13 @@ namespace FDAApp
             [DllImport("kernel32.dll", SetLastError = true)] public static extern bool SetConsoleMode(IntPtr hConsoleHandle, int ioMode);
             [DllImport("Kernel32.dll", SetLastError = true)] public static extern IntPtr GetStdHandle(int nStdHandle);
         }
-        
 
-              
+
+
 
         //static ConsoleEventDelegate handler;   // Keeps it from getting garbage collected
-       // private delegate bool ConsoleEventDelegate(int eventType);
-
+        // private delegate bool ConsoleEventDelegate(int eventType);
+    
 
         /// <summary>
         /// The main entry point for the application.
@@ -100,10 +100,7 @@ namespace FDAApp
             Globals.ExecutionTime = Globals.FDANow();
 
             // get the FDA version string
-            string exePath = System.Reflection.Assembly.GetEntryAssembly().Location;
-            FileVersionInfo versionInfo = FileVersionInfo.GetVersionInfo(exePath);
-            Console.Title = "FDA version " + versionInfo.FileVersion;
-            Globals.FDAVersion = versionInfo.FileVersion;
+            Globals.FDAVersion = Assembly.GetEntryAssembly().GetName().Version.ToString();
 
             // load the configuration from appsettings.json file
             string FDAID;
@@ -237,8 +234,8 @@ namespace FDAApp
                 FDASystemManager systemManager;
                 switch (DBType.ToUpper())
                 {
-                    case "POSTGRESQL": systemManager = new FDASystemManagerPG(DBInstance, DBName, userName, userPass, versionInfo.FileVersion, ExecutionID); break;
-                    case "SQLSERVER": systemManager = new FDASystemManagerSQL(DBInstance, DBName, userName, userPass, versionInfo.FileVersion, ExecutionID); break;
+                    case "POSTGRESQL": systemManager = new FDASystemManagerPG(DBInstance, DBName, userName, userPass,Globals.FDAVersion, ExecutionID); break;
+                    case "SQLSERVER": systemManager = new FDASystemManagerSQL(DBInstance, DBName, userName, userPass,Globals.FDAVersion, ExecutionID); break;
                     default:
                         LogEvent("Unrecognized database server type '" + DBType + "'. Should be 'POSTGRESQL' or 'SQLSERVER'");
                         return;
@@ -248,7 +245,7 @@ namespace FDAApp
 
                 Dictionary<string, FDAConfig> options = systemManager.GetAppConfig();
 
-                systemManager.LogStartup(ExecutionID, Globals.FDANow(), versionInfo.FileVersion);
+                systemManager.LogStartup(ExecutionID, Globals.FDANow(), Globals.FDAVersion);
 
                 // set the "detailed messaging" flag
                 if (options.ContainsKey("DetailedMessaging"))
@@ -276,6 +273,7 @@ namespace FDAApp
                 // create a DBManager of the selected type
                 string FDADBConnString = systemManager.GetAppDBConnectionString();
                 DBManager dbManager;
+                Console.WriteLine("Connecting to the " + DBType + " database");
                 switch (DBType.ToUpper())
                 {
                     case "SQLSERVER": dbManager = new DBManagerSQL(FDADBConnString); break;
@@ -285,6 +283,7 @@ namespace FDAApp
                         return;
                 }
 
+                Console.WriteLine("Starting the Data Acquisition Manager");
                 // start the DataAcqManager             
                 _dataAquisitionManager = new DataAcqManager(FDAID, dbManager, ExecutionID);
 

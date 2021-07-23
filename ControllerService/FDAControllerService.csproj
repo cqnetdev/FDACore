@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.Worker">
 
   <PropertyGroup>
-    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <TargetFramework>net5.0</TargetFramework>
     <UserSecretsId>dotnet-ControllerService-C405C806-E22B-4964-8DC9-69A7E6C707DA</UserSecretsId>
     <AssemblyName>FDAControllerService</AssemblyName>
   </PropertyGroup>
