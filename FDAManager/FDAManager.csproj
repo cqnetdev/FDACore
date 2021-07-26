@@ -1,0 +1,80 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net5.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="Resources\executetriangle.png" />
+    <None Remove="Resources\ManagerGray.ico" />
+    <None Remove="Resources\ManagerGreen.ico" />
+    <None Remove="Resources\ManagerRed.ico" />
+    <None Remove="Resources\ManagerYellow.ico" />
+    <None Remove="Resources\yellow.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\executetriangle.png" />
+    <EmbeddedResource Include="Resources\ManagerGray.ico" />
+    <EmbeddedResource Include="Resources\ManagerGreen.ico" />
+    <EmbeddedResource Include="Resources\ManagerRed.ico" />
+    <EmbeddedResource Include="Resources\ManagerYellow.ico" />
+    <EmbeddedResource Include="Resources\yellow.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="M2Mqtt" Version="4.3.0" />
+    <PackageReference Include="Maikebing.System.Windows.Forms.DataVisualization" Version="5.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.FileExtensions" Version="5.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="5.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="frmAddFDADialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="frmColumnSelector.Designer.cs">
+      <DependentUpon>frmColumnSelector.cs</DependentUpon>
+    </Compile>
+    <Compile Update="frmCommsStats.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="frmMain2.cs">
+      <SubType>Form</SubType>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Update="frmAddFDADialog.resx">
+      <DependentUpon>frmAddFDADialog.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Update="frmCommsStats.resx">
+      <DependentUpon>frmCommsStats.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Update="frmCommsViewer.resx">
+      <DependentUpon>frmCommsViewer.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Update="frmMain2.resx">
+      <SubType>Designer</SubType>
+      <DependentUpon>frmMain2.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Update="frmRowDetails.resx">
+      <DependentUpon>frmRowDetails.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Update="frmTransactions.resx">
+      <DependentUpon>frmTransactions.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Update="SuperSpecialPictureBox.resx">
+      <DependentUpon>SuperSpecialPictureBox.cs</DependentUpon>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>
