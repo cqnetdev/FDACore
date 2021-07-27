@@ -110,7 +110,6 @@ namespace FDA
 
         private void ConnectAsync()
         {
-            Globals.SystemManager.LogApplicationEvent(this,"","Starting ansyc connection process");
             _connectionCancel = new CancellationTokenSource();
             _connectionTask = Task.Factory.StartNew(new Action(DoConnect), _connectionCancel.Token);
         }

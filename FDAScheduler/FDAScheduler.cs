@@ -82,10 +82,10 @@ namespace FDA
     }
 
     //******************************************************************** Oneshot scheduler *******************************************
-    public class FDASchedulerOnshot : FDAScheduler
+    public class FDASchedulerOneshot : FDAScheduler
     {
         private int delayms = 500;
-        public FDASchedulerOnshot(Guid TimerID, string description, List<RequestGroup> RequestGroupList, List<FDATask> tasksList,bool suppressExecution=false) : base(TimerID, description, RequestGroupList, tasksList)
+        public FDASchedulerOneshot(Guid TimerID, string description, List<RequestGroup> RequestGroupList, List<FDATask> tasksList,bool suppressExecution=false) : base(TimerID, description, RequestGroupList, tasksList)
         {
             ScheduleType = ScheduleType.OneShot;
             if (!suppressExecution)
