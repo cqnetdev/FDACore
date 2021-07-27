@@ -15,6 +15,8 @@ using System.Text.Json;
 using System.Reflection;
 using Microsoft.Extensions.Configuration;
 
+
+
 namespace FDAManager
 {
     public class ConnectionHistory
@@ -609,6 +611,7 @@ namespace FDAManager
                     string statusJson = SendCommandToFDAController("FDASTATUS\0");
                     Status = FDAStatus.Deserialize(statusJson);
 
+                    Console.WriteLine("FDA status update received from the controller: " + Status.RunStatus);
                     // and update the GUI, if it's open
                     _mainForm?.SetFDAStatus(Status);
 

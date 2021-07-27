@@ -681,6 +681,10 @@ namespace FDAApp
                     Globals.MQTT = null;
                 }
             }
+            
+            // set the status to stopped and wait 4 seconds to allow the controller to request and receive the stopped state
+            Globals.FDAStatus = Globals.AppState.Stopped;
+            Thread.Sleep(4000);
 
             // stop the control server
             _FDAControlServer.Dispose();
