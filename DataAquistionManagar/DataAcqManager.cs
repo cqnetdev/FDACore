@@ -16,7 +16,7 @@ namespace FDA
     {
         public static Dictionary<Guid, RRConnectionManager> _RRconnectionsDictionary;
         public static Dictionary<Guid, PubSubConnectionManager> _PubSubConnectionsDictionary;
-        private Dictionary<Guid,FDAScheduler> _schedulersDictionary;
+        private readonly Dictionary<Guid,FDAScheduler> _schedulersDictionary;
         private string _dbConnectionString;
         private readonly DBManager _dbManager;
 
@@ -33,7 +33,7 @@ namespace FDA
         // temporary test variable
         //private bool firstGoAround = true;
 
-        public DataAcqManager(string FDAID,DBManager dbManager,Guid executionID)
+        public DataAcqManager(DBManager dbManager,Guid executionID)
         {
             _dbManager = dbManager;
 
@@ -77,7 +77,7 @@ namespace FDA
             Globals.SystemManager.LogApplicationEvent(Globals.FDANow(),"Script", "", "User script " + scriptID + "() executed");
         }
 
-        public int GetTotalQueueCounts()
+        public static int GetTotalQueueCounts()
         {
             int count = 0;
             foreach (RRConnectionManager mgr in _RRconnectionsDictionary.Values)
@@ -119,7 +119,7 @@ namespace FDA
                 // create connection objects for each DSSourceConnection            
                 List<FDASourceConnection> ConnectionList = _dbManager.GetAllConnectionconfigs();
 
-                List<Task> taskList = new List<Task>();
+                List<Task> taskList = new();
                 foreach (FDASourceConnection connectionconfig in ConnectionList)
                 {
                     string sctype = connectionconfig.SCType.ToUpper();
@@ -145,7 +145,7 @@ namespace FDA
                 // create timers for each Schedule
                 try
                 {
-                    Random rnd = new Random(DateTime.Now.Millisecond);
+                    Random rnd = new(DateTime.Now.Millisecond);
                     foreach (FDARequestGroupScheduler sched in _dbManager.GetAllSched())
                     {
 
@@ -261,9 +261,6 @@ namespace FDA
             newConn.ConnDetails = connectionconfig.SCDetail01;
             newConn.CommunicationsEnabled = connectionconfig.CommunicationsEnabled;
 
-
-            Globals.SystemManager.LogApplicationEvent(this, "", "Setting connectionenabled = " + connectionconfig.ConnectionEnabled);
-
             newConn.ConnectionEnabled = connectionconfig.ConnectionEnabled;
 
             // subscribe to "transaction complete" events from it
@@ -377,8 +374,7 @@ namespace FDA
             Dictionary<string, UserScriptDefinition> modules = _dbManager.GetUserScripts();
 
             //get a the list of scripts and sort them by the load_order
-            List<string> loadedScripts = new List<string>();
-            List<UserScriptDefinition> sortedScriptDef = new List<UserScriptDefinition>(modules.Values);
+            List<UserScriptDefinition> sortedScriptDef = new(modules.Values);
             sortedScriptDef.Sort();
 
             foreach (UserScriptDefinition scriptDef in sortedScriptDef)
@@ -408,34 +404,34 @@ namespace FDA
             }
         }
 
-        public void PublishUpdatedConnectionsList()
+        public static void PublishUpdatedConnectionsList()
         {
-            StringBuilder sb = new StringBuilder();
+            StringBuilder sb = new();
             ushort[] Qcounts;
             if (_RRconnectionsDictionary != null)
             {
                 foreach (KeyValuePair<Guid, RRConnectionManager> kvp in DataAcqManager._RRconnectionsDictionary)
                 {
                     sb.Append(kvp.Value.ConnectionStatus.ToString());
-                    sb.Append(".");
+                    sb.Append('.');
                     sb.Append(kvp.Value.Description);
-                    sb.Append(".");
+                    sb.Append('.');
                     sb.Append(kvp.Key.ToString());
-                    sb.Append(".");
+                    sb.Append('.');
                     sb.Append(kvp.Value.ConnectionEnabled ? 1 : 0);
-                    sb.Append(".");
+                    sb.Append('.');
                     sb.Append(kvp.Value.CommunicationsEnabled ? 1 : 0);
-                    sb.Append(".");
+                    sb.Append('.');
                     Qcounts = kvp.Value._queueManager.GetQueueCounts();
                     foreach (ushort count in Qcounts)
                     {
                         sb.Append(count);
-                        sb.Append(".");
+                        sb.Append('.');
                     }
                     //remove the last .
                     if (sb.Length > 0)
                         sb.Remove(sb.Length - 1, 1);
-                    sb.Append("|");
+                    sb.Append('|');
                 }
             }
             //remove the last |
@@ -1052,7 +1048,7 @@ namespace FDA
             }
         }      
 
-        public void HandleSubscriptionChanges(ConfigEventArgs e)
+        public static void HandleSubscriptionChanges(ConfigEventArgs e)
         {
             DataSubscription sub = (DataSubscription)e.Item;
             DataSubscription oldSub = (DataSubscription)e.OldItem;
@@ -1232,11 +1228,10 @@ namespace FDA
         private void UpdatePubSubConnection(PubSubConnectionManager conn, FDASourceConnection updatedConfig)
         {
             // ---------------------------------- Handle SCType changes ----------------------------------
-            bool isValidConnType = true;
+            bool isValidConnType;
             if (conn.ConnectionType.ToString().ToUpper() != updatedConfig.SCType.ToUpper())
             {
-                object connType;
-                isValidConnType = Enum.TryParse(typeof(PubSubConnectionManager.ConnType), updatedConfig.SCType, out connType);
+                isValidConnType = Enum.TryParse(typeof(PubSubConnectionManager.ConnType), updatedConfig.SCType, out object connType);
 
                 if (isValidConnType)
                 {
@@ -1245,8 +1240,7 @@ namespace FDA
                 else
                 {
                     // check if its a valid conn type for an RR connection
-                    object RRconnType;
-                    isValidConnType = Enum.TryParse(typeof(RRConnectionManager.ConnType), updatedConfig.SCType, out RRconnType);
+                    isValidConnType = Enum.TryParse(typeof(RRConnectionManager.ConnType), updatedConfig.SCType, out _);
 
                     if (isValidConnType)
                     {
@@ -1305,11 +1299,10 @@ namespace FDA
         private void UpdateRRConnection(RRConnectionManager conn,FDASourceConnection updatedConfig)
         {
             // SCType has changed
-            bool isValidConnType = true;
+            bool isValidConnType;
             if (conn.ConnectionType.ToString().ToUpper() != updatedConfig.SCType.ToUpper())
-            {
-                object connType;
-                isValidConnType = Enum.TryParse(typeof(RRConnectionManager.ConnType), updatedConfig.SCType, out connType);
+            { 
+                isValidConnType = Enum.TryParse(typeof(RRConnectionManager.ConnType), updatedConfig.SCType, out object connType);
 
                 if (isValidConnType)
                 {
@@ -1318,8 +1311,8 @@ namespace FDA
                 else
                 {
                     // check if its a valid conn type for a PubSub connection
-                    object PubSubconnType;
-                    isValidConnType = Enum.TryParse(typeof(PubSubConnectionManager.ConnType), updatedConfig.SCType, out PubSubconnType);
+                    
+                    isValidConnType = Enum.TryParse(typeof(PubSubConnectionManager.ConnType), updatedConfig.SCType, out _);
 
                     if (isValidConnType)
                     {
@@ -1513,7 +1506,7 @@ namespace FDA
         /// <param name="requestor"></param>
         private List<RequestGroup> ValidateRequestedGroups(List<RequestGroup> groupstoValidate,string requestor)
         {
-            List<RequestGroup> goodGroups = new List<RequestGroup>(groupstoValidate);
+            List<RequestGroup> goodGroups = new(groupstoValidate);
             List<RequestGroup> badGroups = null;
 
 
@@ -1775,7 +1768,7 @@ namespace FDA
             group.writeLookup.Keys.CopyTo(keys, 0);
             group.writeLookup.Values.CopyTo(values, 0);
 
-            Dictionary<Guid, double> updated = new Dictionary<Guid, double>();
+            Dictionary<Guid, double> updated = new();
 
             for (int i=0;i<keys.Length;i++)                
             {
@@ -1800,12 +1793,12 @@ namespace FDA
 
         }
 
-        public void AddDataConnection(RRConnectionManager connection)
+        public static void AddDataConnection(RRConnectionManager connection)
         {
             _RRconnectionsDictionary.Add(connection.ConnectionID, connection);
         }
 
-        public RRConnectionManager GetDataConnection(Guid connectionID)
+        public static RRConnectionManager GetDataConnection(Guid connectionID)
         {
             if (_RRconnectionsDictionary.ContainsKey(connectionID))
                 return _RRconnectionsDictionary[connectionID];
@@ -1815,6 +1808,7 @@ namespace FDA
 
         public void Dispose()
         {
+            GC.SuppressFinalize(this);
             // stop and unload all user scripts
             Globals.SystemManager.LogApplicationEvent(this, "", "Unloading user scripts");
             Scripter.Cleanup();
@@ -1830,7 +1824,7 @@ namespace FDA
             }
 
             // dispose connections and then clear the connections dictionary
-            List<Task> disposalTasks = new List<Task>();
+            List<Task> disposalTasks = new();
             if (_RRconnectionsDictionary != null)
             {
                 foreach (RRConnectionManager conn in _RRconnectionsDictionary.Values)

@@ -21,13 +21,13 @@ namespace Scripting
         private string _code;
         private Script _script;      // compiled script, ready for executing
         private Timer _timer;     // timer for executing user script on a set schedule
-        private Timer _runOnceTimer;      // timer for executing user script only once, at a particular time
-        private object _scriptableObjects;
-        private Type _scriptableObjectsType;
+        //private Timer _runOnceTimer;      // timer for executing user script only once, at a particular time
+        private readonly object _scriptableObjects;
+        private readonly Type _scriptableObjectsType;
         private bool _enabled = false;
         private string _runspec = "";
 
-        private Dictionary<string, List<string>> _onChangeHandlers = new Dictionary<string, List<string>>();  // for OnChange handling (trigger object ID, list of properties to watch for changes)
+        private readonly Dictionary<string, List<string>> _onChangeHandlers = new();  // for OnChange handling (trigger object ID, list of properties to watch for changes)
 
         /****************** internal event that is raised whenever this module is executed **********************/
         internal delegate void ScriptExecuteHandler(string scriptID);
@@ -102,12 +102,11 @@ namespace Scripting
             
         }
 
-        private DateTime GetDateTime(string[] runspecparts,int idx)
+        private static DateTime GetDateTime(string[] runspecparts,int idx)
         {
             string timestring = runspecparts[idx];
 
-            DateTime datetime = new DateTime();
-            if (!DateTime.TryParseExact(timestring, "HH:mm:ss", new CultureInfo("en-US"), System.Globalization.DateTimeStyles.None, out datetime))
+            if (!DateTime.TryParseExact(timestring, "HH:mm:ss", new CultureInfo("en-US"), System.Globalization.DateTimeStyles.None, out DateTime datetime))
                 throw new Exception("Script run time must be supplied in this format (24 hr clock): HH:mm:ss");
 
             // if it's in the past, add a day
@@ -119,11 +118,10 @@ namespace Scripting
 
         private Timer CreateSchedule(string[] runspec)
         {
-            double quantity;
             Int32 intervalms;
             Int32 waitms = -1;
 
-            if (!Double.TryParse(runspec[1], out quantity))
+            if (!Double.TryParse(runspec[1], out double quantity))
             {
                 throw new Exception("Invalid run specification (invalid time quantity '" + runspec[1] + "', must be numeric)");
             }
@@ -289,6 +287,7 @@ namespace Scripting
 
         public void Dispose()
         {
+            GC.SuppressFinalize(this);
             _enabled = false;
 
             // dispose of the timer

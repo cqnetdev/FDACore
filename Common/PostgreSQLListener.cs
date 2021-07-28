@@ -12,9 +12,9 @@ namespace Common
     public class PostgreSQLListener<T> : IDisposable where T : new() 
     {
         private readonly string _channel = "db_notifications";
-        private string _connstring;
-        private NpgsqlConnection _conn;
-        private string _table;
+        private readonly string _connstring;
+        private readonly NpgsqlConnection _conn;
+        private readonly string _table;
 
         public delegate void ConnErrorHandler(object sender, Exception e);
         public event ConnErrorHandler Error;
@@ -47,11 +47,11 @@ namespace Common
             }
 
             // add handlers for notifications and state changes
-            _conn.Notification += _conn_Notification;
-            _conn.StateChange += _conn_StateChange;
+            _conn.Notification += Conn_Notification;
+            _conn.StateChange += Conn_StateChange;
         }
 
-        private void _conn_StateChange(object sender, System.Data.StateChangeEventArgs e)
+        private void Conn_StateChange(object sender, System.Data.StateChangeEventArgs e)
         {
             if (Globals.FDAStatus != Globals.AppState.Normal)
                 return;
@@ -69,7 +69,7 @@ namespace Common
             // start listening for notifications
             try
             {
-                using (NpgsqlCommand command = new NpgsqlCommand("listen " + _channel + ";", _conn))
+                using (NpgsqlCommand command = new ("listen " + _channel + ";", _conn))
                 {
                     command.ExecuteNonQuery();
                 }
@@ -88,7 +88,7 @@ namespace Common
             // start listening for notifications
             try
             {
-                using (NpgsqlCommand command = new NpgsqlCommand("unlisten " + _channel + ";", _conn))
+                using (NpgsqlCommand command = new("unlisten " + _channel + ";", _conn))
                 {
                     command.ExecuteNonQuery();
                 }
@@ -100,7 +100,7 @@ namespace Common
         }
 
         // handle notifications of a change in one of the monitored table
-        private void _conn_Notification(object sender, NpgsqlNotificationEventArgs e)
+        private void Conn_Notification(object sender, NpgsqlNotificationEventArgs e)
         {
            
             JObject json = JObject.Parse(e.Payload);
@@ -113,7 +113,7 @@ namespace Common
             // get the change type (update, delete, insert)
             string operation = (string)json["operation"];
 
-            DBNotification<T> notificationData = new DBNotification<T>();
+            DBNotification<T> notificationData = new();
             notificationData.operation = operation;
             notificationData.table = (string)json["table"];
             notificationData.schema = (string)json["schema"];
@@ -157,7 +157,7 @@ namespace Common
                 // query for the row that changed or was inserted
                 string query = "select row_to_json(t) from( select * from " + table + where + ") t;";
                 string jsonResult;
-                using (NpgsqlConnection conn = new NpgsqlConnection(_connstring))
+                using (NpgsqlConnection conn = new (_connstring))
                 {
                     conn.Open();
                     using (NpgsqlCommand command = conn.CreateCommand())
@@ -177,9 +177,12 @@ namespace Common
 
         public void Dispose()
         {
+            GC.SuppressFinalize(this);
+
             StopListening();
             _conn?.Close();
             _conn.Dispose();
+            
         }
 
      
@@ -204,13 +207,13 @@ namespace Common
             }
         }
 
-        public class DBNotification<T>
+        public class DBNotification<innerT>
         {
             public DateTime Timestamp;
             public string operation;
             public string schema;
             public string table;
-            public T row;
+            public innerT row;
         }
 
 

@@ -121,7 +121,7 @@ namespace FDAManager
             internal static string _CurrentFDA = "";
             internal static string _FDAName;
             internal static string _FDAStatus;
-            internal static long _FDARuntime;
+            //internal static long _FDARuntime;
 
             internal static ConnectionStatus MQTTConnectionStatus { get { return _MQTTConnectionStatus; } set { _MQTTConnectionStatus = value; StatusUpdate?.Invoke(null, new StatusUpdateArgs("MQTT", value)); } }
             internal static ConnectionStatus ControllerConnectionStatus { get { return _ControllerConnectionStatus; } set { _ControllerConnectionStatus = value; StatusUpdate?.Invoke(null, new StatusUpdateArgs("Controller", value)); } }
@@ -137,7 +137,6 @@ namespace FDAManager
             internal static ConnectionHistory ConnHistory;
             private static NotifyIcon notifyIcon;
             private static bool _paused = false;
-            private static readonly ToolStripMenuItem pauseMenuItem;
             private static ToolStripMenuItem openGuiMenuItem;
             private static frmMain2 _mainForm;
             // private System.Threading.Timer dataReceivedCheckTimer;
@@ -757,7 +756,7 @@ namespace FDAManager
                         }
                     }
                     _paused = true;
-                    pauseMenuItem.Text = "Resume FDA";
+                    //pauseMenuItem.Text = "Resume FDA";
                 }
                 else
                 {
@@ -768,7 +767,7 @@ namespace FDAManager
                             MQTT.Publish("FDAManager/command", Encoding.UTF8.GetBytes("RESUME"));
                         }
                     }
-                    pauseMenuItem.Text = "Pause FDA";
+                    //pauseMenuItem.Text = "Pause FDA";
                     _paused = false;
                 }
             }

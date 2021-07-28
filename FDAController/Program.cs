@@ -2,11 +2,13 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Runtime.Versioning;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace FDAController
 {
+    [SupportedOSPlatform("windows")]
     static class Program
     {
 
@@ -27,7 +29,7 @@ namespace FDAController
             {
                 Application.EnableVisualStyles();
                 Application.SetCompatibleTextRenderingDefault(false);
-                Application.Run(new frmMain());
+                Application.Run(new FrmMain());
             }
         }
     }

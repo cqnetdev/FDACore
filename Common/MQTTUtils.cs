@@ -34,7 +34,7 @@ namespace Common
             if (workingDir != "")
                 processStartInfo.WorkingDirectory = workingDir;
 
-            Process process = new Process() { StartInfo = processStartInfo };
+            Process process = new() { StartInfo = processStartInfo };
 
 
 
@@ -62,12 +62,17 @@ namespace Common
             return false; // unrecognized OS
         }
 
-
         public static bool ServiceInstalled()
         {
             if (OperatingSystem.IsWindows())
             {
-                return ServiceController.GetServices().Any(serviceController => serviceController.ServiceName.Equals(serviceName));
+                ServiceController[] services = ServiceController.GetServices();
+                foreach (ServiceController service in services)
+                {
+                    if (service.ServiceName == serviceName)
+                        return true;
+                }
+                return false;
             }
 
             if (OperatingSystem.IsLinux())
@@ -87,7 +92,7 @@ namespace Common
             // check if the service is set to run automatically on startup
             if (OperatingSystem.IsWindows())
             {
-                ServiceController sc = new ServiceController() { ServiceName = serviceName };
+                ServiceController sc = new() { ServiceName = serviceName };
          
                 try
                 {
@@ -210,7 +215,7 @@ namespace Common
             string status = "unknown";
             if (OperatingSystem.IsWindows())
             {
-                ServiceController sc = new ServiceController() { ServiceName = serviceName };
+                ServiceController sc = new() { ServiceName = serviceName };
                 try
                 {
                     status = sc.Status.ToString();
@@ -240,7 +245,7 @@ namespace Common
         {
             if (OperatingSystem.IsWindows())
             {
-                ServiceController sc = new ServiceController() { ServiceName = serviceName };
+                ServiceController sc = new() { ServiceName = serviceName };
                 try
                 {
                     sc.Stop();
@@ -270,7 +275,7 @@ namespace Common
         {
             if (OperatingSystem.IsWindows())
             {
-                ServiceController sc = new ServiceController() { ServiceName = serviceName };
+                ServiceController sc = new() { ServiceName = serviceName };
 
                 try
                 {
@@ -406,8 +411,8 @@ namespace Common
         private static string RunMosquittoExecutable(string argument)
         {
             string error = "";
-            Process process = new Process();
-            ProcessStartInfo startInfo = new ProcessStartInfo() { WindowStyle = ProcessWindowStyle.Normal };
+            Process process = new();
+            ProcessStartInfo startInfo = new() { WindowStyle = ProcessWindowStyle.Normal };
 
             //string path = System.IO.Path.GetDirectoryName(Assembly.GetEntryAssembly().Location) + exePath;
 

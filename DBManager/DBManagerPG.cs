@@ -29,7 +29,7 @@ namespace FDA
   
         protected override bool TestConnection()
         {
-            using (NpgsqlConnection conn = new NpgsqlConnection(ConnectionString))
+            using (NpgsqlConnection conn = new (ConnectionString))
             {
                 try
                 {
@@ -54,9 +54,9 @@ namespace FDA
         {
             int retries = 0;
             int maxRetries = 3;
-            DataTable result = new DataTable();
+            DataTable result = new();
         Retry:
-            using (NpgsqlConnection conn = new NpgsqlConnection(ConnectionString))
+            using (NpgsqlConnection conn = new (ConnectionString))
             {
                 try
                 {
@@ -70,7 +70,7 @@ namespace FDA
 
                 try
                 {
-                    using (NpgsqlDataAdapter da = new NpgsqlDataAdapter(sql, conn))
+                    using (NpgsqlDataAdapter da = new (sql, conn))
                     {
                         da.Fill(result);
                     }
@@ -101,7 +101,7 @@ namespace FDA
             int maxRetries = 3;
             Retry:
 
-            using (NpgsqlConnection conn = new NpgsqlConnection(ConnectionString))
+            using (NpgsqlConnection conn = new (ConnectionString))
             {
                 try
                 {
@@ -150,7 +150,7 @@ namespace FDA
             int retries = 0;
 
             Retry:
-            using (NpgsqlConnection conn = new NpgsqlConnection(ConnectionString))
+            using (NpgsqlConnection conn = new (ConnectionString))
             {
                 try
                 {
@@ -226,33 +226,33 @@ namespace FDA
             if (_scriptsTableExists)
                 _userScriptsMonitor = new PostgreSQLListener<UserScriptDefinition>(ConnectionString, Globals.SystemManager.GetTableName("fda_scripts"));
 
-            _demandMonitor.Notification += _demandMonitor_Notification;
-            _schedMonitor.Notification += _schedMonitor_Notification;
-            _requestGroupDefMonitor.Notification += _requestGroupDefMonitor_Notification;
-            _connectionDefMonitor.Notification += _connectionDefMonitor_Notification;
-            _dataPointDefMonitor.Notification += _dataPointDefMonitor_Notification; 
+            _demandMonitor.Notification += DemandMonitor_Notification;
+            _schedMonitor.Notification += SchedMonitor_Notification;
+            _requestGroupDefMonitor.Notification += RequestGroupDefMonitor_Notification;
+            _connectionDefMonitor.Notification += ConnectionDefMonitor_Notification;
+            _dataPointDefMonitor.Notification += DataPointDefMonitor_Notification; 
             if (_datasubscriptionMonitor != null)
-                _datasubscriptionMonitor.Notification += _datasubscriptionMonitor_Notification;
+                _datasubscriptionMonitor.Notification += DatasubscriptionMonitor_Notification;
             if (_deviceDefMonitor != null)
-                _deviceDefMonitor.Notification += _deviceDefMonitor_Notification;
+                _deviceDefMonitor.Notification += DeviceDefMonitor_Notification;
             if (_taskDefMonitor != null)
-                _taskDefMonitor.Notification += _taskDefMonitor_Notification;
+                _taskDefMonitor.Notification += TaskDefMonitor_Notification;
             if (_userScriptsMonitor != null)
-                _userScriptsMonitor.Notification += _userScriptsMonitor_Notification;
+                _userScriptsMonitor.Notification += UserScriptsMonitor_Notification;
 
-            _demandMonitor.Error += _PostgresSQLMonitor_Error;
-            _schedMonitor.Error += _PostgresSQLMonitor_Error;
-            _requestGroupDefMonitor.Error += _PostgresSQLMonitor_Error;
-            _connectionDefMonitor.Error += _PostgresSQLMonitor_Error;
-            _dataPointDefMonitor.Error += _PostgresSQLMonitor_Error;
+            _demandMonitor.Error += PostgresSQLMonitor_Error;
+            _schedMonitor.Error += PostgresSQLMonitor_Error;
+            _requestGroupDefMonitor.Error += PostgresSQLMonitor_Error;
+            _connectionDefMonitor.Error += PostgresSQLMonitor_Error;
+            _dataPointDefMonitor.Error += PostgresSQLMonitor_Error;
             if (_deviceDefMonitor != null)
-                _deviceDefMonitor.Error += _PostgresSQLMonitor_Error;
+                _deviceDefMonitor.Error += PostgresSQLMonitor_Error;
             if (_taskDefMonitor != null)
-                _taskDefMonitor.Error += _PostgresSQLMonitor_Error;
+                _taskDefMonitor.Error += PostgresSQLMonitor_Error;
             if (_datasubscriptionMonitor != null)
-                _datasubscriptionMonitor.Error += _PostgresSQLMonitor_Error;
+                _datasubscriptionMonitor.Error += PostgresSQLMonitor_Error;
             if (_userScriptsMonitor != null)
-                _userScriptsMonitor.Error += _PostgresSQLMonitor_Error;
+                _userScriptsMonitor.Error += PostgresSQLMonitor_Error;
 
             StartChangeMonitoring();
 
@@ -263,7 +263,7 @@ namespace FDA
         }
 
 
-        private void _PostgresSQLMonitor_Error(object sender,Exception e)
+        private void PostgresSQLMonitor_Error(object sender,Exception e)
         {
             Globals.SystemManager.LogApplicationError(Globals.FDANow(), e, "Error reported by PostgreSQLListener : " + e.Message);
         }
@@ -356,14 +356,14 @@ namespace FDA
 
 
 
-        private void _userScriptsMonitor_Notification(object sender, PostgreSQLListener<UserScriptDefinition>.PostgreSQLNotification notifyEvent)
+        private void UserScriptsMonitor_Notification(object sender, PostgreSQLListener<UserScriptDefinition>.PostgreSQLNotification notifyEvent)
         {
             string changeType = notifyEvent.Notification.operation;
             UserScriptDefinition script = notifyEvent.Notification.row;
             UserScriptChangeNotification(changeType, script);
         }
 
-        private void _taskDefMonitor_Notification(object sender, PostgreSQLListener<FDATask>.PostgreSQLNotification notifyEvent)
+        private void TaskDefMonitor_Notification(object sender, PostgreSQLListener<FDATask>.PostgreSQLNotification notifyEvent)
         {
             string changeType = notifyEvent.Notification.operation;
             FDATask task = notifyEvent.Notification.row;
@@ -371,28 +371,28 @@ namespace FDA
         }
 
 
-        private void _datasubscriptionMonitor_Notification(object sender, PostgreSQLListener<DataSubscription>.PostgreSQLNotification notifyEvent)
+        private void DatasubscriptionMonitor_Notification(object sender, PostgreSQLListener<DataSubscription>.PostgreSQLNotification notifyEvent)
         {
             string changeType = notifyEvent.Notification.operation;
             DataSubscription sub = notifyEvent.Notification.row;
             SubscriptionChangeNotification(changeType, sub);
         }
 
-        private void _deviceDefMonitor_Notification(object sender, PostgreSQLListener<FDADevice>.PostgreSQLNotification notifyEvent)
+        private void DeviceDefMonitor_Notification(object sender, PostgreSQLListener<FDADevice>.PostgreSQLNotification notifyEvent)
         {
             string changeType = notifyEvent.Notification.operation;
             FDADevice device = notifyEvent.Notification.row;
             DeviceMonitorNotification(changeType, device);
         }
 
-        private void _dataPointDefMonitor_Notification(object sender, PostgreSQLListener<FDADataPointDefinitionStructure>.PostgreSQLNotification notifyEvent)
+        private void DataPointDefMonitor_Notification(object sender, PostgreSQLListener<FDADataPointDefinitionStructure>.PostgreSQLNotification notifyEvent)
         {
             string changeType = notifyEvent.Notification.operation;
             FDADataPointDefinitionStructure datapoint = notifyEvent.Notification.row;
             DataPointMonitorNotification(changeType, datapoint);
         }
 
-        private void _connectionDefMonitor_Notification(object sender, PostgreSQLListener<FDASourceConnection>.PostgreSQLNotification notifyEvent)
+        private void ConnectionDefMonitor_Notification(object sender, PostgreSQLListener<FDASourceConnection>.PostgreSQLNotification notifyEvent)
         {
             string changeType = notifyEvent.Notification.operation;
             FDASourceConnection connection = notifyEvent.Notification.row;
@@ -401,7 +401,7 @@ namespace FDA
 
         }
 
-        private void _requestGroupDefMonitor_Notification(object sender, PostgreSQLListener<FDADataBlockRequestGroup>.PostgreSQLNotification notifyEvent)
+        private void RequestGroupDefMonitor_Notification(object sender, PostgreSQLListener<FDADataBlockRequestGroup>.PostgreSQLNotification notifyEvent)
         {
             string changeType = notifyEvent.Notification.operation;
             FDADataBlockRequestGroup requestGroup = notifyEvent.Notification.row;
@@ -409,7 +409,7 @@ namespace FDA
 
         }
 
-        private void _schedMonitor_Notification(object sender, PostgreSQLListener<FDARequestGroupScheduler>.PostgreSQLNotification notifyEvent)
+        private void SchedMonitor_Notification(object sender, PostgreSQLListener<FDARequestGroupScheduler>.PostgreSQLNotification notifyEvent)
         {
             string changeType = notifyEvent.Notification.operation;
             FDARequestGroupScheduler sched = notifyEvent.Notification.row;
@@ -417,7 +417,7 @@ namespace FDA
             SchedulerMonitorNotification(changeType, sched);
         }
 
-        private void _demandMonitor_Notification(object sender, PostgreSQLListener<FDARequestGroupDemand>.PostgreSQLNotification notifyEvent)
+        private void DemandMonitor_Notification(object sender, PostgreSQLListener<FDARequestGroupDemand>.PostgreSQLNotification notifyEvent)
         {
             string changeType = notifyEvent.Notification.operation;
             FDARequestGroupDemand demand = notifyEvent.Notification.row;
@@ -430,7 +430,8 @@ namespace FDA
     
         #region IDisposable Support
          public override void Dispose()
-        { 
+        {
+            GC.SuppressFinalize(this);
             // postgreSQL specific disposal
             _demandMonitor?.StopListening();
             _schedMonitor?.StopListening();

@@ -199,8 +199,8 @@ namespace FDAApp
                     IntPtr conHandle = NativeMethods.GetConsoleWindow();
 
                     //disable the window close button(X)
-                    NativeMethods.DeleteMenu(NativeMethods.GetSystemMenu(conHandle, false), NativeMethods.SC_CLOSE, NativeMethods.MF_BYCOMMAND);
-
+                    _ = NativeMethods.DeleteMenu(NativeMethods.GetSystemMenu(conHandle, false), NativeMethods.SC_CLOSE, NativeMethods.MF_BYCOMMAND);
+      
                     // disable quick edit mode (this causes the app to pause when the user clicks in the console window)             
                     IntPtr stdHandle = NativeMethods.GetStdHandle(NativeMethods.STD_INPUT_HANDLE);
                     if (!NativeMethods.GetConsoleMode(stdHandle, out int mode))
@@ -226,7 +226,7 @@ namespace FDAApp
                
 
                 Globals.FDAIsElevated = false;
-                Globals.FDAIsElevated = MQTTUtils.ThisProcessIsWindowsAdmin();
+                Globals.FDAIsElevated = MQTTUtils.ThisProcessIsAdmin();
 
 
  
@@ -285,7 +285,7 @@ namespace FDAApp
 
                 Console.WriteLine("Starting the Data Acquisition Manager");
                 // start the DataAcqManager             
-                _dataAquisitionManager = new DataAcqManager(FDAID, dbManager, ExecutionID);
+                _dataAquisitionManager = new DataAcqManager(dbManager, ExecutionID);
 
                 // watch for changes to the MQTTEnabled option
                 _dataAquisitionManager.MQTTEnableStatusChanged += DataAquisitionManager_MQTTEnableStatusChanged;
@@ -433,8 +433,7 @@ namespace FDAApp
         
 
             // publish the current connection list
-            if (_dataAquisitionManager != null)
-                _dataAquisitionManager.PublishUpdatedConnectionsList();
+            DataAcqManager.PublishUpdatedConnectionsList();
 
 
             PublishSubscribables();
@@ -517,7 +516,7 @@ namespace FDAApp
                 switch (topic[0].ToUpper())
                 {
                     case "CONNECTION":
-                        RRConnectionManager conn = _dataAquisitionManager.GetDataConnection(objectID);
+                        RRConnectionManager conn = DataAcqManager.GetDataConnection(objectID);
                         if (conn != null)
                             conn.MQTTEnabled = enabled;
                         break;
@@ -568,7 +567,7 @@ namespace FDAApp
                         //LogEvent("Getting queue counts");
                         int count = -1;
                         if (_dataAquisitionManager != null)
-                            count = _dataAquisitionManager.GetTotalQueueCounts();
+                            count = DataAcqManager.GetTotalQueueCounts();
                         //LogEvent("Replying with the count (" + count.ToString() + ")");
                         _FDAControlServer.Send(e.ClientID, count.ToString());
                         break;
@@ -618,23 +617,21 @@ namespace FDAApp
 
         private static FDAStatus GetFDAStatus()
         {
-            TimeSpan uptime = new TimeSpan(0);
+            TimeSpan uptime = new(0);
             if (Globals.ExecutionTime != DateTime.MinValue)
             {
                 uptime = Globals.FDANow().Subtract(Globals.ExecutionTime);
             }
 
-            string mode = "";
+            string mode;
             if (Globals.ConsoleMode)
                 mode = "debug (console)";
             else
                 mode = "background";
 
-            int count = -1;
-            if (_dataAquisitionManager != null)
-                count = _dataAquisitionManager.GetTotalQueueCounts();
+            int count = DataAcqManager.GetTotalQueueCounts();
 
-            FDAStatus status = new FDAStatus()
+            FDAStatus status = new()
             {
                 DB = DBType,
                 RunStatus = Globals.FDAStatus.ToString(),
@@ -644,7 +641,7 @@ namespace FDAApp
                 TotalQueueCount = count    
             };
 
-            string json = status.JSON();
+            //string json = status.JSON();
             return status;
         }
 
@@ -677,7 +674,7 @@ namespace FDAApp
             {
                 if (Globals.MQTT.IsConnected)
                 {
-                    Globals.MQTT.Publish("FDA/connectionlist", new byte[0], 0, true);
+                    Globals.MQTT.Publish("FDA/connectionlist", Array.Empty<byte>(), 0, true);
                     autoResetEvent.WaitOne(3000);
                     Globals.MQTT.Disconnect();
                     Globals.MQTT = null;

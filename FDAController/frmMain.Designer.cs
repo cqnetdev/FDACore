@@ -1,7 +1,7 @@
 ﻿
 namespace FDAController
 {
-    partial class frmMain
+    partial class FrmMain
     {
         /// <summary>
         /// Required designer variable.
@@ -54,7 +54,7 @@ namespace FDAController
             this.btnFDA.Text = "Start";
             this.ttFDAStart.SetToolTip(this.btnFDA, "Right Click for start options");
             this.btnFDA.UseVisualStyleBackColor = true;
-            this.btnFDA.MouseDown += new System.Windows.Forms.MouseEventHandler(this.btnFDA_MouseClick);
+            this.btnFDA.MouseDown += new System.Windows.Forms.MouseEventHandler(this.BtnFDA_MouseClick);
             // 
             // lblLastupdate
             // 
@@ -110,7 +110,7 @@ namespace FDAController
             this.btnMQTT.TabIndex = 8;
             this.btnMQTT.Text = "Start";
             this.btnMQTT.UseVisualStyleBackColor = true;
-            this.btnMQTT.Click += new System.EventHandler(this.startstopBtn_Click);
+            this.btnMQTT.Click += new System.EventHandler(this.StartStopBtn_Click);
             // 
             // btnController
             // 
@@ -120,7 +120,7 @@ namespace FDAController
             this.btnController.TabIndex = 9;
             this.btnController.Text = "Start";
             this.btnController.UseVisualStyleBackColor = true;
-            this.btnController.Click += new System.EventHandler(this.startstopBtn_Click);
+            this.btnController.Click += new System.EventHandler(this.StartStopBtn_Click);
             // 
             // ctxStartFDA
             // 
@@ -136,14 +136,14 @@ namespace FDAController
             this.miStartFDAbg.Name = "miStartFDAbg";
             this.miStartFDAbg.Size = new System.Drawing.Size(368, 32);
             this.miStartFDAbg.Text = "Start in Background Mode";
-            this.miStartFDAbg.Click += new System.EventHandler(this.miStartFDAbg_Click);
+            this.miStartFDAbg.Click += new System.EventHandler(this.MenuItemStartFDAbg_Click);
             // 
             // miStartFDAConsole
             // 
             this.miStartFDAConsole.Name = "miStartFDAConsole";
             this.miStartFDAConsole.Size = new System.Drawing.Size(368, 32);
             this.miStartFDAConsole.Text = "Start FDA in Console (Debug) Mode";
-            this.miStartFDAConsole.Click += new System.EventHandler(this.miStartFDAConsole_Click);
+            this.miStartFDAConsole.Click += new System.EventHandler(this.MenuItemStartFDAConsole_Click);
             // 
             // frmMain
             // 

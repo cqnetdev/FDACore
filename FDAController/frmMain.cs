@@ -1,23 +1,20 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.ComponentModel;
-using System.Data;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
-using System.Linq;
 using System.Net.Sockets;
 using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.ServiceProcess;
 using System.Security.Principal;
 using System.Text.Json;
-using System.Text.Json.Serialization;
+using System.Runtime.Versioning;
 
 namespace FDAController
 {
-    public partial class frmMain : Form
+    [SupportedOSPlatform("windows")]
+    public partial class FrmMain : Form
     {
         private readonly Color GoodColor = Color.Green;
         private readonly Color WarningColor = Color.Blue;
@@ -26,13 +23,14 @@ namespace FDAController
         private const string _controllerIP = "127.0.0.1";
         private bool _isStopping = false;
         private bool _isStarting = false;
-        private ServiceController FDAControllerService;
-        private ServiceController MQTTService;
+        private readonly ServiceController FDAControllerService;
+        private readonly ServiceController MQTTService;
         private readonly BackgroundWorker bg_StatusChecker;
 
         private delegate void SafePropertyUpdateDelgate(Control control, string property, object value);
 
-        public frmMain()
+     
+        public FrmMain()
         {
             InitializeComponent();
             bg_StatusChecker = new BackgroundWorker();
@@ -72,8 +70,8 @@ namespace FDAController
         {
             string result;
             string status;
-            Color textcolor = GoodColor;
-            bool controllerStatus = false;
+            Color textcolor;
+            bool controllerStatus;
 
             // is the controller service running?
             FDAControllerService.Refresh();
@@ -135,10 +133,10 @@ namespace FDAController
 
         private void CheckMosquittoService()
         {
-            Color textcolor = GoodColor;
             MQTTService.Refresh();
             bool status = MQTTService.Status == ServiceControllerStatus.Running;
-            
+
+            Color textcolor;
             if (status)
             {
                 SafePropertySet(lblMQTT, "Text", "MQTT service is running");
@@ -157,7 +155,7 @@ namespace FDAController
 
         private void CheckFDAProcess(bool controllerRunning)
         {
-            Color textcolor = GoodColor;
+            Color textcolor;
             string result;
             string statusText;
             
@@ -232,7 +230,6 @@ namespace FDAController
 
         private void Bg_StatusChecker_DoWork(object sender, DoWorkEventArgs e)
         {
-            Color textcolor = GoodColor;
             bool controllerStatus;
             while (!e.Cancel)
             {
@@ -254,12 +251,12 @@ namespace FDAController
         }
 
 
-        private string SendRequest(string address, int port, string request)
+        private static string SendRequest(string address, int port, string request)
         {
             byte[] buffer = new byte[1024];
             byte[] response;
             int bytesRead = 0;
-            using (TcpClient client = new TcpClient())
+            using (TcpClient client = new())
             {
                 // connect
                 try
@@ -316,7 +313,7 @@ namespace FDAController
         }
       
 
-        private void btnFDA_MouseClick(object sender, MouseEventArgs e)
+        private void BtnFDA_MouseClick(object sender, MouseEventArgs e)
         {
    
             if (!ProcessRunning("FDACore"))
@@ -335,12 +332,12 @@ namespace FDAController
 
         }
 
-        private void miStartFDAbg_Click(object sender, EventArgs e)
+        private void MenuItemStartFDAbg_Click(object sender, EventArgs e)
         {
             StartFDA("");
         }
 
-        private void miStartFDAConsole_Click(object sender, EventArgs e)
+        private void MenuItemStartFDAConsole_Click(object sender, EventArgs e)
         {
             StartFDA("-console");
         }
@@ -426,7 +423,7 @@ namespace FDAController
             return (self && proc.Length > 1) || (!self && proc.Length > 0);
         }
         
-        private void startstopBtn_Click(object sender, EventArgs e)
+        private void StartStopBtn_Click(object sender, EventArgs e)
         {
             // check if controller gui was run as admin
             bool isAdmin = new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator);
@@ -437,7 +434,7 @@ namespace FDAController
             }
 
             string serviceName = ((Button)sender).Tag.ToString();
-            ServiceController sc = new ServiceController(serviceName);
+            ServiceController sc = new(serviceName);
 
             try
             {
@@ -488,7 +485,7 @@ namespace FDAController
                 {
                     status = JsonSerializer.Deserialize<FDAStatus>(json);
                 }
-                catch (Exception ex)
+                catch
                 {
                     return new FDAStatus();
                 }
