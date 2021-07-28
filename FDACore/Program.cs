@@ -403,10 +403,10 @@ namespace FDAApp
                 Globals.SystemManager.LogApplicationEvent(null, "", "Failed to connect to MQTT broker. Will attempt to reconnect every 30 seconds until a connection is established", false, false);
                 // check if the Mosquitto service is not started, try to start it if it isn't running
                 RepairMosquittoService();
-                
+                Globals.SystemManager.LogApplicationEvent(null, "", "Attempting to connect to MQTT broker");
                 // start a 5 second timer for re-attempting the connection
                 if (MqttRetryTimer == null)
-                    MqttRetryTimer = new System.Threading.Timer(MQTTConnect, o, 30000, 30000);              
+                    MqttRetryTimer = new System.Threading.Timer(MQTTConnect, o, 0, 30000);              
             }
         }
 
@@ -737,7 +737,7 @@ namespace FDAApp
                     string result = MQTTUtils.RepairMQTT();
                     if (result == "")
                     {
-                        Globals.SystemManager.LogApplicationEvent(null, "", "MQTT succesfully repaired");
+                        Globals.SystemManager.LogApplicationEvent(null, "", "MQTT repair process complete");
                     }
                     else
                         Globals.SystemManager.LogApplicationEvent(null, "", "Unable to repair MQTT broker: " + result);           
