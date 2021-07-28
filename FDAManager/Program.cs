@@ -611,51 +611,10 @@ namespace FDAManager
                     string statusJson = SendCommandToFDAController("FDASTATUS\0");
                     Status = FDAStatus.Deserialize(statusJson);
 
-                    Console.WriteLine("FDA status update received from the controller: " + Status.RunStatus);
+                    //Console.WriteLine("FDA status update received from the controller: " + Status.RunStatus);
                     // and update the GUI, if it's open
                     _mainForm?.SetFDAStatus(Status);
 
-                    //if (Status.RunStatus == "Running")
-                    //{
-                    //    _mainForm?.SetFDAStatus("Normal");
-
-                    //    // get the FDA Run time
-                    //    string ticksString = SendCommandToFDAController("RUNTIME\0");
-                    //    long ticks;
-
-                    //    if (long.TryParse(ticksString, out ticks))
-                    //    {
-                    //        _FDARuntime = ticks;
-                    //        _mainForm?.SetRunTime(ticks);
-                    //    }
-
-                    //    //Thread.Sleep(1000);
-                    //    // and the DBType (if we don't already know it)
-                    //    if (_FDADBType == "")
-                    //    {
-                    //        _FDADBType = SendCommandToFDAController("DBTYPE\0");
-                    //        if (_FDADBType != "")
-                    //            _mainForm?.SetDBType(_FDADBType);
-                    //    }
-
-                    //    // and the version number (if we don't already know it)
-                    //    if (_FDAVersion == "")
-                    //    {
-                    //        _FDAVersion = SendCommandToFDAController("VERSION\0");
-                    //        if (_FDAVersion != "")
-                    //            _mainForm?.SetVersion(_FDAVersion);
-                    //    }
-
-
-
-                    //}
-                    //else 
-                    //{
-                    //    _mainForm?.SetFDAStatus("Stopped");
-                    //    _FDARuntime = 0;
-                    //    _FDAVersion = "";
-                    //    _FDADBType = "";
-                    //}
 
                     // reset the ping timer
                     ControllerPinger.Change(ControllerPingRate, ControllerPingRate);
