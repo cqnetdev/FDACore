@@ -247,8 +247,8 @@ namespace FDAManager
                 //btn_Connect.Enabled = false;
                 //tb_activeFDA.Text = FDAName + " (" + host + ")";
                 //FDAStatus.Text = "FDA Status: Unknown";
-                startToolStripMenuItem.Enabled = true;
-                startwithConsoleToolStripMenuItem.Enabled = true;
+                //startToolStripMenuItem.Enabled = true;
+                //startwithConsoleToolStripMenuItem.Enabled = true;
 
                 SubscribeToFDATopics(null);
                 if (_connOverviewDict != null)
@@ -623,60 +623,59 @@ namespace FDAManager
             }
             else
             {
-                if (FDAManagerContext.MQTTConnectionStatus == FDAManagerContext.ConnectionStatus.Connected)
+                switch (imgFDARunStatus.Tag.ToString())
                 {
-                    switch (imgFDARunStatus.Tag.ToString())
-                    {
-                        case "unknown":
-                            startToolStripMenuItem.Enabled = true;
-                            startwithConsoleToolStripMenuItem.Enabled = true;
-                            stopToolStripMenuItem.Enabled = false;
-                            pauseToolStripMenuItem.Enabled = false;
-                            mQTTQueryTestToolStripMenuItem.Enabled = false;
-                            communicationsStatsToolStripMenuItem.Enabled = false;
-                            break;
-                        case "Normal":
-                            startToolStripMenuItem.Enabled = false;
-                            startwithConsoleToolStripMenuItem.Enabled = false;
-                            stopToolStripMenuItem.Enabled = true;
-                            pauseToolStripMenuItem.Enabled = true;
+                    case "unknown":
+                        startToolStripMenuItem.Enabled = true;
+                        startwithConsoleToolStripMenuItem.Enabled = true;
+                        stopToolStripMenuItem.Enabled = false;
+                        pauseToolStripMenuItem.Enabled = false;
+                        mQTTQueryTestToolStripMenuItem.Enabled = false;
+                        communicationsStatsToolStripMenuItem.Enabled = false;
+                        break;
+                    case "Normal":
+                        startToolStripMenuItem.Enabled = false;
+                        startwithConsoleToolStripMenuItem.Enabled = false;
+                        stopToolStripMenuItem.Enabled = true;
+                        pauseToolStripMenuItem.Enabled = true;
+                        if (FDAManagerContext.MQTTConnectionStatus == FDAManagerContext.ConnectionStatus.Connected)
+                        {
                             mQTTQueryTestToolStripMenuItem.Enabled = true;
                             communicationsStatsToolStripMenuItem.Enabled = true;
-                            break;
-                        case "ShuttingDown":
-                            startToolStripMenuItem.Enabled = false;
-                            startwithConsoleToolStripMenuItem.Enabled = false;
-                            stopToolStripMenuItem.Enabled = false;
-                            pauseToolStripMenuItem.Enabled = false;
-                            mQTTQueryTestToolStripMenuItem.Enabled = false;
-                            communicationsStatsToolStripMenuItem.Enabled = false;
-                            break;
-                        case "Stopped":
-                            startToolStripMenuItem.Enabled = true;
-                            startwithConsoleToolStripMenuItem.Enabled = true;
-                            stopToolStripMenuItem.Enabled = false;
-                            pauseToolStripMenuItem.Enabled = false;
-                            mQTTQueryTestToolStripMenuItem.Enabled = false;
-                            communicationsStatsToolStripMenuItem.Enabled = false;
-                            break;
-                        default:
-                            startToolStripMenuItem.Enabled = false;
-                            startwithConsoleToolStripMenuItem.Enabled = false;
-                            stopToolStripMenuItem.Enabled = false;
-                            pauseToolStripMenuItem.Enabled = false;
-                            mQTTQueryTestToolStripMenuItem.Enabled = false;
-                            communicationsStatsToolStripMenuItem.Enabled = false;
-                            break;
-                    }
-                }
-                else
-                {
-                    startToolStripMenuItem.Enabled = false;
-                    startwithConsoleToolStripMenuItem.Enabled = false;
-                    stopToolStripMenuItem.Enabled = false;
-                    pauseToolStripMenuItem.Enabled = false;
-                    mQTTQueryTestToolStripMenuItem.Enabled = false;
-                    communicationsStatsToolStripMenuItem.Enabled = false;
+                        }
+                        break;
+                    case "ShuttingDown":
+                        startToolStripMenuItem.Enabled = false;
+                        startwithConsoleToolStripMenuItem.Enabled = false;
+                        stopToolStripMenuItem.Enabled = false;
+                        pauseToolStripMenuItem.Enabled = false;
+                        mQTTQueryTestToolStripMenuItem.Enabled = false;
+                        communicationsStatsToolStripMenuItem.Enabled = false;
+                        break;
+                    case "Stopped":
+                        startToolStripMenuItem.Enabled = true;
+                        startwithConsoleToolStripMenuItem.Enabled = true;
+                        stopToolStripMenuItem.Enabled = false;
+                        pauseToolStripMenuItem.Enabled = false;
+                        mQTTQueryTestToolStripMenuItem.Enabled = false;
+                        communicationsStatsToolStripMenuItem.Enabled = false;
+                        break;
+                    case "":
+                        startToolStripMenuItem.Enabled = true;
+                        startwithConsoleToolStripMenuItem.Enabled = true;
+                        stopToolStripMenuItem.Enabled = false;
+                        pauseToolStripMenuItem.Enabled = false;
+                        mQTTQueryTestToolStripMenuItem.Enabled = false;
+                        communicationsStatsToolStripMenuItem.Enabled = false;
+                        break;
+                    default:
+                        startToolStripMenuItem.Enabled = false;
+                        startwithConsoleToolStripMenuItem.Enabled = false;
+                        stopToolStripMenuItem.Enabled = false;
+                        pauseToolStripMenuItem.Enabled = false;
+                        mQTTQueryTestToolStripMenuItem.Enabled = false;
+                        communicationsStatsToolStripMenuItem.Enabled = false;
+                        break;
                 }
             }
         }
@@ -1041,6 +1040,9 @@ namespace FDAManager
                     imgFDARunStatus.Image = imageList1.Images[2];
                     break;
                 case "unknown":
+                    imgFDARunStatus.Image = imageList1.Images[3];
+                    break;
+                case "":
                     imgFDARunStatus.Image = imageList1.Images[3];
                     break;
                 default:
