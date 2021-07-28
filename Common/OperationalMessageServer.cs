@@ -18,8 +18,29 @@ namespace Common
 
         public static void Start()
         {
-            _TCPServer = FDA.TCPServer.NewTCPServer(9573);
+            _TCPServer = FDA.TCPServer.NewTCPServer(9573,"Operational Messages Server");
             _TCPServer.Start();
+            _TCPServer.ClientConnected += _TCPServer_ClientConnected;
+            _TCPServer.ClientDisconnected += _TCPServer_ClientDisconnected;
+        }
+
+        private static void _TCPServer_ClientDisconnected(object sender, FDA.TCPServer.ClientEventArgs e)
+        {
+            LogEvent("TCP client (" + e.ClientAddress + ") disconnected");
+        }
+
+        private static void _TCPServer_ClientConnected(object sender, FDA.TCPServer.ClientEventArgs e)
+        {
+           
+            LogEvent("TCP client (" + e.ClientAddress + ") connected on port " + _TCPServer.Port);
+        }
+
+        static private void LogEvent(string message)
+        {
+            if (Globals.SystemManager != null)
+                Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "TCPServer",_TCPServer.ServerName, message);
+            else
+                Console.WriteLine(Globals.FDANow().ToString() + ": " + message);
         }
 
         public static void Stop()

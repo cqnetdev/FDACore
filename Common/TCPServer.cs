@@ -19,6 +19,7 @@ namespace FDA
 {
     public class TCPServer : IDisposable
     {
+        private readonly string _serverName = "";
         private readonly int _listeningPort;
 
         private readonly int _tickRate = 100; //ms
@@ -30,6 +31,7 @@ namespace FDA
 
         private bool isDisposing = false;
 
+        public string ServerName { get { return _serverName; } }
         public int Port { get { return _listeningPort; } }
         public int ClientCount { get { return _clients.Count; } }
 
@@ -46,19 +48,21 @@ namespace FDA
         /// Create a new TCP Server o nthe specified port
         /// </summary>
         /// <param name="listeningPort"></param>
-        private TCPServer(int listeningPort)
+        private TCPServer(int listeningPort,string name="")
         {
+            _serverName = name;
             _listeningPort = listeningPort;
             _server = new TcpListener(IPAddress.Any, _listeningPort);
             _clients = new Dictionary<Guid, Client>();
         }
 
-        public static TCPServer NewTCPServer(int listeningPort)
+        public static TCPServer NewTCPServer(int listeningPort,string name="")
         {
+           
             TCPServer newServer;
             try
             {
-                newServer = new TCPServer(listeningPort);
+                newServer = new TCPServer(listeningPort,name);
                 //FileStream fs = new FileStream(_serverCertificatePath, FileMode.Open);
                 //byte[] certificateData = new byte[fs.Length];
                 //fs.Read(certificateData, 0, certificateData.Length);
@@ -82,7 +86,7 @@ namespace FDA
                 _server.Start();
             } catch (Exception ex)
             {
-                AsyncConsole.WriteLine("Error starting TCP server on port " + Port + ": " + ex.Message);
+                AsyncConsole.WriteLine("Error starting TCP server '" + _serverName + "' on port " + Port + ": " + ex.Message);
                 success = false;
             }
 
@@ -183,7 +187,7 @@ namespace FDA
             Client dcClient = (Client)sender;
             _clients?.Remove(dcClient.ID);
             //Globals.SystemManager.LogApplicationEvent(this, "", "TCP client " + dcClient.Address + " disconnected");
-            ClientDisconnected?.Invoke(dcClient, new ClientEventArgs(dcClient.ID, dcClient.Address));
+            ClientDisconnected?.Invoke(this, new ClientEventArgs(dcClient.ID, dcClient.Address));
         }
 
         private class Client : IDisposable
@@ -341,15 +345,16 @@ namespace FDA
         public class ClientEventArgs : EventArgs
         {
             private readonly Guid _clientID;
-            private readonly string _hostname;
+            private readonly string _address;
 
             public Guid ClientID { get { return _clientID; } }
+            public string ClientAddress { get { return _address; } }
 
 
-            internal ClientEventArgs(Guid clientID, string host)
+            internal ClientEventArgs(Guid clientID, string address)
             {
                 _clientID = clientID;
-                _hostname = host;
+                _address = address;
             }
         }
 

@@ -161,13 +161,13 @@ namespace FDAApp
             }
 
             // start basic services server
-            Console.WriteLine("Starting the basic services control port server");
-            _FDAControlServer = TCPServer.NewTCPServer(9572);
+            Console.WriteLine("Starting the basic services control server");
+            _FDAControlServer = TCPServer.NewTCPServer(9572,"Basic Services Control Server");
             if (_FDAControlServer != null)
             {
                 _FDAControlServer.DataAvailable += TCPServer_DataAvailable;
-                _FDAControlServer.ClientDisconnected += TCPServer_ClientDisconnected;
-                _FDAControlServer.ClientConnected += TCPServer_ClientConnected;
+                _FDAControlServer.ClientDisconnected += BSCP_ClientDisconnected;
+                _FDAControlServer.ClientConnected += BSCP_ClientConnected;
                 _FDAControlServer.Start();
             }
             else
@@ -355,14 +355,16 @@ namespace FDAApp
             }
         }
 
-        private static void TCPServer_ClientDisconnected(object sender, TCPServer.ClientEventArgs e)
+        private static void BSCP_ClientDisconnected(object sender, TCPServer.ClientEventArgs e)
         {
-            LogEvent("Client disconnected");
+            string serverName = ((TCPServer)sender).ServerName;
+            LogEvent("TCP Client (" + e.ClientAddress + ") disconnected","TCPServer",serverName);
         }
 
-        private static void TCPServer_ClientConnected(object sender, TCPServer.ClientEventArgs e)
-        {        
-            LogEvent("TCP client connected on port " + _FDAControlServer.Port);
+        private static void BSCP_ClientConnected(object sender, TCPServer.ClientEventArgs e)
+        {
+            string serverName = ((TCPServer)sender).ServerName; 
+            LogEvent("TCP client (" + e.ClientAddress + ") connected on port " + _FDAControlServer.Port,"TCPServer",serverName);
         }
 
         static private void MQTTConnect(object o)
@@ -756,10 +758,10 @@ namespace FDAApp
         }
         
 
-        static private void LogEvent(string message)
+        static private void LogEvent(string message,string sourcetype="FDA",string sourcename="")
         {
             if (Globals.SystemManager != null)
-                Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "FDA", "", message);
+                Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), sourcetype, sourcename, message);
             else
                 Console.WriteLine(Globals.FDANow().ToString() + ": " + message);
 
