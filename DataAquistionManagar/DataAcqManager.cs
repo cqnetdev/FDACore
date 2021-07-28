@@ -80,8 +80,17 @@ namespace FDA
         public static int GetTotalQueueCounts()
         {
             int count = 0;
-            foreach (RRConnectionManager mgr in _RRconnectionsDictionary.Values)
-                count += mgr.TotalQueueCount;
+            if (_RRconnectionsDictionary != null)
+            {
+                foreach (RRConnectionManager mgr in _RRconnectionsDictionary.Values)
+                    count += mgr.TotalQueueCount;
+            }
+
+            if (_PubSubConnectionsDictionary != null)
+            {
+                foreach (PubSubConnectionManager mgr in _PubSubConnectionsDictionary.Values)
+                    count += mgr.TotalQueueCount;
+            }
             
             return count;
         }

@@ -36,6 +36,7 @@ namespace FDA
         public int Priority2Count { get => _priority2Count; set { if (value != _priority2Count) { _priority2Count = value; HandlePropertyChanged(nameof(Priority2Count), Globals.FDANow().Ticks); } } }
         public int Priority3Count { get => _priority3Count; set { if (value != _priority3Count) { _priority3Count = value; HandlePropertyChanged(nameof(Priority3Count), Globals.FDANow().Ticks); } } }
 
+        public int TotalQueueCount { get => _queueManager.TotalQueueCount; }
 
         // public events
         public delegate void DataUpdateHandler(object sender, TransactionEventArgs e);
