@@ -159,9 +159,9 @@ namespace FDAManager
 
             private static bool IntentionalDisconnect = false;
 
-            private static TimeSpan ControllerPingRate = new TimeSpan(0, 0, 1);
-            private static TimeSpan ControllerRetryRate = new TimeSpan(0, 0, 5);
-            private static TimeSpan ReconnectRate = new TimeSpan(0, 0, 5);
+            private readonly static TimeSpan ControllerPingRate = new (0, 0, 1);
+            //private readonly static TimeSpan ControllerRetryRate = new (0, 0, 5);
+            //private readonly static TimeSpan ReconnectRate = new(0, 0, 5);
 
             public delegate void ConnectionStatusUpdateHandler(object sender, StatusUpdateArgs e);
             public static event ConnectionStatusUpdateHandler StatusUpdate;
@@ -193,9 +193,9 @@ namespace FDAManager
                 FileVersionInfo versionInfo = FileVersionInfo.GetVersionInfo(exePath);
 
 
-                ToolStripMenuItem titleItem = new ToolStripMenuItem("FDA Manager ver " + versionInfo.FileVersion);
-                openGuiMenuItem = new ToolStripMenuItem("Open FDA Tools",new System.Drawing.Bitmap(20,20), OpenGui);
-                ToolStripMenuItem exitMenuItem = new ToolStripMenuItem("Close FDA Manager", new System.Drawing.Bitmap(20, 20), DoExit);
+                ToolStripMenuItem titleItem = new ("FDA Manager ver " + versionInfo.FileVersion);
+                openGuiMenuItem = new ("Open FDA Tools",new System.Drawing.Bitmap(20,20), OpenGui);
+                ToolStripMenuItem exitMenuItem = new ("Close FDA Manager", new System.Drawing.Bitmap(20, 20), DoExit);
                 notifyIcon = new NotifyIcon()
                 {
                     Icon = GetIcon("ManagerGray"), 
@@ -230,9 +230,9 @@ namespace FDAManager
                 {
                     try
                     {
-                        using (FileStream stream = new FileStream("ConnectionHistory.xml", FileMode.Open))
+                        using (FileStream stream = new ("ConnectionHistory.xml", FileMode.Open))
                         {
-                            XmlSerializer serializer = new XmlSerializer(typeof(ConnectionHistory));
+                            XmlSerializer serializer = new (typeof(ConnectionHistory));
                             ConnHistory = (ConnectionHistory)serializer.Deserialize(stream);
                         }
                     }
@@ -442,7 +442,7 @@ namespace FDAManager
                 MQTTConnectionStatus = ConnectionStatus.Connecting;
 
                 string MQTTServer_IP = args[0];
-                string MQTTServer_Name = args[1];
+                //string MQTTServer_Name = args[1];
                 // bool suppressMessages = (args[2] == "True");
 
 
@@ -568,7 +568,7 @@ namespace FDAManager
             private static void PingController(object state)
             {
                 ControllerPinger.Change(Timeout.Infinite, Timeout.Infinite);
-                bool connected = true;
+                bool connected;
 
                 if (FDAControllerClient == null)
                 {
@@ -857,10 +857,12 @@ namespace FDAManager
             {
                 if (_mainForm == null)
                 {
-                    _mainForm = new frmMain2();
-                    _mainForm.MQTT = MQTT;
+                    _mainForm = new frmMain2
+                    {
+                        MQTT = MQTT
+                    };
                     _mainForm.Disposed += MainForm_Disposed;
-                    _mainForm.Shown += _mainForm_Shown;
+                    _mainForm.Shown += MainForm_Shown;
 
 
                     // start checking for subscription updates from the FDA
@@ -885,7 +887,7 @@ namespace FDAManager
                     _mainForm.Focus();
             }
 
-            private void _mainForm_Shown(object sender, EventArgs e)
+            private void MainForm_Shown(object sender, EventArgs e)
             {
 
 
@@ -945,9 +947,9 @@ namespace FDAManager
                 // save the recent FDA connection history
                 try
                 {
-                    using (FileStream stream = new FileStream("ConnectionHistory.xml", FileMode.Create))
+                    using (FileStream stream = new ("ConnectionHistory.xml", FileMode.Create))
                     {
-                        XmlSerializer serializer = new XmlSerializer(typeof(ConnectionHistory));
+                        XmlSerializer serializer = new (typeof(ConnectionHistory));
                         serializer.Serialize(stream, ConnHistory);
                     }
                 }
@@ -966,7 +968,7 @@ namespace FDAManager
                 Stream resourceStream = assembly.GetManifestResourceStream(fullName);
                 if (resourceStream != null)
                 {
-                    System.Drawing.Icon icon = new System.Drawing.Icon(resourceStream);
+                    System.Drawing.Icon icon = new(resourceStream);
                     return icon;
                 }
                 else
@@ -975,7 +977,7 @@ namespace FDAManager
 
             public static System.Drawing.Image GetImage(string imageName)
             {
-                string fullName = "FDAManager.Resources." + imageName;
+                //string fullName = "FDAManager.Resources." + imageName;
                 Assembly assembly = Assembly.GetEntryAssembly();
                 Stream resourceStream = assembly.GetManifestResourceStream(imageName);
                 if (resourceStream != null)
@@ -989,7 +991,7 @@ namespace FDAManager
 
             public static string GetSetting(string settingName)
             {
-                IConfigurationSection appConfig = null;
+                IConfigurationSection appConfig;
                 try
                 {
                     IConfiguration configuration = new ConfigurationBuilder().AddJsonFile("appsettings.json", false, true).Build();
