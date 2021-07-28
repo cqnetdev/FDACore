@@ -21,7 +21,7 @@ namespace ControllerService
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             // check for root account (required for starting the FDA service)            
-            if (Environment.OSVersion.Platform == PlatformID.Unix)
+            if (OperatingSystem.IsLinux())
             {
                 if (Environment.UserName != "root")
                 {
@@ -29,7 +29,7 @@ namespace ControllerService
                 }
             }
 
-            if (Environment.OSVersion.Platform == PlatformID.Win32NT)
+            if (OperatingSystem.IsWindows())
             {
                 if (!(new System.Security.Principal.WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator)))
                 {

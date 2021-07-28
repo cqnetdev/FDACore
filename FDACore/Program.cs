@@ -184,7 +184,7 @@ namespace FDAApp
             Thread.Sleep(5000);
 
             // if running in background mode: hide the console, disable the x button, and disable quick edit mode (windows only)
-            if (Environment.OSVersion.Platform == PlatformID.Win32NT)
+            if (OperatingSystem.IsWindows())
             {
                 // hide the console window if the -show command line option is not specified
                 if (!args.Contains("-console"))
@@ -226,7 +226,7 @@ namespace FDAApp
                
 
                 Globals.FDAIsElevated = false;
-                Globals.FDAIsElevated = MQTTUtils.ThisProcessIsAdmin();
+                Globals.FDAIsElevated = MQTTUtils.ThisProcessIsWindowsAdmin();
 
 
  

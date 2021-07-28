@@ -152,7 +152,7 @@ namespace ControllerService
                         if (OMServer.ClientCount > 0)
                         {
                             logmessage += ", " + OMServer.ClientCount + " client(s) connected, forwarding the data";
-                            if (Environment.OSVersion.Platform == PlatformID.Unix)
+                            if (OperatingSystem.IsLinux())
                             {
                                 messages = messages.Replace("\n", "\r\n");
                             }

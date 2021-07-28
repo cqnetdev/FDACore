@@ -75,12 +75,12 @@ namespace ControllerService
         {
 
 
-            if (Environment.OSVersion.Platform == PlatformID.Win32NT)
+            if (OperatingSystem.IsWindows())
             {
                 RunConsoleCommand("FDACore.exe", "", "C:\\IntricateFDA\\FDACore\\");
             }
 
-            if (Environment.OSVersion.Platform == PlatformID.Unix)
+            if (OperatingSystem.IsLinux())
             {
 
                 //string result = RunTerminalCommand("gnome-terminal", "-- bash -c '" + _FDAPath + "'; exec bash");

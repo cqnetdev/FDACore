@@ -11,12 +11,12 @@ namespace ControllerService
     {
         public static void Main(string[] args)
         {
-            if (Environment.OSVersion.Platform == PlatformID.Win32NT)
+            if (OperatingSystem.IsWindows())
             {
                 CreateHostBuilderWindows(args).Build().Run();
             }
 
-            if (Environment.OSVersion.Platform == PlatformID.Unix)
+            if (OperatingSystem.IsLinux())
             {
                 CreateHostBuilder(args).Build().Run();
             }

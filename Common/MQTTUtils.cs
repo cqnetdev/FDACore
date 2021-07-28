@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.Versioning;
 using System.Security.Principal;
 using System.ServiceProcess;
 using System.Text;
@@ -46,32 +47,30 @@ namespace Common
             else { return error; }
         }
 
-
         public static bool ThisProcessIsAdmin()
         {
-
-            if (Environment.OSVersion.Platform == PlatformID.Win32NT)
+            if (OperatingSystem.IsWindows())
             {
                 return new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator);
             }
             
-            if (Environment.OSVersion.Platform == PlatformID.Unix)
+            if (OperatingSystem.IsLinux())
             {
                 return Environment.UserName == "root";
             }
 
-            return false;
+            return false; // unrecognized OS
         }
 
 
         public static bool ServiceInstalled()
         {
-            if (Environment.OSVersion.Platform == PlatformID.Win32NT)
+            if (OperatingSystem.IsWindows())
             {
                 return ServiceController.GetServices().Any(serviceController => serviceController.ServiceName.Equals(serviceName));
             }
 
-            if (Environment.OSVersion.Platform == PlatformID.Unix)
+            if (OperatingSystem.IsLinux())
             {
                 string result = RunCommand("systemctl", "status " + serviceName);
 
@@ -86,7 +85,7 @@ namespace Common
         {
             string starttype = "unknown start type (service not found)";
             // check if the service is set to run automatically on startup
-            if (Environment.OSVersion.Platform == PlatformID.Win32NT)
+            if (OperatingSystem.IsWindows())
             {
                 ServiceController sc = new ServiceController() { ServiceName = serviceName };
          
@@ -97,7 +96,7 @@ namespace Common
                 catch { }
             }
 
-            if (Environment.OSVersion.Platform == PlatformID.Unix)
+            if (OperatingSystem.IsLinux())
             {
                 string result = RunCommand("systemctl", "status " + serviceName);
 
@@ -116,7 +115,7 @@ namespace Common
         public static string InstallMosquitto()
         {
             string error = "";
-            if (Environment.OSVersion.Platform == PlatformID.Win32NT)
+            if (OperatingSystem.IsWindows())
             {
                 error = RunMosquittoExecutable("install");
                 if (error != String.Empty)
@@ -125,7 +124,7 @@ namespace Common
                 return error;
             }
 
-            if (Environment.OSVersion.Platform == PlatformID.Unix)
+            if (OperatingSystem.IsLinux())
             {
                 // install mosquitto
                 RunCommand("wget", "http://repo.mosquitto.org/debian/mosquitto-repo.gpg.key");
@@ -153,7 +152,7 @@ namespace Common
         public static string UnInstallMosquitto()
         {
             string error = "";
-            if (Environment.OSVersion.Platform == PlatformID.Win32NT)
+            if (OperatingSystem.IsWindows())
             {
                 error = RunMosquittoExecutable("uninstall");
                 if (error != String.Empty)
@@ -161,7 +160,7 @@ namespace Common
 
             }
 
-            if (Environment.OSVersion.Platform == PlatformID.Unix)
+            if (OperatingSystem.IsLinux())
             {
                error = RunCommand("apt-get", "-y remove mosquitto");
             }
@@ -209,7 +208,7 @@ namespace Common
         public static string GetMQTTStatus()
         {
             string status = "unknown";
-            if (Environment.OSVersion.Platform == PlatformID.Win32NT)
+            if (OperatingSystem.IsWindows())
             {
                 ServiceController sc = new ServiceController() { ServiceName = serviceName };
                 try
@@ -222,7 +221,7 @@ namespace Common
             }
 
 
-            if (Environment.OSVersion.Platform == PlatformID.Unix)
+            if (OperatingSystem.IsLinux())
             {
                 string result = RunCommand("systemctl", "status " + serviceName);
                 if (result.Contains("active (running)"))
@@ -239,7 +238,7 @@ namespace Common
 
         public static string StopMosquittoService()
         {
-            if (Environment.OSVersion.Platform == PlatformID.Win32NT)
+            if (OperatingSystem.IsWindows())
             {
                 ServiceController sc = new ServiceController() { ServiceName = serviceName };
                 try
@@ -257,7 +256,7 @@ namespace Common
                 return string.Empty;
             }
 
-            if (Environment.OSVersion.Platform == PlatformID.Unix)
+            if (OperatingSystem.IsLinux())
             {
                 string result = RunCommand("systemctl", "stop " + serviceName);
                 return result;
@@ -269,7 +268,7 @@ namespace Common
 
         public static string StartMosquittoService()
         {
-            if (Environment.OSVersion.Platform == PlatformID.Win32NT)
+            if (OperatingSystem.IsWindows())
             {
                 ServiceController sc = new ServiceController() { ServiceName = serviceName };
 
@@ -288,7 +287,7 @@ namespace Common
                 return string.Empty;
             }                   
 
-            if (Environment.OSVersion.Platform == PlatformID.Unix)
+            if (OperatingSystem.IsLinux())
             {
                 string result = RunCommand("systemctl", "start " + serviceName);
                 return result;
@@ -331,7 +330,7 @@ namespace Common
                 return "Service not installed, and an attempt to installed it failed: " + error;
 
             // environment variable is windows only
-            if (Environment.OSVersion.Platform == PlatformID.Win32NT)
+            if (OperatingSystem.IsWindows())
             {
                 // check that the required environment variable exists
                 bool repaired = false;
@@ -372,14 +371,14 @@ namespace Common
             string result = "";
             if (GetMQTTStartMode() != "Automatic")
             {
-                if (Environment.OSVersion.Platform == PlatformID.Win32NT)
+                if (OperatingSystem.IsWindows())
                 {
                     // no way to just change the start mode, uninstall it and re-install it and the intaller will set it to automatic
                     UnInstallMosquitto();
                     result = InstallMosquitto();
                 }
 
-                if (Environment.OSVersion.Platform == PlatformID.Unix)
+                if (OperatingSystem.IsLinux())
                 {
                     // enable the service
                     Console.WriteLine("Enabling the service");
