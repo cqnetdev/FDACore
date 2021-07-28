@@ -516,9 +516,5 @@
         private SuperSpecialPictureBox imgBrokerStatus;
         private SuperSpecialPictureBox imgControllerServiceStatus;
         private System.Windows.Forms.ToolStripMenuItem disconnectToolStripMenuItem;
-        private SuperSpecialPictureBox superSpecialPictureBox2;
-        private SuperSpecialPictureBox superSpecialPictureBox1;
-        private ConnDetailsCtrl connDetailsCtrl;
-        private QueueHistory queueHistory1;
     }
 }
