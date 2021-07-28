@@ -64,17 +64,17 @@ namespace FDA
         private void HandleUserScriptCompileError(string scriptID, List<string> errors)
         {
             Scripter.GetScript(scriptID).Enabled = false;
-            Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "Scripter", "", "User script '" + scriptID + "' has been disabled because it failed to compile, error(s): " + String.Join("\n",errors));
+            Globals.SystemManager.LogApplicationEvent(Globals.FDANow(),"Script","","User script '" + scriptID + "' has been disabled because it failed to compile, error(s): " + String.Join("\n",errors));
         }
         private void HandleUserScriptRuntimeError(string scriptID, string errorMsg)
         {
             Scripter.GetScript(scriptID).Enabled = false;
-            Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "Scripter", "", "User script '" + scriptID + "' has been disabled because it produced a run-time error: " + errorMsg);
+            Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "Script", "", "User script '" + scriptID + "' has been disabled because it produced a run-time error: " + errorMsg);
         }
 
         private void HandleUserScriptExecutedEvent(string scriptID)
         {
-            Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "Scripter", "", "User script " + scriptID + "() executed");
+            Globals.SystemManager.LogApplicationEvent(Globals.FDANow(),"Script", "", "User script " + scriptID + "() executed");
         }
 
         public int GetTotalQueueCounts()
@@ -209,7 +209,7 @@ namespace FDA
 
         private void CreatePubSubConnectionMgr(FDASourceConnection connectionconfig)
         {
-           Globals.SystemManager.LogApplicationEvent(this,"","CreatePubSubConnectionMgr()");
+           Globals.SystemManager.LogApplicationEvent(this,"","CreatePubSubConnectionMgr(" + connectionconfig.Description + ")");
             string[] connDetails;
             PubSubConnectionManager newConn = null;
 
@@ -225,7 +225,7 @@ namespace FDA
                         CommsLogEnabled = connectionconfig.CommsLogEnabled,
                         MQTTEnabled = false // connectionconfig.MQTTEnabled;
                     };
-                    Globals.SystemManager.LogApplicationEvent(this, "", "Configuring manager as OPCUA " + connDetails[0] + ":" + connDetails[1]);
+                    //Globals.SystemManager.LogApplicationEvent(this, "", "Configuring manager as OPCUA " + connDetails[0] + ":" + connDetails[1]);
                     newConn.ConfigureAsOPCUA(
                         connDetails[0],             // host
                         int.Parse(connDetails[1])); // port
@@ -277,6 +277,8 @@ namespace FDA
       
         private void CreateRRConnectionMgr(FDASourceConnection connectionconfig)
         {
+            Globals.SystemManager.LogApplicationEvent(this, "", "CreateRRConnectionMgr(" + connectionconfig.Description + ")");
+
             string[] connDetails = connectionconfig.SCDetail01.Split(':');  // separate the hostname from the port
    
             // create a new connection manager
@@ -385,7 +387,7 @@ namespace FDA
                 //if (!module.enabled)
                 //   continue;
 
-                 Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "Scripter", "Loading user script '" + scriptDef.script_name + "'");
+                 Globals.SystemManager.LogApplicationEvent(this, "", "Loading user script '" + scriptDef.script_name + "'");
                 try
                 {
                     Scripter.LoadScript(scriptDef.script_name, scriptDef.script, scriptDef.enabled, scriptDef.run_spec);
