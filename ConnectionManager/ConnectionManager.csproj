@@ -5,8 +5,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\BSAP\BSAP.csproj" />
     <ProjectReference Include="..\Modbus\Modbus.csproj" />
     <ProjectReference Include="..\OPC\OPC.csproj" />
+    <ProjectReference Include="..\ROC\ROC.csproj" />
   </ItemGroup>
 
   <ItemGroup>

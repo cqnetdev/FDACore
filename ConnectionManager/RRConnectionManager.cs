@@ -6,14 +6,13 @@ using System.ComponentModel;
 using System.Net.Sockets;
 using System.IO;
 using Common;
-using ROC;
 using Modbus;
-using BSAP;
 using System.Runtime.CompilerServices;
 using System.Diagnostics;
 using System.IO.Ports;
-using System.Reflection;
 using System.Net;
+using ROC;
+using BSAP;
 
 namespace FDA
 {
@@ -956,7 +955,7 @@ namespace FDA
 
                         // record the request timestamp for the first transaction as the start time for the group
 
-                        if (currentRequestGroup.CommsInitiatedTimestamp == null)
+                        if (currentRequestGroup.CommsInitiatedTimestamp == DateTime.MinValue)
                             currentRequestGroup.CommsInitiatedTimestamp = currentRequest.RequestTimestamp;
 
                         if (ConnectionType == ConnType.EthernetUDP && currentRequest.UDPIPAddr != null)
