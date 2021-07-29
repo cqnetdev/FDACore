@@ -128,6 +128,7 @@ namespace FDA
                 // create connection objects for each DSSourceConnection            
                 List<FDASourceConnection> ConnectionList = _dbManager.GetAllConnectionconfigs();
 
+                // create the connection managers in parallel
                 List<Task> taskList = new();
                 foreach (FDASourceConnection connectionconfig in ConnectionList)
                 {
@@ -145,6 +146,7 @@ namespace FDA
                     }
                 }
 
+                // wait for all connection manager creation tasks to finish
                 Task.WaitAll(taskList.ToArray());
                 taskList.Clear();
 
@@ -541,7 +543,7 @@ namespace FDA
                     _backfillManager.AnalyzeResponse(e.RequestRef);
             }  
             
-            // if this is a completed backfill request, send it to the dbMananger to be saved in the DB
+            // if this is a completed backfill request, send it to the dbManager to be saved in the DB
             if (e.RequestRef.MessageType == DataRequest.RequestType.Backfill)
                 _dbManager.WriteDataToDB(e.RequestRef);
         }
@@ -557,7 +559,6 @@ namespace FDA
             }
 
             // if the analysis resulted in any backfill groups, send them to the connection manager for processing
-            // (do they need to go to "PrepareAndSendRequestGroups()"? or can they go directly to the connection?
             if (e.BackfillGroups != null)
                 if (e.BackfillGroups.Count > 0)
                 {

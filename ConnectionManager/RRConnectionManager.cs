@@ -132,10 +132,10 @@ namespace FDA
         public StopBits SerialStopBits { get => _serialStopBits; set { if (value != _serialStopBits) { _serialStopBits = value; HandlePropertyChanged(); } } }
         public Handshake SerialHandshake { get => _serialHandshake; set { if (value != _serialHandshake) { _serialHandshake = value; HandlePropertyChanged(); } } }
         public string SerialPortName { get => _serialPortName; set { if (value != _serialPortName) { _serialPortName = value; HandlePropertyChanged(); } } }
-        public int Priority0Count { get => _priority0Count; set { if (value != _priority0Count) { _priority0Count = value; HandlePropertyChanged("Priority0Count", Globals.FDANow().Ticks); } } }
-        public int Priority1Count { get => _priority1Count; set { if (value != _priority1Count) { _priority1Count = value; HandlePropertyChanged("Priority1Count", Globals.FDANow().Ticks); } } }
-        public int Priority2Count { get => _priority2Count; set { if (value != _priority2Count) { _priority2Count = value; HandlePropertyChanged("Priority2Count", Globals.FDANow().Ticks); } } }
-        public int Priority3Count { get => _priority3Count; set { if (value != _priority3Count) { _priority3Count = value; HandlePropertyChanged("Priority3Count", Globals.FDANow().Ticks); } } }
+        public int Priority0Count { get => _priority0Count; set { if (value != _priority0Count) { _priority0Count = value; HandlePropertyChanged(nameof(Priority0Count), Globals.FDANow().Ticks); } } }
+        public int Priority1Count { get => _priority1Count; set { if (value != _priority1Count) { _priority1Count = value; HandlePropertyChanged(nameof(Priority1Count), Globals.FDANow().Ticks); } } }
+        public int Priority2Count { get => _priority2Count; set { if (value != _priority2Count) { _priority2Count = value; HandlePropertyChanged(nameof(Priority2Count), Globals.FDANow().Ticks); } } }
+        public int Priority3Count { get => _priority3Count; set { if (value != _priority3Count) { _priority3Count = value; HandlePropertyChanged(nameof(Priority3Count), Globals.FDANow().Ticks); } } }
         public DateTime LastCommsTime { get => _lastCommsDateTime; set { if (value != _lastCommsDateTime) { _lastCommsDateTime = value; HandlePropertyChanged(); } } }
         public string ConnDetails { get => _connDetails; set { if (value != _connDetails) { _connDetails = value; HandlePropertyChanged(); } } }
 
@@ -262,7 +262,7 @@ namespace FDA
 
         public Globals.ConnDetails GetConnSettings()
         {
-            Globals.ConnDetails settings = new Globals.ConnDetails()
+            Globals.ConnDetails settings = new()
             {
                 ID = ConnectionID.ToString(),
                 Description = Description,
@@ -434,7 +434,7 @@ namespace FDA
                     _bgCommsWorker.CancelAsync();
 
                 TimeSpan timeLimit = TimeSpan.FromSeconds(90); // TimeSpan.FromMilliseconds(_socketConnectionAttemptTimeout * _maxSocketConnectionAttempts * 2);
-                Stopwatch timeoutTimer = new Stopwatch();
+                Stopwatch timeoutTimer = new();
                 timeoutTimer.Start();
 
                 // new Dec 17 - ensure that the threads have exited before disconnecting (avoid crashes due to connection becoming null in the middle of an operation)
@@ -465,7 +465,7 @@ namespace FDA
                 // new Dec 17 - ensure that the threads have exited before disconnecting (avoid crashes due to connection becoming null in the middle of an operation)
                 // allow up to twice the total amount of time required for a connection attempt for the threads to exit (should be plenty of time, but prevents an infinite loop in the event that something goes haywire)
                 TimeSpan timeLimit = TimeSpan.FromMilliseconds(_socketConnectionAttemptTimeout * _maxSocketConnectionAttempts * 2);
-                Stopwatch timeoutTimer = new Stopwatch();
+                Stopwatch timeoutTimer = new();
                 timeoutTimer.Start();
                 while (timeoutTimer.Elapsed < timeLimit &&  _bgCommsWorker.IsBusy)
                 {
@@ -588,15 +588,15 @@ namespace FDA
 
         private void LogCommsEvent(DataRequest currentRequest, RequestGroup currentGroup, int attemptCount)
         {
-            string devaddr;
-            if (currentRequest.Protocol == "BSAPUDP")
-                devaddr = currentRequest.UDPIPAddr;
-            else
-                devaddr = currentRequest.NodeID;
+            //string devaddr;
+            //if (currentRequest.Protocol == "BSAPUDP")
+            //    devaddr = currentRequest.UDPIPAddr;
+            //else
+            //    devaddr = currentRequest.NodeID;
 
             if (currentGroup.CommsLogEnabled || CommsLogEnabled)
             {
-                TransactionLogItem logItem = new TransactionLogItem(currentRequest, attemptCount, this.ConnectionID, currentGroup.ID, currentRequest.GroupSize, currentRequest.GroupIdxNumber,"Queue " + currentGroup.Priority + " count = " + _queueManager.GetQueueCount(currentGroup.Priority));
+                TransactionLogItem logItem = new(currentRequest, attemptCount, this.ConnectionID, currentGroup.ID, currentRequest.GroupSize, currentRequest.GroupIdxNumber,"Queue " + currentGroup.Priority + " count = " + _queueManager.GetQueueCount(currentGroup.Priority));
                 Globals.SystemManager.LogCommsEvent(logItem);
                 Thread.Sleep(1);
             }           
@@ -604,7 +604,7 @@ namespace FDA
 
         private void LogAckEvent(DateTime eventTime, DataRequest currentRequest)
         {
-            AcknowledgementEvent ack = new AcknowledgementEvent(currentRequest,this.ConnectionID, eventTime, currentRequest.AckBytes, currentRequest.GroupID, currentRequest.GroupSize, currentRequest.GroupIdxNumber);
+            AcknowledgementEvent ack = new(currentRequest,this.ConnectionID, eventTime, currentRequest.AckBytes, currentRequest.GroupID, currentRequest.GroupSize, currentRequest.GroupIdxNumber);
             Globals.SystemManager.LogAckEvent(ack);
         }
 
@@ -629,7 +629,7 @@ namespace FDA
             Thread.Sleep(1);
         }
 
-        private void ProtocolResponseValidityCheck(DataRequest transaction,bool finalAttempt)
+        private static void ProtocolResponseValidityCheck(DataRequest transaction,bool finalAttempt)
         {
             
             switch (transaction.Protocol.ToUpper())
@@ -653,7 +653,7 @@ namespace FDA
 
         private bool IsTCPClientConnected()
         {
-            bool clientConnected = true;
+            bool clientConnected;
        
             if (_tcpConnection == null)
                 clientConnected = false;
@@ -679,7 +679,7 @@ namespace FDA
 
             if (!clientConnected)
             {
-                clientConnected = false;
+                //clientConnected = false;
                 ConnectionStatus = Globals.ConnStatus.Disconnected;
                 LogCommsEvent(initTime.Add(runTime.Elapsed),"Connection: " + Description + " - remote device not connected");
             }
@@ -820,7 +820,7 @@ namespace FDA
                 else
                     return;
 
-                MemoryStream memStream = new MemoryStream();
+                MemoryStream memStream = new();
 
                 while (_queueManager.TotalQueueCount > 0 && CommunicationsEnabled) // repeat as long as there are request groups found in the queue
                 {
@@ -975,7 +975,7 @@ namespace FDA
                                 return;
                             }
                             // perform the transaction (attempt up to the set maximum number of times)
-                            Stopwatch transactionStopwatch = new Stopwatch();
+                            Stopwatch transactionStopwatch = new();
                             DateTime eventTime = initTime.Add(runTime.Elapsed);
                             if (eventTime.ToString() == _lastLogTimestamp.ToString()) eventTime = eventTime.AddMilliseconds(1);
                             _lastLogTimestamp = eventTime;
@@ -1073,7 +1073,7 @@ namespace FDA
                             {
                                 // failed to read the response, record the error message and move on to the next DataRequest
                                 currentRequest.ErrorMessage = ex.Message;
-                                currentRequest.ResponseBytes = new Byte[0];
+                                currentRequest.ResponseBytes = Array.Empty<byte>();
                                 currentRequest.SetStatus(DataRequest.RequestStatus.Error);
                                 Globals.SystemManager.LogApplicationError(initTime.Add(runTime.Elapsed), ex, "Error while attempting to read the response to request " + currentRequest.GroupIdxNumber + " of group " + currentRequestGroup.ID);
                                 transactionStopwatch.Stop();
@@ -1192,7 +1192,7 @@ namespace FDA
                                 case "BSAP": BSAPProtocol.CancelDeviceRequests(currentRequest); break;
                             }
                             AddRequestTimeSpanToBuffer(currentRequest.RequestTimestamp, initTime.Add(runTime.Elapsed));
-                            currentRequest.ResponseBytes = new byte[0];
+                            currentRequest.ResponseBytes = Array.Empty<byte>();
                             AddToCompletedQueue(currentRequest);
                             requestIdx++;
                             continue;  // next request
@@ -1257,7 +1257,7 @@ namespace FDA
             catch (Exception ex)
             {
                 // send request failed (application error) record error message and move on to the next DataRequest
-                currentTrans.ResponseBytes = new Byte[0];
+                currentTrans.ResponseBytes = Array.Empty<byte>();
                 currentTrans.ErrorMessage = ex.Message;
                 currentTrans.SetStatus(DataRequest.RequestStatus.Error);
                 Globals.SystemManager.LogApplicationError(initTime.Add(runTime.Elapsed), ex,"Error occurred while attempting to send request " + currentTrans.GroupIdxNumber + " of group " + currentTrans.GroupID);
@@ -1282,7 +1282,7 @@ namespace FDA
             ConnectionStatus = Globals.ConnStatus.Connecting;
             string errorMsg = "";
             byte status = 0;
-            Stopwatch connectionTimer = new Stopwatch();
+            Stopwatch connectionTimer = new();
             DateTime startTime = initTime.Add(runTime.Elapsed);
             connectionTimer.Start();
 
@@ -1394,14 +1394,14 @@ namespace FDA
 
             // attempt connection
             int attemptCount = 1;
-            Stopwatch connectionTimer = new Stopwatch();
-            Stopwatch attemptTimer = new Stopwatch();
+            Stopwatch connectionTimer = new();
+            Stopwatch attemptTimer = new();
 
             //while (!_tcpConnection.Connected && !Globals.ShuttingDown && !CommsThreadCancelled() )
             //{
                 connectionTimer.Reset();
                 connectionTimer.Start();
-                attemptCount = 1;
+                //attemptCount = 1;
                 try
                 {
                     while (!_tcpConnection.Connected && attemptCount <= MaxSocketConnectionAttempts && !CommsThreadCancelled())
@@ -1495,7 +1495,7 @@ namespace FDA
         {
             //udp.ExclusiveAddressUse = false;
             //udp.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
-            UdpClient udp = new UdpClient();
+            UdpClient udp = new();
            
             try
             {           
@@ -1584,6 +1584,7 @@ namespace FDA
         #region cleanup
         public void Dispose()
         {
+            GC.SuppressFinalize(this);
             Globals.SystemManager.LogApplicationEvent(this, "", "Shutting down connection manager for '" + Description + "' (" + ConnectionID + ")");
 
             base.MQTTEnabled = false;

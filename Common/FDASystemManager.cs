@@ -318,7 +318,7 @@ namespace Common
             _appConfig.Clear();
             // load app config settings (if present)
             string optionName = "";
-            string query = string.Empty;
+            string query;
      
                 query = "SELECT count(1) from (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'fdaconfig') A;";
                     
@@ -387,7 +387,7 @@ namespace Common
             if (config.OPTIONNAME == "BackfillDataLapseLimit")
                 return;
 
-            bool isReadOnly = false;
+            bool isReadOnly;
             if (changeType != "NONE")
             {
                 isReadOnly = ReadOnlyOptions.Contains(config.OPTIONNAME);
@@ -693,7 +693,7 @@ namespace Common
 
         private int ExecuteSQLSync(string sql,string connString, bool isScalar = false)
         {
-            int result = 0;
+            int result;
 
             if (isScalar)
                 result = (int)ExecuteScalar(sql,connString);
@@ -713,7 +713,6 @@ namespace Common
 
             if (versioncolumnCheck < 1)
             {
-                versionColExists = false;
                 sql = "ALTER TABLE FDAStarts ADD FDAVersion varchar(50);";
                 versionColExists = (ExecuteSQLSync(sql,SystemDBConnectionString) == -1);
             }

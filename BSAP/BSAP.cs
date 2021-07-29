@@ -69,7 +69,7 @@ namespace BSAP
             else
             {
                 // check if a device reference is present in header element 1
-                string deviceRefString = null;
+                string deviceRefString;
                 string localAddrStr;
                 string[] headerElement1 = header[1].Split('^');
                 localAddrStr = headerElement1[0];
@@ -105,8 +105,7 @@ namespace BSAP
                 // UDP has IP:port as the first two elements
                 if (isUDP)
                 {
-                    IPAddress ip;
-                    if (!IPAddress.TryParse(header[0], out ip))
+                    if (!IPAddress.TryParse(header[0], out _))
                     {
                         RecordValidationError(obj, groupID, requestor, "contains a request with an invalid IP address in the header '" + header[0] + "'");
                         valid = false;
@@ -310,7 +309,7 @@ namespace BSAP
             FDADevice deviceSettings = null;
 
             Guid tagID;
-            List<ushort> MSDRequestList = new List<ushort>();
+            List<ushort> MSDRequestList = new();
             List<Tag> MSDTagList = new List<Tag>();
             List<string> SignalNameRequestList = new List<string>();
             List<Tag> SignalNameTagList = new List<Tag>();
