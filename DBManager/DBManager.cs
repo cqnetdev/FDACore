@@ -32,7 +32,10 @@ namespace FDA
         private readonly CacheManager _cacheManager;
         protected DateTime _PreviousDBStartTime = DateTime.MinValue;
 
+        // incorrectly identified by IDE as unused, suppress the warning
+#pragma warning disable IDE0052 // Remove unread private members
         private readonly Timer _logTrimTimer;
+#pragma warning restore IDE0052 // Remove unread private members
 
         public delegate void ConfigChangeHandler(object sender, ConfigEventArgs e);
         public event ConfigChangeHandler ConfigChange;
@@ -64,9 +67,9 @@ namespace FDA
 
 
         protected Timer _keepAliveTimer;
-        protected TimeSpan _DBKeepAliveRate = new TimeSpan(0, 0, 3);
-        protected Stopwatch _DBDownTimer = new Stopwatch();
-        protected readonly TimeSpan _databaseDownNotificationLimit = new TimeSpan(0, 30, 0); // in days (default to 30 minutes)
+        protected TimeSpan _DBKeepAliveRate = new(0, 0, 3);
+        protected Stopwatch _DBDownTimer = new();
+        protected readonly TimeSpan _databaseDownNotificationLimit = new(0, 30, 0); // in days (default to 30 minutes)
 
         public string ConnectionString { get; set; }
 
@@ -98,10 +101,10 @@ namespace FDA
 
             // load custom batch write settings (if specified)
             if (Globals.SystemManager.GetAppConfig().ContainsKey("BatchInsertMaxRecords"))
-                int.TryParse(Globals.SystemManager.GetAppConfig()["BatchInsertMaxRecords"].OptionValue, out batchLimit);
+               _ = int.TryParse(Globals.SystemManager.GetAppConfig()["BatchInsertMaxRecords"].OptionValue, out batchLimit);
 
             if (Globals.SystemManager.GetAppConfig().ContainsKey("BatchInsertMaxTime"))
-                int.TryParse(Globals.SystemManager.GetAppConfig()["BatchInsertMaxTime"].OptionValue, out batchTimeout);
+                _ = int.TryParse(Globals.SystemManager.GetAppConfig()["BatchInsertMaxTime"].OptionValue, out batchTimeout);
 
             // cap write batches at 500 records
             if (batchLimit > 500)
@@ -115,7 +118,7 @@ namespace FDA
             //find the amount of time between now and midnight and set the timer to execute then, and every 24 hours from then
             DateTime currentDateTime = DateTime.Now;
             DateTime tomorrow = DateTime.Now.AddDays(1);
-            DateTime timeOfFirstRun = new DateTime(tomorrow.Year, tomorrow.Month, tomorrow.Day, 0, 0, 0);
+            DateTime timeOfFirstRun = new(tomorrow.Year, tomorrow.Month, tomorrow.Day, 0, 0, 0);
             TimeSpan timeFromNowToFirstRun = timeOfFirstRun.Subtract(currentDateTime);
 
 
@@ -324,7 +327,7 @@ namespace FDA
 
         protected void DeleteRequestGroup(List<RequestGroup> groupsToDelete)
         {
-            StringBuilder sb = new StringBuilder();
+            StringBuilder sb = new();
             sb.Append("delete from ");
             sb.Append(Globals.SystemManager.GetTableName("FDADataBlockRequestGroup"));
             sb.Append(" where DRGUID in (");
@@ -335,7 +338,7 @@ namespace FDA
 
             foreach (RequestGroup group in groupsToDelete)
             {
-                sb.Append("'");
+                sb.Append('\'');
                 sb.Append(group.ID);
                 sb.Append("',");
             }
@@ -398,7 +401,7 @@ namespace FDA
                         }
                     }
 
-                    StringBuilder batch = new StringBuilder();
+                    StringBuilder batch = new();
                     object value;
                     int querycount = 0;
 
@@ -471,7 +474,7 @@ namespace FDA
                                     batch.Append(DateTimeHelpers.FormatDateTime(tag.Timestamp));
                                     batch.Append("',");
                                     batch.Append(value);
-                                    batch.Append(",");
+                                    batch.Append(',');
                                     batch.Append(tag.Quality);
                                     batch.Append(");");
 
@@ -613,7 +616,7 @@ namespace FDA
 
         public void GetLastValues(string table, Dictionary<Guid, double> values)
         {
-            StringBuilder query = new StringBuilder("select A.DPDUID,A.Value FROM ");
+            StringBuilder query = new("select A.DPDUID,A.Value FROM ");
             query.Append(table);
             query.Append(" A inner join (select DPDUID, MAX(Timestamp) as LastEntry FROM ");
             query.Append(table);
@@ -622,13 +625,13 @@ namespace FDA
             foreach (Guid id in values.Keys)
             {
                 if (!first)
-                    query.Append(",");
+                    query.Append(',');
                 else
                     first = false;
 
-                query.Append("'");
+                query.Append('\'');
                 query.Append(id);
-                query.Append("'");
+                query.Append('\'');
             }
             query.Append(")) B on A.DPDUID = B.DPDUID and A.Timestamp = B.LastEntry");
 
@@ -651,13 +654,13 @@ namespace FDA
 
 
             // look for any tags that did not get a value, mention them in an event message
-            StringBuilder errorList = new StringBuilder();
+            StringBuilder errorList = new();
             foreach (KeyValuePair<Guid, double> kvp in values)
             {
                 if (double.IsNaN(kvp.Value))
                 {
                     errorList.Append(kvp.Key);
-                    errorList.Append(",");
+                    errorList.Append(',');
                 }
             }
 
@@ -741,9 +744,9 @@ namespace FDA
         }
 
 
-        protected string[] FindNulls(object thing, List<string> exceptionList = null)
+        protected static string[] FindNulls(object thing, List<string> exceptionList = null)
         {
-            List<string> nullProperties = new List<string>();
+            List<string> nullProperties = new();
 
             foreach (System.Reflection.PropertyInfo property in thing.GetType().GetProperties())
             {
@@ -770,7 +773,7 @@ namespace FDA
 
             string CommsLog = Globals.SystemManager.GetTableName("CommsLog");
             string AppLog = Globals.SystemManager.GetTableName("AppLog");
-            int result = 0;
+            int result;
 
             // SQL Server version
             //string query = "DELETE FROM " + AppLog + " where Timestamp < DATEADD(HOUR," + Globals.UTCOffset + ",GETUTCDATE()) - " + Globals.SystemManager.EventLogMaxDays;
@@ -899,7 +902,7 @@ namespace FDA
             bool commsLogExists = false;
             //bool FDAServiceBrokerEnabled = false;
             // bool FDASystemServiceBrokerEnabled = false;
-            string FDAdbname;
+            //string FDAdbname;
             object result;
             string query;
 
@@ -921,10 +924,11 @@ namespace FDA
             }
 
 
-            FDAdbname = "FDA";
-            if (Globals.SystemManager.GetAppConfig().ContainsKey("FDADBName"))
-                FDAdbname = Globals.SystemManager.GetAppConfig()["FDADBName"].OptionValue;
-
+           
+            //if (Globals.SystemManager.GetAppConfig().ContainsKey("FDADBName"))
+            //    FDAdbname = Globals.SystemManager.GetAppConfig()["FDADBName"].OptionValue;
+            //else
+            //    FDAdbname = "FDA";
 
 
             if (!appLogexists)
@@ -946,7 +950,7 @@ namespace FDA
 
         protected List<RequestGroup> RequestGroupListToRequestGroups(Guid requestorID, int priority, string requestGroupString, out List<FDATask> otherTasks)
         {
-            List<RequestGroup> requestGroups = new List<RequestGroup>();
+            List<RequestGroup> requestGroups = new();
             string[] requestgroupconfigs;
             RequestGroup newRequestGroup;
             requestgroupconfigs = requestGroupString.Split('|');
@@ -1369,7 +1373,7 @@ namespace FDA
                 try
                 {
                     ID = row["FRGSUID"].ToString();
-                    FDARequestGroupScheduler scheduler = new FDARequestGroupScheduler()
+                    FDARequestGroupScheduler scheduler = new()
                     {
                         FRGSUID = (Guid)row["FRGSUID"],
                         Description = (string)row["Description"],
@@ -1479,7 +1483,7 @@ namespace FDA
             // the data logger requires a DataRequest object containing a list of Tag objects with data to be written
             // we'll create one for the updated soft point
 
-            Tag softPointTag = new Tag(updatedSoftpoint.DPDUID)
+            Tag softPointTag = new(updatedSoftpoint.DPDUID)
             {
                 Timestamp = updatedSoftpoint.LastRead.Timestamp,
                 Quality = updatedSoftpoint.LastRead.Quality,
@@ -1487,7 +1491,7 @@ namespace FDA
                 TagID = updatedSoftpoint.DPDUID
             };
 
-            DataRequest softTagRequestObject = new DataRequest()
+            DataRequest softTagRequestObject = new()
             {
                 RequestID = Guid.NewGuid().ToString(),
                 TagList = new List<Tag> { softPointTag },
@@ -1510,7 +1514,7 @@ namespace FDA
             ushort evtsPtr = (ushort)PtrPositionRequest.TagList[1].Value;
             DateTime evtsTimestamp = PtrPositionRequest.TagList[1].Timestamp;
             string nodeID = PtrPositionRequest.NodeID;
-            int affectedRows = 0;
+            int affectedRows;
 
             string ResponseTimestamp = DateTimeHelpers.FormatDateTime(PtrPositionRequest.ResponseTimestamp);
 
@@ -1568,7 +1572,7 @@ namespace FDA
             return new byte[] { Convert.ToByte(lastRead), Convert.ToByte(currPtr) };
         }
 
-        public List<object> ParseStatsCalcParams(string paramstring, out string error)
+        public static List<object> ParseStatsCalcParams(string paramstring, out string error)
         {
             string[] calcParams = paramstring.Split(':');
 
@@ -1580,7 +1584,7 @@ namespace FDA
 
             DateTime fromTime;
             DateTime toTime;
-            List<object> statsCalcParams = new List<object>();
+            List<object> statsCalcParams = new();
             var ci = new CultureInfo("en-CA");
             if (calcParams[0].ToUpper() == "RECENT")
             {
@@ -1744,7 +1748,7 @@ namespace FDA
                 return;
             }
 
-            string action = "";
+            string action;
             DataSubscription olditem = null;
             switch (changeType)
             {
@@ -1763,7 +1767,6 @@ namespace FDA
                     {
                         action = "deleted from the database but was not found in the FDA, so no action was taken";
                     }
-                    action = "deleted";
                     break;
                 case "UPDATE":
                     if (_dataSubscriptionsConfig.ContainsKey(subscription.subscription_id))
@@ -1820,7 +1823,6 @@ namespace FDA
                     {
                         action = "deleted from the database but was not found in the FDA, so no action was taken";
                     }
-                    action = "deleted"; 
                     break;
                 case "UPDATE":
                     if (_scriptsConfig.ContainsKey(scriptModule.script_name))
@@ -1831,9 +1833,9 @@ namespace FDA
                     else
                     {
                         _scriptsConfig.Add(scriptModule.script_name, scriptModule);
-                        action = "not found, adding it as a new Module";
+                        action = "not found, so it was added as a new Module";
                         changeType = "INSERT";
-                        action = "updated";
+                        UserScriptChangeNotification(changeType, scriptModule);
                     }
                     break;
                 default: action = "<action>"; break;
@@ -1930,7 +1932,7 @@ namespace FDA
             // check for nulls
             if (changeType == "INSERT" || changeType == "UPDATE")
             {
-                List<string> exceptionList = new List<string>(new string[] { "backfill_enabled", "backfill_dataID", "backfill_data_structure_type", "backfill_data_lapse_limit", "backfill_data_interval","LastReadDataType"});
+                List<string> exceptionList = new(new string[] { "backfill_enabled", "backfill_dataID", "backfill_data_structure_type", "backfill_data_lapse_limit", "backfill_data_interval","LastReadDataType"});
                 string[] nulls = FindNulls(datapoint, exceptionList);
                 if (nulls.Length > 0)
                 {
@@ -2112,7 +2114,7 @@ namespace FDA
             // check for nulls
             if (changeType == "INSERT" || changeType == "UPDATE")
             {
-                List<string> exceptions = new List<string> { "SCDetail02" };
+                List<string> exceptions = new() { "SCDetail02" };
                 string[] nulls = FindNulls(connection, exceptions);
                 if (nulls.Length > 0)
                 {
@@ -2352,7 +2354,7 @@ namespace FDA
                             return;
                         }
 
-                        List<RequestGroup> demandedGroupList = new List<RequestGroup>();
+                        List<RequestGroup> demandedGroupList = new();
 
                         string[] requestGroupConfigs = demand.RequestGroupList.Split('|');
 
@@ -2480,7 +2482,7 @@ namespace FDA
             }
             _cacheManager.Dispose();
 
-            Stopwatch stopwatch = new Stopwatch();
+            Stopwatch stopwatch = new();
             // wait for datawriter thread to finish (up to 10 seconds)
             if (_dataWriter != null)
             {
@@ -2508,14 +2510,14 @@ namespace FDA
                 _alarmsEventsWriter.Dispose();
             }
 
-            stopwatch = null;
-
 
             lock (_schedConfig) { _schedConfig.Clear(); }
             lock (_requestgroupConfig) { _requestgroupConfig.Clear(); }
             lock (_dataPointConfig) { _dataPointConfig.Clear(); }
             lock (_connectionsConfig) { _connectionsConfig.Clear(); }
             lock (_scriptsConfig) { _scriptsConfig.Clear(); }
+
+            GC.SuppressFinalize(this);
         }
     
 

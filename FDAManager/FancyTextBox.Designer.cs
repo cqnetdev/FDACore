@@ -36,12 +36,12 @@
             // flashtimer
             // 
             this.flashtimer.Interval = 500;
-            this.flashtimer.Tick += new System.EventHandler(this.flashtimer_Tick);
+            this.flashtimer.Tick += new System.EventHandler(this.Flashtimer_Tick);
             // 
             // inhibitTimer
             // 
             this.inhibitTimer.Interval = 1000;
-            this.inhibitTimer.Tick += new System.EventHandler(this.inhibitTimer_Tick);
+            this.inhibitTimer.Tick += new System.EventHandler(this.InhibitTimer_Tick);
             // 
             // FancyTextBox
             // 

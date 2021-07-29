@@ -37,14 +37,7 @@ namespace FDAApp
         static IConfiguration configuration;
         //private string FDAidentifier = "";
         static BackgroundWorker shutdownWorker;
-
-        static private class AppSettings
-        {
-            static string FDAID { get; set; }
-            static string SQLServerInstance { get; set; }
-        }
         
-        /* not .NET Core compatible */
         static private class NativeMethods
         {
             public const int SW_HIDE = 0;
@@ -112,9 +105,11 @@ namespace FDAApp
             try
             {
                 configuration = new ConfigurationBuilder().AddJsonFile("appsettings.json", false, true).Build();
-                appConfig = configuration.GetSection(nameof(AppSettings));
+                appConfig = configuration.GetSection("AppSettings");
+                
                 FDAID = appConfig["FDAID"];
                 DBInstance = appConfig["DatabaseInstance"];
+                
                 DBType = appConfig["DatabaseType"];
                 DBName = appConfig["SystemDBName"];
                 userName = appConfig["SystemLogin"];
@@ -172,7 +167,7 @@ namespace FDAApp
             }
             else
             {
-                Globals.SystemManager.LogApplicationError(Globals.FDANow(), TCPServer.LastError, "Error occurred while initializing the Basic Services Control Port Server");
+                Globals.SystemManager.LogApplicationError(Globals.FDANow(), TCPServer.GetLastError(), "Error occurred while initializing the Basic Services Control Port Server");
             }
 
             // start operational messages server
@@ -377,7 +372,7 @@ namespace FDAApp
                     Globals.MQTT = new MqttClient(o.ToString());
                 }
   
-                IConfigurationSection appConfig = configuration.GetSection(nameof(AppSettings));
+                IConfigurationSection appConfig = configuration.GetSection("AppSettings");
                 string pass = Common.Encrypt.DecryptString(appConfig["MQTT"], "KrdXI6HhS3B8C0CulLtB");
 
                 if (Globals.MQTT.IsConnected)
@@ -446,9 +441,20 @@ namespace FDAApp
         {
              if (_dataAquisitionManager != null)
             {
-                if (DataAcqManager._RRconnectionsDictionary != null)
+                Dictionary<Guid, RRConnectionManager> rrConnections = DataAcqManager.GetRRConnections();
+                if (rrConnections != null)
                 {
-                    foreach (SubscriptionManager.SubscribeableObject connection in DataAcqManager._RRconnectionsDictionary.Values)
+                    foreach (SubscriptionManager.SubscribeableObject connection in rrConnections.Values)
+                    {
+                        if (connection.MQTTEnabled)
+                            connection.PublishAll();  // PublishAll checks if the MQTT enabled flag is set
+                    }
+                }
+
+                Dictionary<Guid, PubSubConnectionManager> pubsubConnections = DataAcqManager.GetPubSubConnections();
+                if (pubsubConnections != null)
+                {
+                    foreach (SubscriptionManager.SubscribeableObject connection in pubsubConnections.Values)
                     {
                         if (connection.MQTTEnabled)
                             connection.PublishAll();  // PublishAll checks if the MQTT enabled flag is set

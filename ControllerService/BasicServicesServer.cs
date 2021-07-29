@@ -19,7 +19,7 @@ namespace ControllerService
             _basicServicesPort.DataAvailable += BasicServices_DataAvailable;
         }
 
-        public void Start()
+        public static void Start()
         {
             _basicServicesPort.Start();
         }
@@ -46,7 +46,7 @@ namespace ControllerService
             switch (command)
             {
                 case "START":
-                    _logger.LogInformation("Start command received, starting FDA", new object[] { });
+                    _logger.LogInformation("Start command received, starting FDA", Array.Empty<object>());
                     StartFDA();
                     //_logger.LogInformation("Replying 'OK' to requestor", new object[] { });
                     _basicServicesPort.Send(e.ClientID, "OK");
@@ -104,8 +104,10 @@ namespace ControllerService
             if (workingDir != "")
                 processStartInfo.WorkingDirectory = workingDir;
 
-            var process = new Process();
-            process.StartInfo = processStartInfo;
+            var process = new Process
+            {
+                StartInfo = processStartInfo
+            };
 
 
             process.Start();

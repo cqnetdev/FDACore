@@ -10,7 +10,7 @@ namespace Common
 
     public class CircularBuffer<T> : IEnumerable
     {
-        private T[] _buffer;
+        private readonly T[] _buffer;
         private int _idx;
         private int _count;
 
@@ -26,7 +26,7 @@ namespace Common
 
         public List<T> GetBuffer()
         {
-            List<T> bufferCopy = new List<T>(_buffer.Length);
+            List<T> bufferCopy = new (_buffer.Length);
             foreach (T item in _buffer)
                 bufferCopy.Add(item);
             return bufferCopy;

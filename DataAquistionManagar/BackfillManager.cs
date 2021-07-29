@@ -40,10 +40,10 @@ namespace FDA
 
         public void AnalyzeResponse(DataRequest request)
         {
-            List<Tag> backfillTags = new List<Tag>();
+            List<Tag> backfillTags = new();
 
             // get the backfill time from options (default to 30 minutes)
-            TimeSpan backfillLimit = new TimeSpan(0, 30, 0);
+            TimeSpan backfillLimit = new(0, 30, 0);
 
 
             try
@@ -119,7 +119,7 @@ namespace FDA
                 // if any tags need to be backfilled, send them to the backfill processor to have requestgroups generated
                 if (backfillTags.Count > 0)
                 {
-                    BackfillItem item = new BackfillItem(request, backfillTags);
+                    BackfillItem item = new(request, backfillTags);
                     lock (_incomingQueue)
                     {
                         _incomingQueue.Enqueue(item);
@@ -152,7 +152,7 @@ namespace FDA
                 }
                
 
-                List<RequestGroup> backfillGroupList = new List<RequestGroup>(); // this is what will be returned to the DataAcqManager 
+                List<RequestGroup> backfillGroupList = new(); // this is what will be returned to the DataAcqManager 
                 List<RequestGroup> TagRequestGroupList;
 
                 //-------------------------------- new code --------------------------------------------------------------------------

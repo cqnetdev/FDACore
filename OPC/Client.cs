@@ -92,8 +92,8 @@ namespace OPC
 
         public List<OpcValue> ReadNodes(string nodelist,out List<Guid> datapointdefs)
         {
-            List<OpcReadNode> toRead = new List<OpcReadNode>();
-            List<Guid> datapoints = new List<Guid>();
+            List<OpcReadNode> toRead = new();
+            List<Guid> datapoints = new();
             string[] nodes = nodelist.Split("$", StringSplitOptions.RemoveEmptyEntries);
             string[] nodeparts;
             int ns;
@@ -104,7 +104,7 @@ namespace OPC
                 toRead.Add(new OpcReadNode(nodeparts[1], ns));
                 datapoints.Add(Guid.Parse(nodeparts[2]));
             }
-           List<OpcValue> values = new List<OpcValue>(_client.ReadNodes(toRead));
+           List<OpcValue> values = new(_client.ReadNodes(toRead));
             datapointdefs = datapoints;
             return values;
         }
@@ -115,7 +115,7 @@ namespace OPC
             string[] nodeparts;
             int ns;
             string path;
-            List<OpcSubscribeNode> nodesList = new List<OpcSubscribeNode>();
+            List<OpcSubscribeNode> nodesList = new();
 
             OpcDataChangeFilter filter;
             if (subscriptionDef.report_on_timestamp_change)

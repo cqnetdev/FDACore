@@ -12,16 +12,16 @@ using System.Windows.Forms;
 
 namespace FDAScripter
 {
-    public partial class frmCompileResult : Form
+    public partial class FrmCompileResult : Form
     {
-        public frmCompileResult(ImmutableArray<Diagnostic> diags)
+        public FrmCompileResult(ImmutableArray<Diagnostic> diags)
         {
             InitializeComponent();
 
-            BindingList<ErrorItem> errors = new BindingList<ErrorItem>();
+            BindingList<ErrorItem> errors = new();
             
             foreach (Diagnostic diag in diags)
-                errors.Add(new frmCompileResult.ErrorItem(diag));
+                errors.Add(new FrmCompileResult.ErrorItem(diag));
 
             dgvDiagnostics.AutoGenerateColumns = true;
             dgvDiagnostics.DataSource = errors;

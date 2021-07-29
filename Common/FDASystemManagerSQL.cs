@@ -47,7 +47,7 @@ namespace Common
 
             if (_appConfigMonitor != null)
             {
-                _appConfigMonitor.OnChanged += _appConfigMonitor_OnChanged;
+                _appConfigMonitor.OnChanged += AppConfigMonitor_OnChanged;
                 _appConfigMonitor.OnStatusChanged += AppConfigMonitor_OnStatusChanged;
                 _appConfigMonitor.OnError += AppConfigMonitor_OnError;
             }
@@ -75,9 +75,9 @@ namespace Common
 
             if (_rocDataTypesMonitor != null)
             {
-                _rocDataTypesMonitor.OnChanged += _rocDataTypesMonitor_OnChanged;
-                _rocDataTypesMonitor.OnStatusChanged += _rocDataTypesMonitor_OnStatusChanged;
-                _rocDataTypesMonitor.OnError += _rocDataTypesMonitor_OnError;
+                _rocDataTypesMonitor.OnChanged += RocDataTypesMonitor_OnChanged;
+                _rocDataTypesMonitor.OnStatusChanged += RocDataTypesMonitor_OnStatusChanged;
+                _rocDataTypesMonitor.OnError += RocDataTypesMonitor_OnError;
                 _rocDataTypesMonitor.Start();
             }
 
@@ -104,9 +104,9 @@ namespace Common
 
             if (_RocEventsFormatsMonitor != null)
             {
-                _RocEventsFormatsMonitor.OnChanged += _RocEventsFormatsMonitor_OnChanged;
-                _RocEventsFormatsMonitor.OnStatusChanged += _RocEventsFormatsMonitor_OnStatusChanged;
-                _RocEventsFormatsMonitor.OnError += _RocEventFormatsMonitor_OnError;
+                _RocEventsFormatsMonitor.OnChanged += RocEventsFormatsMonitor_OnChanged;
+                _RocEventsFormatsMonitor.OnStatusChanged += RocEventsFormatsMonitor_OnStatusChanged;
+                _RocEventsFormatsMonitor.OnError += RocEventFormatsMonitor_OnError;
                 _RocEventsFormatsMonitor.Start();
             }
 
@@ -135,7 +135,7 @@ namespace Common
             int maxRetries = 3;
             Retry:
 
-            using (SqlConnection conn = new SqlConnection(connString))
+            using (SqlConnection conn = new(connString))
             {
                 try
                 {
@@ -182,9 +182,9 @@ namespace Common
         {
             int retries = 0;
             int maxRetries = 3;
-            DataTable result = new DataTable();
+            DataTable result = new();
             Retry:
-            using (SqlConnection conn = new SqlConnection(connString))
+            using (SqlConnection conn = new(connString))
             {
                 try
                 {
@@ -198,7 +198,7 @@ namespace Common
 
                 try
                 {
-                    using (SqlDataAdapter da = new SqlDataAdapter(sql, conn))
+                    using (SqlDataAdapter da = new(sql, conn))
                     {
                         da.Fill(result);
                     }
@@ -228,7 +228,7 @@ namespace Common
             int retries = 0;
 
             Retry:
-            using (SqlConnection conn = new SqlConnection(connString))
+            using (SqlConnection conn = new(connString))
             {
                 try
                 {
@@ -288,7 +288,7 @@ namespace Common
 
         }
 
-        private void _appConfigMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<FDAConfig> e)
+        private void AppConfigMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<FDAConfig> e)
         {
             AppConfigNotification(e.ChangeType.ToString().ToUpper(), e.Entity);
         }
@@ -301,7 +301,7 @@ namespace Common
 
         private void AppConfigMonitor_OnError(object sender, TableDependency.SqlClient.Base.EventArgs.ErrorEventArgs e)
         {
-            _appConfigMonitor.OnChanged -= _appConfigMonitor_OnChanged;
+            _appConfigMonitor.OnChanged -= AppConfigMonitor_OnChanged;
             _appConfigMonitor.OnStatusChanged -= AppConfigMonitor_OnStatusChanged;
             _appConfigMonitor.OnError -= AppConfigMonitor_OnError;
             _appConfigMonitor = null;
@@ -320,8 +320,8 @@ namespace Common
             string triggerQuerySQL = "select TR.name as trigname,U.name as tablename from (select name, parent_obj from sysobjects where type = 'TR') TR inner join (select name, id from sysobjects where name in ('FDAConfig', 'RocDataTypes', 'RocEventFormats')) U on TR.parent_obj = U.id;";
             DataTable triggers = ExecuteQuery(triggerQuerySQL,SystemDBConnectionString);
 
-            string triggerName = "";
-            string tableName = "";
+            string triggerName;
+            string tableName;
             foreach (DataRow row in triggers.Rows)
             {
                 triggerName = (string)row["trigname"];
@@ -334,44 +334,44 @@ namespace Common
 
         }
 
-        private void _RocEventsFormatsMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<RocEventFormats> e)
+        private void RocEventsFormatsMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<RocEventFormats> e)
         {
             ROCEventsNotification(e.ChangeType.ToString().ToUpper(), e.Entity);
         }
 
 
-        private void _RocEventsFormatsMonitor_OnStatusChanged(object sender, TableDependency.SqlClient.Base.EventArgs.StatusChangedEventArgs e)
+        private void RocEventsFormatsMonitor_OnStatusChanged(object sender, TableDependency.SqlClient.Base.EventArgs.StatusChangedEventArgs e)
         {
             if (e.Status != TableDependencyStatus.StopDueToError)
                 LogApplicationEvent(Globals.FDANow(), "SQLTableDependency", "RocEventFormatsMonitor", "Status change: " + e.Status.ToString());
         }
 
 
-        private void _RocEventFormatsMonitor_OnError(object sender, TableDependency.SqlClient.Base.EventArgs.ErrorEventArgs e)
+        private void RocEventFormatsMonitor_OnError(object sender, TableDependency.SqlClient.Base.EventArgs.ErrorEventArgs e)
         {
-            _RocEventsFormatsMonitor.OnChanged -= _RocEventsFormatsMonitor_OnChanged;
-            _RocEventsFormatsMonitor.OnStatusChanged -= _RocEventsFormatsMonitor_OnStatusChanged;
-            _RocEventsFormatsMonitor.OnError -= _RocEventFormatsMonitor_OnError;
+            _RocEventsFormatsMonitor.OnChanged -= RocEventsFormatsMonitor_OnChanged;
+            _RocEventsFormatsMonitor.OnStatusChanged -= RocEventsFormatsMonitor_OnStatusChanged;
+            _RocEventsFormatsMonitor.OnError -= RocEventFormatsMonitor_OnError;
             _RocEventsFormatsMonitor = null;
             Globals.SystemManager.LogApplicationError(Globals.FDANow(), e.Error, "SQL Table change monitor object (RocEventFormats) error: " + e.Error.Message);
         }
     
-        private void _rocDataTypesMonitor_OnStatusChanged(object sender, TableDependency.SqlClient.Base.EventArgs.StatusChangedEventArgs e)
+        private void RocDataTypesMonitor_OnStatusChanged(object sender, TableDependency.SqlClient.Base.EventArgs.StatusChangedEventArgs e)
         {
             if (e.Status != TableDependencyStatus.StopDueToError)
                 LogApplicationEvent(Globals.FDANow(), "SQLTableDependency", "RocDataTypesMonitor", "Status change: " + e.Status.ToString());
         }
 
-        private void _rocDataTypesMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<RocDataTypes> e)
+        private void RocDataTypesMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<RocDataTypes> e)
         {
             ROCDataTypes_Notification(e.ChangeType.ToString().ToUpper(), e.Entity);
         }
 
-        private void _rocDataTypesMonitor_OnError(object sender, TableDependency.SqlClient.Base.EventArgs.ErrorEventArgs e)
+        private void RocDataTypesMonitor_OnError(object sender, TableDependency.SqlClient.Base.EventArgs.ErrorEventArgs e)
         {
-            _rocDataTypesMonitor.OnChanged -= _rocDataTypesMonitor_OnChanged;
-            _rocDataTypesMonitor.OnStatusChanged -= _rocDataTypesMonitor_OnStatusChanged;
-            _rocDataTypesMonitor.OnError -= _rocDataTypesMonitor_OnError;
+            _rocDataTypesMonitor.OnChanged -= RocDataTypesMonitor_OnChanged;
+            _rocDataTypesMonitor.OnStatusChanged -= RocDataTypesMonitor_OnStatusChanged;
+            _rocDataTypesMonitor.OnError -= RocDataTypesMonitor_OnError;
             _rocDataTypesMonitor = null;
             Globals.SystemManager.LogApplicationError(Globals.FDANow(), e.Error, "SQL Table change monitor object (RocDataTypes) error: " + e.Error.Message);
         }

@@ -8,10 +8,10 @@ namespace Common
 {
     public static class OperationalMessageServer
     {
-        private static readonly StringBuilder _sb = new StringBuilder();
+        private static readonly StringBuilder _sb = new();
         private static volatile CancellationTokenSource _cts;
         private static int _count;
-        private static int _flushRate = 500;
+        private readonly static int _flushRate = 500;
 
         private static FDA.TCPServer _TCPServer;
        
@@ -20,16 +20,16 @@ namespace Common
         {
             _TCPServer = FDA.TCPServer.NewTCPServer(9573,"Operational Messages Server");
             _TCPServer.Start();
-            _TCPServer.ClientConnected += _TCPServer_ClientConnected;
-            _TCPServer.ClientDisconnected += _TCPServer_ClientDisconnected;
+            _TCPServer.ClientConnected += TCPServer_ClientConnected;
+            _TCPServer.ClientDisconnected += TCPServer_ClientDisconnected;
         }
 
-        private static void _TCPServer_ClientDisconnected(object sender, FDA.TCPServer.ClientEventArgs e)
+        private static void TCPServer_ClientDisconnected(object sender, FDA.TCPServer.ClientEventArgs e)
         {
             LogEvent("TCP client (" + e.ClientAddress + ") disconnected");
         }
 
-        private static void _TCPServer_ClientConnected(object sender, FDA.TCPServer.ClientEventArgs e)
+        private static void TCPServer_ClientConnected(object sender, FDA.TCPServer.ClientEventArgs e)
         {
            
             LogEvent("TCP client (" + e.ClientAddress + ") connected on port " + _TCPServer.Port);

@@ -55,7 +55,7 @@ namespace Common
             {
                 Int64 elapsed = 0; // Convert.ToInt64(ResponseTimestamp.Subtract(RequestTimestamp).TotalMilliseconds);
                 if (!firstItem)
-                    sb.Append(",");
+                    sb.Append(',');
 
                 //  (FDAExecutionID, connectionID, DeviceAddress, Attempt, TimestampUTC1, TimestampUTC2, ElapsedPeriod, TransCode, TransStatus, ApplicationMessage,DBRGUID,DBRGIdx,DBRGSize,Details01,TxSize,Details02,RxSize,ProtocolNote,Protocol) values ");
 
@@ -73,7 +73,7 @@ namespace Common
                 sb.Append(DateTimeHelpers.FormatDateTime(EventTime));
                 sb.Append("',");
                 sb.Append(elapsed);
-                sb.Append(",");
+                sb.Append(',');
                 sb.Append(EventType);
                 sb.Append(",CAST(1 as bit),");
                 sb.Append("'','"); // app message
@@ -128,7 +128,7 @@ namespace Common
             {
                 DateTime endTime = StartTime.Add(Elapsed);
                 if (!firstItem)
-                    sb.Append(",");
+                    sb.Append(',');
                 sb.Append("('");
                 sb.Append(executionID);
                 sb.Append("','");
@@ -141,9 +141,9 @@ namespace Common
                 sb.Append(DateTimeHelpers.FormatDateTime(endTime));
                 sb.Append("',");
                 sb.Append(Elapsed.TotalMilliseconds);
-                sb.Append(",");
+                sb.Append(',');
                 sb.Append(EventType);
-                sb.Append(",");
+                sb.Append(',');
                 sb.Append("cast(" + Status + " as bit)");
                 sb.Append(",'");
                 sb.Append(Message.Replace("'", "''"));
@@ -184,7 +184,7 @@ namespace Common
                 string timestampStr = DateTimeHelpers.FormatDateTime(Timestamp);
 
                 if (!firstItem)
-                    sb.Append(",");
+                    sb.Append(',');
                 sb.Append("('");
                 sb.Append(executionID);
                 sb.Append("','");
@@ -260,7 +260,7 @@ namespace Common
             {
                 Int64 elapsed = Convert.ToInt64(ResponseTimestamp.Subtract(RequestTimestamp).TotalMilliseconds);
                 if (!firstItem)
-                    sb.Append(",");
+                    sb.Append(',');
 
  
                 sb.Append("('");
@@ -277,14 +277,14 @@ namespace Common
                 sb.Append(DateTimeHelpers.FormatDateTime(ResponseTimestamp));
                 sb.Append("',");
                 sb.Append(elapsed);
-                sb.Append(",");
+                sb.Append(',');
                 sb.Append(EventType);
-                sb.Append(",");
+                sb.Append(',');
                 if (ResultStatus == DataRequest.RequestStatus.Success)
                     sb.Append("cast(1 as bit),");
                 else
                     sb.Append("cast(0 as bit),");
-                sb.Append("'");
+                sb.Append('\'');
                 sb.Append(ApplicationMessage);
                 sb.Append("','");
                 sb.Append(GroupID);

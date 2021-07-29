@@ -14,12 +14,12 @@ namespace Scripting
     public static class Scripter
     {
         // private   
-        private static readonly Dictionary<string, UserScript> _scripts = new Dictionary<string, UserScript>();
+        private static readonly Dictionary<string, UserScript> _scripts = new();
 
         // internal
-        internal static ScriptInterface _scriptInterface = new ScriptInterface();
-        internal static List<string> _imports = new List<string>();
-        internal static List<string> _references = new List<string>();
+        internal static ScriptInterface _scriptInterface = new();
+        internal static List<string> _imports = new();
+        internal static List<string> _references = new();
 
         // public     
         public delegate void CompileErrorHandler(string scriptID, List<string> errors);
@@ -117,7 +117,7 @@ namespace Scripting
 
         private static void HandleCompileError(string scriptid,System.Collections.Immutable.ImmutableArray<Diagnostic> errors)
         {
-            List<string> errorMsgs = new List<string>();
+            List<string> errorMsgs = new();
             foreach (Diagnostic diag in errors)
             {
                 errorMsgs.Add(diag.ToString());

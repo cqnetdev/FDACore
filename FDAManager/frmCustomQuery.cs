@@ -87,8 +87,8 @@ namespace FDAManager
                 }
 
                 // convert the XML to a dataset that can be displayed in a datagridview
-                StringReader theReader = new StringReader(rawResult);
-                DataSet theDataSet = new DataSet();
+                StringReader theReader = new(rawResult);
+                DataSet theDataSet = new();
                 theDataSet.ReadXml(theReader);
                 if (theDataSet.Tables.Count > 0)
                 {
@@ -108,7 +108,7 @@ namespace FDAManager
 
         private void WriteDataTableToCSV(DataTable table)
         {
-            StringBuilder sb = new StringBuilder();
+            StringBuilder sb = new();
 
             string[] columnNames = table.Columns.Cast<DataColumn>().Select(column => column.ColumnName).ToArray();
             sb.AppendLine(string.Join(",", columnNames));
@@ -127,7 +127,7 @@ namespace FDAManager
 
         private string DataTableToCSV(DataTable table)
         {
-            StringBuilder sb = new StringBuilder();
+            StringBuilder sb = new();
             string[] columnNames = table.Columns.Cast<DataColumn>().Select(column => column.ColumnName).ToArray();
             sb.AppendLine(string.Join(",", columnNames));
 

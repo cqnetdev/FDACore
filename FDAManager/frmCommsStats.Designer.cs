@@ -212,7 +212,7 @@
             this.dataGridView1.RowTemplate.Height = 28;
             this.dataGridView1.Size = new System.Drawing.Size(1269, 244);
             this.dataGridView1.TabIndex = 20;
-            this.dataGridView1.DataSourceChanged += new System.EventHandler(this.dataGridView1_DataSourceChanged);
+            this.dataGridView1.DataSourceChanged += new System.EventHandler(this.DataGridView1_DataSourceChanged);
             // 
             // btn_export
             // 
@@ -228,7 +228,7 @@
             this.btn_export.TabIndex = 21;
             this.btn_export.Text = "Export Results";
             this.btn_export.UseVisualStyleBackColor = false;
-            this.btn_export.Click += new System.EventHandler(this.btn_export_Click);
+            this.btn_export.Click += new System.EventHandler(this.Btn_export_Click);
             // 
             // saveFileDialog1
             // 
@@ -275,7 +275,7 @@
             this.btnSetStart.TabIndex = 25;
             this.btnSetStart.Text = "Set to";
             this.btnSetStart.UseVisualStyleBackColor = true;
-            this.btnSetStart.Click += new System.EventHandler(this.btnSetStart_Click);
+            this.btnSetStart.Click += new System.EventHandler(this.BtnSetStart_Click);
             // 
             // dayshoursago
             // 
@@ -304,7 +304,7 @@
             this.btnSetEnd.TabIndex = 30;
             this.btnSetEnd.Text = "Now";
             this.btnSetEnd.UseVisualStyleBackColor = true;
-            this.btnSetEnd.Click += new System.EventHandler(this.btnSetEnd_Click);
+            this.btnSetEnd.Click += new System.EventHandler(this.BtnSetEnd_Click);
             // 
             // groupBox1
             // 
@@ -384,7 +384,7 @@
             this.chkSaveToDB.TabIndex = 34;
             this.chkSaveToDB.Text = "Save data to FDA database";
             this.chkSaveToDB.UseVisualStyleBackColor = true;
-            this.chkSaveToDB.CheckedChanged += new System.EventHandler(this.chkSaveToDB_CheckedChanged);
+            this.chkSaveToDB.CheckedChanged += new System.EventHandler(this.ChkSaveToDB_CheckedChanged);
             // 
             // frmCommsStats
             // 
@@ -408,7 +408,7 @@
             //this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.Name = "frmCommsStats";
             this.Text = "Comms Stats";
-            this.Load += new System.EventHandler(this.frmCommsStats_Load);
+            this.Load += new System.EventHandler(this.FrmCommsStats_Load);
             this.panel1.ResumeLayout(false);
             this.panel1.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.dataGridView1)).EndInit();

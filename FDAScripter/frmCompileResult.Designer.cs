@@ -1,7 +1,7 @@
 ﻿
 namespace FDAScripter
 {
-    partial class frmCompileResult
+    partial class FrmCompileResult
     {
         /// <summary>
         /// Required designer variable.

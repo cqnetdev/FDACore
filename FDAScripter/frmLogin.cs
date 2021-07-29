@@ -25,7 +25,7 @@ namespace FDAScripter
             }
         }
 
-        private void btnConnect_Click(object sender, EventArgs e)
+        private void BTN_Connect_Click(object sender, EventArgs e)
         {
             btnConnect.Enabled = false;
 
@@ -47,7 +47,7 @@ namespace FDAScripter
             btnConnect.Enabled = true;
         }
 
-        private void cbRecent_SelectedIndexChanged(object sender, EventArgs e)
+        private void CB_Recent_SelectedIndexChanged(object sender, EventArgs e)
         {
             string selectedRecent = cbRecent.SelectedItem.ToString();
             Program.RecentConn recent = Program.RecentConnections[selectedRecent];

@@ -20,10 +20,10 @@ namespace FDA
         private TcpClient _tcpClient;
         private SerialPort _serialPort;
         private UdpClient _UDPClient;
-        private int _UDPPort;
+        private readonly int _UDPPort;
         private IPEndPoint _receivedFrom;
        
-        private string _connType = "";
+        private readonly string _connType = "";
         private readonly string _connectionID;
 
         public bool DataAvailable { get { return CheckIfDataAvailable(); } }
@@ -80,9 +80,9 @@ namespace FDA
                     // so we'll do it ourselves
                     byte[] garbagePail = new byte[1000];
                     int garbageCount;
-                    MemoryStream garbageBin = new MemoryStream();
+                    MemoryStream garbageBin = new();
 
-                    Stopwatch stopwatch = new Stopwatch();
+                    Stopwatch stopwatch = new();
                     stopwatch.Start();
                     while (_tcpClient.GetStream().DataAvailable && garbageBin.Length < 2000 && stopwatch.ElapsedMilliseconds < 1000)
                     {
@@ -112,9 +112,9 @@ namespace FDA
                     if (_UDPClient.Available > 0)
                     {
                         int totalRemoved = 0;
-                        Stopwatch timer = new Stopwatch();
-                        byte[] buffer = new byte[0];
-                        IPEndPoint receivedFrom = new IPEndPoint(IPAddress.Any, 0);
+                        Stopwatch timer = new();
+                        byte[] buffer;
+                        IPEndPoint receivedFrom = new(IPAddress.Any, 0);
                         timer.Start();
                         while (_UDPClient.Available > 0 && timer.ElapsedMilliseconds < 500)
                         {
@@ -153,7 +153,6 @@ namespace FDA
                     bytesRead = _serialPort.Read(buffer, offset, count);
                     break;
                 case "UDP":
-                    bytesRead = 0;
                     byte[] temp;
                     temp = _UDPClient.Receive(ref _receivedFrom);
                     Array.Copy(temp, buffer, temp.Length);
@@ -169,8 +168,7 @@ namespace FDA
         {
             if (_connType.ToUpper() == "UDP")
             {
-                IPAddress addr = null;
-                if (!IPAddress.TryParse(ipAddress, out addr))
+                if (!IPAddress.TryParse(ipAddress, out IPAddress addr))
                     return false;
                 _UDPClient.Connect(new IPEndPoint(addr, _UDPPort));
             }
@@ -272,7 +270,7 @@ namespace FDA
             // Do not change this code. Put cleanup code in Dispose(bool disposing) above.
             Dispose(true);
             // TODO: uncomment the following line if the finalizer is overridden above.
-            // GC.SuppressFinalize(this);
+            GC.SuppressFinalize(this);
         }
         #endregion
 

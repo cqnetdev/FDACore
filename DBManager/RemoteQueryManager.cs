@@ -18,14 +18,14 @@ namespace FDA
     public class RemoteQueryManager :IDisposable
     {
     
-        private string _connString;
+        private readonly string _connString;
 
         private static string _storedProcCheck = "";
         private static string _createStoredProc = "";
 
         private readonly string _DBManagerType;
 
-        private List<BackgroundWorker> currentWorkers;
+        private readonly List<BackgroundWorker> currentWorkers;
  
         public RemoteQueryManager(string dbType, string connString)
         {
@@ -72,7 +72,7 @@ namespace FDA
                 query += ",@outputTable='" + commsStatsParams[5] + "'";
             query += ",@saveOutput=1";
 
-            BackgroundWorker worker = new BackgroundWorker();
+            BackgroundWorker worker = new();
             lock (currentWorkers) { currentWorkers.Add(worker); }
 
             switch (_DBManagerType)
@@ -97,7 +97,7 @@ namespace FDA
 
             string query = Encoding.UTF8.GetString(e.Message);
 
-            BackgroundWorker worker = new BackgroundWorker();
+            BackgroundWorker worker = new();
             switch (_DBManagerType)
             {
                 case "DBManagerPG": worker.DoWork += Worker_DoWorkPG; break;
@@ -111,12 +111,12 @@ namespace FDA
         private void Worker_DoWorkSQL(object sender, DoWorkEventArgs e)
         {
             QueryParameters queryParams = (QueryParameters)e.Argument;
-            SqlDataAdapter da = new SqlDataAdapter();
-            DataSet ds = new DataSet();
-            StringWriter resultXML = new StringWriter();
+            SqlDataAdapter da = new();
+            DataSet ds = new();
+            StringWriter resultXML = new();
             e.Result = ""; // default to empty string as result
 
-            using (SqlConnection conn = new SqlConnection(_connString))
+            using (SqlConnection conn = new(_connString))
             {
                 try
                 {
@@ -147,7 +147,7 @@ namespace FDA
                                 var resourceName = assembly.GetManifestResourceNames().Single(str => str.EndsWith("CreateStoredProcSQL.txt"));
 
                                 using (Stream stream = assembly.GetManifestResourceStream(resourceName))
-                                using (StreamReader reader = new StreamReader(stream))
+                                using (StreamReader reader = new(stream))
                                 {
                                     _createStoredProc = reader.ReadToEnd();
                                 }
@@ -181,12 +181,12 @@ namespace FDA
         private void Worker_DoWorkPG(object sender, DoWorkEventArgs e)
         {
             QueryParameters queryParams = (QueryParameters)e.Argument;
-            NpgsqlDataAdapter da = new NpgsqlDataAdapter();
-            DataSet ds = new DataSet();
-            StringWriter resultXML = new StringWriter();
+            NpgsqlDataAdapter da = new();
+            DataSet ds = new();
+            StringWriter resultXML = new();
             e.Result = ""; // default to empty string as result
 
-            using (NpgsqlConnection conn = new NpgsqlConnection(_connString))
+            using (NpgsqlConnection conn = new(_connString))
             {
                 try
                 {
@@ -218,7 +218,7 @@ namespace FDA
                                 var resourceName = assembly.GetManifestResourceNames().Single(str => str.EndsWith("CreateStoredProcPG.txt"));
 
                                 using (Stream stream = assembly.GetManifestResourceStream(resourceName))
-                                using (StreamReader reader = new StreamReader(stream))
+                                using (StreamReader reader = new(stream))
                                 {
                                     _createStoredProc = reader.ReadToEnd();
                                 }
@@ -298,11 +298,13 @@ namespace FDA
 
         public void Dispose()
         {
+            GC.SuppressFinalize(this);
+
             if (currentWorkers.Count > 0)
             {
                 // let any active workers finish up (give them 5 seconds)
-                Stopwatch timer = new Stopwatch();
-                TimeSpan timeout = new TimeSpan(0, 0, 5);
+                Stopwatch timer = new();
+                TimeSpan timeout = new(0, 0, 5);
                 timer.Start();
                 while (timer.Elapsed < timeout && currentWorkers.Count > 0)
                 {

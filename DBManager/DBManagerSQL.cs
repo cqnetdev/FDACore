@@ -159,39 +159,39 @@ namespace FDA
 
 
             // subscribe to events, so we'll be notified when something changes in the tables, or if something changes in the status of the monitor objects
-            _demandMonitor.OnChanged += _DemandMonitor_OnChanged;
-            _schedMonitor.OnChanged += _SchedMonitor_OnChanged;
-            _requestGroupDefMonitor.OnChanged += _requestGroupMonitor_OnChanged;
-            _connectionDefMonitor.OnChanged += _connectionDefMonitor_OnChanged;
-            _dataPointDefMonitor.OnChanged += _dataPointDefMonitor_OnChanged;
+            _demandMonitor.OnChanged += DemandMonitor_OnChanged;
+            _schedMonitor.OnChanged += SchedMonitor_OnChanged;
+            _requestGroupDefMonitor.OnChanged += RequestGroupMonitor_OnChanged;
+            _connectionDefMonitor.OnChanged += ConnectionDefMonitor_OnChanged;
+            _dataPointDefMonitor.OnChanged += DataPointDefMonitor_OnChanged;
             if (_deviceDefMonitor != null)
-                _deviceDefMonitor.OnChanged += _deviceDefMonitor_OnChanged;
+                _deviceDefMonitor.OnChanged += DeviceDefMonitor_OnChanged;
             if (_taskDefMonitor != null)
-                _taskDefMonitor.OnChanged += _taskDefMonitor_OnChanged; 
+                _taskDefMonitor.OnChanged += TaskDefMonitor_OnChanged; 
             if (_scriptMonitor != null)
-                _scriptMonitor.OnChanged += _scriptMonitor_OnChanged;
+                _scriptMonitor.OnChanged += ScriptMonitor_OnChanged;
             if (_subscriptionMonitor != null)
-                _subscriptionMonitor.OnChanged += _subscriptionMonitor_OnChanged;
+                _subscriptionMonitor.OnChanged += SubscriptionMonitor_OnChanged;
 
             _schedMonitor.OnStatusChanged += SchedMonitor_OnStatusChanged;
             _demandMonitor.OnStatusChanged += DemandMonitor_OnStatusChanged;
             _requestGroupDefMonitor.OnStatusChanged += RequestGroupDefMonitor_OnStatusChanged;
             _connectionDefMonitor.OnStatusChanged += ConnectionDefMonitor_OnStatusChanged;
             _dataPointDefMonitor.OnStatusChanged += DataPointDefMonitor_OnStatusChanged;
-            if (_deviceDefMonitor != null) _deviceDefMonitor.OnStatusChanged += _deviceDefMonitor_OnStatusChanged;
-            if (_taskDefMonitor != null) _taskDefMonitor.OnStatusChanged += _taskDefMonitor_OnStatusChanged;
-            if (_scriptMonitor != null) _scriptMonitor.OnStatusChanged += _scriptMonitor_OnStatusChanged;
-            if (_subscriptionMonitor != null) _subscriptionMonitor.OnStatusChanged += _subscriptionMonitor_OnStatusChanged;
+            if (_deviceDefMonitor != null) _deviceDefMonitor.OnStatusChanged += DeviceDefMonitor_OnStatusChanged;
+            if (_taskDefMonitor != null) _taskDefMonitor.OnStatusChanged += TaskDefMonitor_OnStatusChanged;
+            if (_scriptMonitor != null) _scriptMonitor.OnStatusChanged += ScriptMonitor_OnStatusChanged;
+            if (_subscriptionMonitor != null) _subscriptionMonitor.OnStatusChanged += SubscriptionMonitor_OnStatusChanged;
 
             _schedMonitor.OnError += SchedMonitor_OnError;
             _demandMonitor.OnError += DemandMonitor_OnError; ;
             _requestGroupDefMonitor.OnError += RequestGroupDefMonitor_OnError;
             _connectionDefMonitor.OnError += ConnectionDefMonitor_OnError;
             _dataPointDefMonitor.OnError += DataPointDefMonitor_OnError;
-            if (_deviceDefMonitor != null) _deviceDefMonitor.OnError += _deviceDefMonitor_OnError;
-            if (_taskDefMonitor != null) _taskDefMonitor.OnError += _taskDefMonitor_OnError;
-            if (_scriptMonitor != null) _scriptMonitor.OnError += _scriptMonitor_OnError;
-            if (_subscriptionMonitor != null) _subscriptionMonitor.OnError += _subscriptionMonitor_OnError; 
+            if (_deviceDefMonitor != null) _deviceDefMonitor.OnError += DeviceDefMonitor_OnError;
+            if (_taskDefMonitor != null) _taskDefMonitor.OnError += TaskDefMonitor_OnError;
+            if (_scriptMonitor != null) _scriptMonitor.OnError += ScriptMonitor_OnError;
+            if (_subscriptionMonitor != null) _subscriptionMonitor.OnError += SubscriptionMonitor_OnError; 
             StartChangeMonitoring();
         }
 
@@ -277,7 +277,7 @@ namespace FDA
             int maxRetries = 3;
         Retry:
 
-            using (SqlConnection conn = new SqlConnection(ConnectionString))
+            using (SqlConnection conn = new(ConnectionString))
             {
                 try
                 {
@@ -324,9 +324,9 @@ namespace FDA
         {
             int retries = 0;
             int maxRetries = 3;
-            DataTable result = new DataTable();
+            DataTable result = new();
         Retry:
-            using (SqlConnection conn = new SqlConnection(ConnectionString))
+            using (SqlConnection conn = new(ConnectionString))
             {
                 try
                 {
@@ -340,7 +340,7 @@ namespace FDA
 
                 try
                 {
-                    using (SqlDataAdapter da = new SqlDataAdapter(sql, conn))
+                    using (SqlDataAdapter da = new(sql, conn))
                     {
                         da.Fill(result);
                     }
@@ -370,7 +370,7 @@ namespace FDA
             int retries = 0;
 
         Retry:
-            using (SqlConnection conn = new SqlConnection(ConnectionString))
+            using (SqlConnection conn = new(ConnectionString))
             {
                 try
                 {
@@ -425,7 +425,7 @@ namespace FDA
 
         protected override bool TestConnection()
         {
-            using (SqlConnection conn = new SqlConnection(ConnectionString))
+            using (SqlConnection conn = new(ConnectionString))
             {
                 try
                 {
@@ -442,56 +442,56 @@ namespace FDA
         {
             Globals.SystemManager.LogApplicationError(Globals.FDANow(),e.Error, "Error reported by SQLTableDependency : " + e.Message);
         }
-        private void _scriptMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<UserScriptDefinition> e)
+        private void ScriptMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<UserScriptDefinition> e)
         {
             string changeType = e.ChangeType.ToString().ToUpper();
             base.UserScriptChangeNotification(changeType, e.Entity);
         }
 
-        private void _taskDefMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<FDATask> e)
+        private void TaskDefMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<FDATask> e)
         {
             string changeType = e.ChangeType.ToString().ToUpper();
             base.TaskMonitorNotification(changeType, e.Entity);
         }
 
-        private void _deviceDefMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<FDADevice> e)
+        private void DeviceDefMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<FDADevice> e)
         {
             string changeType = e.ChangeType.ToString().ToUpper();
             base.DeviceMonitorNotification(changeType, e.Entity);
         }
 
-        private void _dataPointDefMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<FDADataPointDefinitionStructure> e)
+        private void DataPointDefMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<FDADataPointDefinitionStructure> e)
         {
             string changeType = e.ChangeType.ToString().ToUpper();
             base.DataPointMonitorNotification(changeType, e.Entity);
         }
 
-        private void _requestGroupMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<FDADataBlockRequestGroup> e)
+        private void RequestGroupMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<FDADataBlockRequestGroup> e)
         {
             string changeType = e.ChangeType.ToString().ToUpper();
             base.RequestGroupMonitorNotification(changeType, e.Entity);
         }
 
-        private void _SchedMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<FDARequestGroupScheduler> e)
+        private void SchedMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<FDARequestGroupScheduler> e)
         {
             string changeType = e.ChangeType.ToString().ToUpper();
             base.SchedulerMonitorNotification(changeType, e.Entity);
         }
 
-        private void _DemandMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<FDARequestGroupDemand> e)
+        private void DemandMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<FDARequestGroupDemand> e)
         {
             string changeType = e.ChangeType.ToString().ToUpper();
             base.DemandMonitorNotification(changeType, e.Entity);
         }
 
 
-        private void _connectionDefMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<FDASourceConnection> e)
+        private void ConnectionDefMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<FDASourceConnection> e)
         {
             string changeType = e.ChangeType.ToString().ToUpper();
             base.SourceConnectionMonitorNotification(changeType, e.Entity);
         }
 
-        private void _subscriptionMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<DataSubscription> e)
+        private void SubscriptionMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<DataSubscription> e)
         {
             string changeType = e.ChangeType.ToString().ToUpper();
             base.SubscriptionChangeNotification(changeType, e.Entity);
@@ -501,7 +501,7 @@ namespace FDA
         {
             if (_connectionDefMonitor != null)
             {
-                _connectionDefMonitor.OnChanged -= _connectionDefMonitor_OnChanged;
+                _connectionDefMonitor.OnChanged -= ConnectionDefMonitor_OnChanged;
                 _connectionDefMonitor.OnStatusChanged -= ConnectionDefMonitor_OnStatusChanged;
                 _connectionDefMonitor.OnError -= ConnectionDefMonitor_OnError;
                 _connectionDefMonitor = null;
@@ -509,13 +509,13 @@ namespace FDA
             HandleTableMonitorError("ConnectionDef", e);
         }
 
-        private void _subscriptionMonitor_OnError(object sender, TableDependency.SqlClient.Base.EventArgs.ErrorEventArgs e)
+        private void SubscriptionMonitor_OnError(object sender, TableDependency.SqlClient.Base.EventArgs.ErrorEventArgs e)
         {
             if (_subscriptionMonitor != null)
             {
-                _subscriptionMonitor.OnChanged -= _subscriptionMonitor_OnChanged;
-                _subscriptionMonitor.OnStatusChanged -= _subscriptionMonitor_OnStatusChanged;
-                _subscriptionMonitor.OnError -= _subscriptionMonitor_OnError;
+                _subscriptionMonitor.OnChanged -= SubscriptionMonitor_OnChanged;
+                _subscriptionMonitor.OnStatusChanged -= SubscriptionMonitor_OnStatusChanged;
+                _subscriptionMonitor.OnError -= SubscriptionMonitor_OnError;
                 _subscriptionMonitor = null;
             }
             HandleTableMonitorError("Subscriptions", e);
@@ -526,7 +526,7 @@ namespace FDA
         {
             if (_dataPointDefMonitor != null)
             {
-                _dataPointDefMonitor.OnChanged -= _dataPointDefMonitor_OnChanged;
+                _dataPointDefMonitor.OnChanged -= DataPointDefMonitor_OnChanged;
                 _dataPointDefMonitor.OnStatusChanged -= DataPointDefMonitor_OnStatusChanged;
                 _dataPointDefMonitor.OnError -= DataPointDefMonitor_OnError;
                 _dataPointDefMonitor = null;
@@ -534,13 +534,13 @@ namespace FDA
             HandleTableMonitorError("DataPointDefMonitor", e);
         }
 
-        private void _scriptMonitor_OnError(object sender, TableDependency.SqlClient.Base.EventArgs.ErrorEventArgs e)
+        private void ScriptMonitor_OnError(object sender, TableDependency.SqlClient.Base.EventArgs.ErrorEventArgs e)
         {
             if (_scriptMonitor != null)
             {
-                _scriptMonitor.OnChanged -= _scriptMonitor_OnChanged;
-                _scriptMonitor.OnStatusChanged -= _scriptMonitor_OnStatusChanged;
-                _scriptMonitor.OnError -= _scriptMonitor_OnError;
+                _scriptMonitor.OnChanged -= ScriptMonitor_OnChanged;
+                _scriptMonitor.OnStatusChanged -= ScriptMonitor_OnStatusChanged;
+                _scriptMonitor.OnError -= ScriptMonitor_OnError;
                 _scriptMonitor = null;
             }
             HandleTableMonitorError("ScriptMonitor", e);
@@ -552,7 +552,7 @@ namespace FDA
         {
             if (_requestGroupDefMonitor != null)
             {
-                _requestGroupDefMonitor.OnChanged -= _requestGroupMonitor_OnChanged;
+                _requestGroupDefMonitor.OnChanged -= RequestGroupMonitor_OnChanged;
                 _requestGroupDefMonitor.OnStatusChanged -= RequestGroupDefMonitor_OnStatusChanged;
                 _requestGroupDefMonitor.OnError -= RequestGroupDefMonitor_OnError;
                 _requestGroupDefMonitor = null;
@@ -566,7 +566,7 @@ namespace FDA
         {
             if (_demandMonitor != null)
             {
-                _demandMonitor.OnChanged -= _DemandMonitor_OnChanged;
+                _demandMonitor.OnChanged -= DemandMonitor_OnChanged;
                 _demandMonitor.OnStatusChanged -= DemandMonitor_OnStatusChanged;
                 _demandMonitor.OnError -= DemandMonitor_OnError;
                 _demandMonitor = null;
@@ -579,7 +579,7 @@ namespace FDA
         {
             if (_schedMonitor != null)
             {
-                _schedMonitor.OnChanged -= _SchedMonitor_OnChanged;
+                _schedMonitor.OnChanged -= SchedMonitor_OnChanged;
                 _schedMonitor.OnStatusChanged -= SchedMonitor_OnStatusChanged;
                 _schedMonitor.OnError -= SchedMonitor_OnError;
                 _schedMonitor = null;
@@ -588,25 +588,25 @@ namespace FDA
         }
 
 
-        private void _deviceDefMonitor_OnError(object sender, TableDependency.SqlClient.Base.EventArgs.ErrorEventArgs e)
+        private void DeviceDefMonitor_OnError(object sender, TableDependency.SqlClient.Base.EventArgs.ErrorEventArgs e)
         {
             if (_deviceDefMonitor != null)
             {
-                _deviceDefMonitor.OnChanged -= _deviceDefMonitor_OnChanged;
-                _deviceDefMonitor.OnStatusChanged -= _deviceDefMonitor_OnStatusChanged;
-                _deviceDefMonitor.OnError -= _deviceDefMonitor_OnError;
+                _deviceDefMonitor.OnChanged -= DeviceDefMonitor_OnChanged;
+                _deviceDefMonitor.OnStatusChanged -= DeviceDefMonitor_OnStatusChanged;
+                _deviceDefMonitor.OnError -= DeviceDefMonitor_OnError;
                 _deviceDefMonitor = null;
             }
             HandleTableMonitorError("DeviceMonitor", e);
         }
 
-        private void _taskDefMonitor_OnError(object sender, TableDependency.SqlClient.Base.EventArgs.ErrorEventArgs e)
+        private void TaskDefMonitor_OnError(object sender, TableDependency.SqlClient.Base.EventArgs.ErrorEventArgs e)
         {
             if (_taskDefMonitor != null)
             {
-                _taskDefMonitor.OnChanged -= _taskDefMonitor_OnChanged;
-                _taskDefMonitor.OnStatusChanged -= _taskDefMonitor_OnStatusChanged;
-                _taskDefMonitor.OnError -= _taskDefMonitor_OnError;
+                _taskDefMonitor.OnChanged -= TaskDefMonitor_OnChanged;
+                _taskDefMonitor.OnStatusChanged -= TaskDefMonitor_OnStatusChanged;
+                _taskDefMonitor.OnError -= TaskDefMonitor_OnError;
                 _taskDefMonitor = null;
             }
             HandleTableMonitorError("TaskMonitor", e);
@@ -618,7 +618,7 @@ namespace FDA
             LogMonitorStatusChangeEvent("DemandMonitor", e);
         }
 
-        private void _subscriptionMonitor_OnStatusChanged(object sender, TableDependency.SqlClient.Base.EventArgs.StatusChangedEventArgs e)
+        private void SubscriptionMonitor_OnStatusChanged(object sender, TableDependency.SqlClient.Base.EventArgs.StatusChangedEventArgs e)
         {
             LogMonitorStatusChangeEvent("SubscriptionsMonitor", e);
         }
@@ -641,7 +641,7 @@ namespace FDA
             LogMonitorStatusChangeEvent("RequestGroupDefMonitor", e);
         }
 
-        private void _scriptMonitor_OnStatusChanged(object sender, TableDependency.SqlClient.Base.EventArgs.StatusChangedEventArgs e)
+        private void ScriptMonitor_OnStatusChanged(object sender, TableDependency.SqlClient.Base.EventArgs.StatusChangedEventArgs e)
         {
             LogMonitorStatusChangeEvent("UserScriptMonitor", e);
         }
@@ -652,19 +652,19 @@ namespace FDA
             LogMonitorStatusChangeEvent("ScheduleMonitor", e);
         }
 
-        private void _deviceDefMonitor_OnStatusChanged(object sender, TableDependency.SqlClient.Base.EventArgs.StatusChangedEventArgs e)
+        private void DeviceDefMonitor_OnStatusChanged(object sender, TableDependency.SqlClient.Base.EventArgs.StatusChangedEventArgs e)
         {
             LogMonitorStatusChangeEvent("DeviceMonitor", e);
         }
 
-        private void _taskDefMonitor_OnStatusChanged(object sender, TableDependency.SqlClient.Base.EventArgs.StatusChangedEventArgs e)
+        private void TaskDefMonitor_OnStatusChanged(object sender, TableDependency.SqlClient.Base.EventArgs.StatusChangedEventArgs e)
         {
             LogMonitorStatusChangeEvent("TaskMonitor", e);
         }
 
 
 
-        private void LogMonitorStatusChangeEvent(string monitorName, TableDependency.SqlClient.Base.EventArgs.StatusChangedEventArgs e)
+        private static void LogMonitorStatusChangeEvent(string monitorName, TableDependency.SqlClient.Base.EventArgs.StatusChangedEventArgs e)
         {
             if (e.Status != TableDependencyStatus.StopDueToError)
                 Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "SQLTableDependency", monitorName, "Status change: " + e.Status.ToString());
@@ -679,8 +679,8 @@ namespace FDA
             string triggerQuerySQL = "select TR.name as trigname,U.name as tablename from (select name, parent_obj from sysobjects where type = 'TR') TR inner join (select name, id from sysobjects where name in ('DataPointDefinitionStructures', 'FDADataBlockRequestGroup', 'FDADevices','FDARequestGroupDemand','FDARequestGroupScheduler','FDASourceConnections','FDATasks')) U on TR.parent_obj = U.id;";
             DataTable triggers = ExecuteQuery(triggerQuerySQL);
 
-            string triggerName = "";
-            string tableName = "";
+            string triggerName;
+            string tableName;
             foreach (DataRow row in triggers.Rows)
             {
                 triggerName = (string)row["trigname"];
@@ -718,6 +718,8 @@ namespace FDA
 
             // general disposal
             base.Dispose();
+
+            GC.SuppressFinalize(this);
         }
 
    

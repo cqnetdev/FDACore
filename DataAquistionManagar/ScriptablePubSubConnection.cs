@@ -13,7 +13,7 @@ namespace FDA
     {
         public static List<ScriptablePubSubConnection> WrapConn(Dictionary<Guid, PubSubConnectionManager> toWrap)
         {
-            List<ScriptablePubSubConnection> output = new List<ScriptablePubSubConnection>();
+            List<ScriptablePubSubConnection> output = new();
             foreach (PubSubConnectionManager connMgr in toWrap.Values)
             {
                 output.Add(new ScriptablePubSubConnection(connMgr));
@@ -25,7 +25,7 @@ namespace FDA
    
 
 
-        private PubSubConnectionManager _connMgr;
+        private readonly PubSubConnectionManager _connMgr;
 
 
         public bool ConnectionEnabled { get => _connMgr.ConnectionEnabled; set { _connMgr.ConnectionEnabled = value; OnPropertyChanged(); } }

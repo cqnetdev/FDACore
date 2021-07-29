@@ -25,7 +25,7 @@ namespace ControllerService
             {
                 if (Environment.UserName != "root")
                 {
-                    _logger.Log(LogLevel.Warning,"FDAController service is running under the account '" + Environment.UserName + "'. Service must run as root to be able to start the FDA service",new object[] { });
+                    _logger.Log(LogLevel.Warning,"FDAController service is running under the account '" + Environment.UserName + "'. Service must run as root to be able to start the FDA service", Array.Empty<object>());
                 }
             }
 
@@ -33,14 +33,14 @@ namespace ControllerService
             {
                 if (!(new System.Security.Principal.WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator)))
                 {
-                    _logger.Log(LogLevel.Warning, "Warning: FDAController service not running in administrator mode.The service must run as administrator to be able to start the FDA as an administrator", new object[] { });
+                    _logger.Log(LogLevel.Warning, "Warning: FDAController service not running in administrator mode.The service must run as administrator to be able to start the FDA as an administrator", Array.Empty<object>());
                 }
             }
             
 
             // listens for basic services requests (start/stop FDA, etc)
             ControllerGlobals.BasicServicesServer = new BasicServicesServer(9571,_logger);
-            ControllerGlobals.BasicServicesServer.Start();
+            BasicServicesServer.Start();
 
             // connects to the FDA on the control port
             ControllerGlobals.BasicServicesClient = new BasicServicesClient(9572,_logger);

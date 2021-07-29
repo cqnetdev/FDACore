@@ -15,6 +15,8 @@ using System.Diagnostics;
 namespace Common
 {
 
+//disable warning about non-readonly static fields (that's the whole purpose of this class)
+#pragma warning disable CA2211
     public static class Globals
     {
         /* not .NET Core compatible
@@ -35,7 +37,7 @@ namespace Common
         public enum ConnStatus { Disconnected, ConnectionRetry_Delay, Connected_Ready, Connecting, Connected_Delayed }
 
 
-        public readonly static List<string> SupportedProtocols = new List<string>(new string[] { "ROC", "MODBUS","MODBUSTCP","ENRONMODBUS","BSAP","BSAPUDP","OPC"});
+        public readonly static List<string> SupportedProtocols = new(new string[] { "ROC", "MODBUS","MODBUSTCP","ENRONMODBUS","BSAP","BSAPUDP","OPC"});
         public static bool RunConsoleCommand(string command, string args, string workingDir = "")
         {
             try
@@ -53,8 +55,10 @@ namespace Common
                 if (workingDir != "")
                     processStartInfo.WorkingDirectory = workingDir;
 
-                var process = new Process();
-                process.StartInfo = processStartInfo;
+                var process = new Process
+                {
+                    StartInfo = processStartInfo
+                };
 
 
                 process.Start();
@@ -98,7 +102,7 @@ namespace Common
 
         public static DateTime ExecutionTime = DateTime.MinValue;
 
-        public static DateTime SQLMinDate = new DateTime(1900, 1, 1, 0, 0, 0);
+        public static DateTime SQLMinDate = new(1900, 1, 1, 0, 0, 0);
 
         public static FDASystemManager SystemManager { get; set; }
 
@@ -316,13 +320,13 @@ namespace Common
             {
                 byte[] initVectorBytes = Encoding.UTF8.GetBytes(initVector);
                 byte[] plainTextBytes = Encoding.UTF8.GetBytes(plainText);
-                PasswordDeriveBytes password = new PasswordDeriveBytes(passPhrase, null);
+                PasswordDeriveBytes password = new(passPhrase, null);
                 byte[] keyBytes = password.GetBytes(keysize / 8);
-                RijndaelManaged symmetricKey = new RijndaelManaged();
+                RijndaelManaged symmetricKey = new();
                 symmetricKey.Mode = CipherMode.CBC;
                 ICryptoTransform encryptor = symmetricKey.CreateEncryptor(keyBytes, initVectorBytes);
-                MemoryStream memoryStream = new MemoryStream();
-                CryptoStream cryptoStream = new CryptoStream(memoryStream, encryptor, CryptoStreamMode.Write);
+                MemoryStream memoryStream = new();
+                CryptoStream cryptoStream = new(memoryStream, encryptor, CryptoStreamMode.Write);
                 cryptoStream.Write(plainTextBytes, 0, plainTextBytes.Length);
                 cryptoStream.FlushFinalBlock();
                 byte[] cipherTextBytes = memoryStream.ToArray();
@@ -342,13 +346,13 @@ namespace Common
             {
                 byte[] initVectorBytes = Encoding.UTF8.GetBytes(initVector);
                 byte[] cipherTextBytes = Convert.FromBase64String(cipherText);
-                PasswordDeriveBytes password = new PasswordDeriveBytes(passPhrase, null);
+                PasswordDeriveBytes password = new(passPhrase, null);
                 byte[] keyBytes = password.GetBytes(keysize / 8);
-                RijndaelManaged symmetricKey = new RijndaelManaged();
+                RijndaelManaged symmetricKey = new();
                 symmetricKey.Mode = CipherMode.CBC;
                 ICryptoTransform decryptor = symmetricKey.CreateDecryptor(keyBytes, initVectorBytes);
-                MemoryStream memoryStream = new MemoryStream(cipherTextBytes);
-                CryptoStream cryptoStream = new CryptoStream(memoryStream, decryptor, CryptoStreamMode.Read);
+                MemoryStream memoryStream = new(cipherTextBytes);
+                CryptoStream cryptoStream = new(memoryStream, decryptor, CryptoStreamMode.Read);
                 byte[] plainTextBytes = new byte[cipherTextBytes.Length];
                 int decryptedByteCount = cryptoStream.Read(plainTextBytes, 0, plainTextBytes.Length);
                 memoryStream.Close();

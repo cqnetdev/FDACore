@@ -23,10 +23,10 @@ namespace FDA
         private readonly int _listeningPort;
 
         private readonly int _tickRate = 100; //ms
-        TcpListener _server;
+        private readonly TcpListener _server;
         Dictionary<Guid, Client> _clients;
         System.Threading.Timer _timer;
-        public static Exception LastError = null;
+        private static Exception LastError = null;
         public string WelcomeMessage = "";
 
         private bool isDisposing = false;
@@ -98,6 +98,10 @@ namespace FDA
             }
         }
 
+        public static Exception GetLastError()
+        {
+            return LastError;
+        }
         public bool Send(Guid clientID, string message)
         {
             bool broadcast = (clientID == Guid.Empty);   // Guid.Empty = broadcast to all clients 
@@ -146,7 +150,7 @@ namespace FDA
             // check for pending connections
             if (_server.Pending())
             {
-                Client client = new Client(_server.AcceptTcpClient()/*, _serverCertificate*/);
+                Client client = new(_server.AcceptTcpClient()/*, _serverCertificate*/);
                 if (client.Connected)
                 {
 
@@ -192,9 +196,9 @@ namespace FDA
 
         private class Client : IDisposable
         {
-            private TcpClient _connection;
-            private string _address;
-            private BackgroundWorker _workerThread;
+            private readonly TcpClient _connection;
+            private readonly string _address;
+            private readonly BackgroundWorker _workerThread;
             public Queue<byte[]> ReceivedQueue;
             public Queue<byte[]> SendQueue;
             private Guid _clientID;
@@ -206,17 +210,17 @@ namespace FDA
             public delegate void DisconnectedEventHandler(object sender, EventArgs e);
             public event DisconnectedEventHandler Disconnected;
 
-            public delegate void DataReceivedHandler(object sender, DataReceivedEventArgs e);
+            //public delegate void DataReceivedHandler(object sender, DataReceivedEventArgs e);
 
-            public class DataReceivedEventArgs : EventArgs
-            {
-                byte[] Data;
+            //public class DataReceivedEventArgs : EventArgs
+            //{
+            //    private readonly byte[] Data;
 
-                DataReceivedEventArgs(byte[] data)
-                {
-                    Data = data;
-                }
-            }
+            //    DataReceivedEventArgs(byte[] data)
+            //    {
+            //        Data = data;
+            //    }
+            //}
 
             public Client(TcpClient client/*, X509Certificate2 serverCert*/)
             {
@@ -235,7 +239,7 @@ namespace FDA
 
             private void ClientWorker_DoWork(object sender, DoWorkEventArgs e)
             {
-                NetworkStream stream = null;
+                NetworkStream stream;
 
                 try
                 {
@@ -313,7 +317,7 @@ namespace FDA
             }
             */
 
-            private bool IsConnected(Socket socket)
+            private static bool IsConnected(Socket socket)
             {
                 try
                 {
@@ -419,7 +423,7 @@ namespace FDA
             // Do not change this code. Put cleanup code in Dispose(bool disposing) above.
             Dispose(true);
             // TODO: uncomment the following line if the finalizer is overridden above.
-            // GC.SuppressFinalize(this);
+            GC.SuppressFinalize(this);
         }
         #endregion
 

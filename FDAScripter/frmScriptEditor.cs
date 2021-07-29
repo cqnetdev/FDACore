@@ -16,7 +16,7 @@ namespace FDAScripter
     {
         private bool inhibitTextChangedTrigger = true;
         private string _currentScriptName;
-        private frmFDAObjects objectsForm;
+        private FrmFDAObjects objectsForm;
 
         public frmScriptEditor()
         {
@@ -84,7 +84,7 @@ namespace FDAScripter
 
         private void btnAddAscript_Click(object sender, EventArgs e)
         {
-            frmNewScriptName nameDlg = new frmNewScriptName();
+            FrmNewScriptName nameDlg = new();
             if (nameDlg.ShowDialog() == DialogResult.OK)
             {
                 if (!DiscardCheckandConfirm()) return;
@@ -161,7 +161,7 @@ namespace FDAScripter
                 MessageBox.Show("Looking good!");
             else
             {
-                frmCompileResult resultsForm = new frmCompileResult(result);
+                FrmCompileResult resultsForm = new(result);
                 resultsForm.Show();
             }
         }
@@ -170,7 +170,7 @@ namespace FDAScripter
         {
             if (objectsForm == null)
             {
-                objectsForm = new frmFDAObjects();
+                objectsForm = new FrmFDAObjects();
                 objectsForm.Show(this);
             }
             else

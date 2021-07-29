@@ -17,7 +17,7 @@ namespace Common
         public double EventLogMaxDays { get => _eventLogMaxDays; set => _eventLogMaxDays = value; }
         public bool EnableDebugMessages { get => _enableDebugMessages; set => _enableDebugMessages = value; }
 
-        private List<string> ReadOnlyOptions;
+        private readonly List<string> ReadOnlyOptions;
 
         private Dictionary<string, FDAConfig> _appConfig;
 
@@ -29,10 +29,10 @@ namespace Common
         
   
 
-        private Queue<CommsLogItemBase> _commsLogInputBuffer;
-        private Queue<EventLogItem> _eventLogInputBuffer;
-        private BackgroundWorker _bgCommsLogger;
-        private BackgroundWorker _bgEventLogger;
+        private readonly Queue<CommsLogItemBase> _commsLogInputBuffer;
+        private readonly Queue<EventLogItem> _eventLogInputBuffer;
+        private readonly BackgroundWorker _bgCommsLogger;
+        private readonly BackgroundWorker _bgEventLogger;
         private double _commsLogMaxDays = 1;
         private double _eventLogMaxDays = 1;
         private bool _enableDebugMessages;
@@ -67,10 +67,10 @@ namespace Common
             _eventLogInputBuffer = new Queue<EventLogItem>();
 
             _bgCommsLogger = new BackgroundWorker();
-            _bgCommsLogger.DoWork += _bgCommsLogger_DoWork;
+            _bgCommsLogger.DoWork += BGCommsLogger_DoWork;
 
             _bgEventLogger = new BackgroundWorker();
-            _bgEventLogger.DoWork += _bgEventLogger_DoWork;
+            _bgEventLogger.DoWork += BGEventLogger_DoWork;
 
 
             // load the FDAConfig table from the database
@@ -464,7 +464,7 @@ namespace Common
 
     
          
-        private void PublishCommsStatsTable(string table)
+        private static void PublishCommsStatsTable(string table)
         {
             // publish changes to the default CommsStats output table to MQTT
             byte[] tableBytes = Encoding.UTF8.GetBytes(table);
@@ -490,7 +490,7 @@ namespace Common
             //    description = description.Replace("'", "''");
 
             // log application error events
-            EventLogItem ELI = new EventLogItem(timestamp, ex, description);
+            EventLogItem ELI = new(timestamp, ex, description);
 
             lock (_eventLogInputBuffer)
             {
@@ -530,7 +530,7 @@ namespace Common
 
             // write it to the database
             description = description.Replace("'", "''");
-            EventLogItem ELI = new EventLogItem(timestamp, objectType, objectName, description, configError);
+            EventLogItem ELI = new(timestamp, objectType, objectName, description, configError);
 
             lock (_eventLogInputBuffer)
             {
@@ -570,7 +570,7 @@ namespace Common
         public void LogCommsEvent(Guid connectionID, DateTime timestamp, string eventDetails, byte transCode = 0)
         {
             //eventDetails = eventDetails.Replace("'", "''");
-            CommsEventLogItem logItem = new CommsEventLogItem(connectionID, timestamp, eventDetails, transCode);
+            CommsEventLogItem logItem = new(connectionID, timestamp, eventDetails, transCode);
 
             lock (_commsLogInputBuffer)
             {
@@ -583,7 +583,7 @@ namespace Common
 
         public void LogConnectionCommsEvent(Guid connectionID, int attemptNum, DateTime startTime, TimeSpan elapsed, byte status, string message)
         {
-            CommsConnectionEventLogItem logItem = new CommsConnectionEventLogItem(connectionID, attemptNum, startTime, elapsed, status, message);
+            CommsConnectionEventLogItem logItem = new(connectionID, attemptNum, startTime, elapsed, status, message);
             lock (_commsLogInputBuffer)
             {
                 _commsLogInputBuffer.Enqueue(logItem);
@@ -594,11 +594,11 @@ namespace Common
         }
 
 
-        private void _bgEventLogger_DoWork(object sender, DoWorkEventArgs e)
+        private void BGEventLogger_DoWork(object sender, DoWorkEventArgs e)
         {
             string query;
             EventLogItem logItem;
-            StringBuilder batchbuilder = new StringBuilder();
+            StringBuilder batchbuilder = new();
             string tblName = Globals.SystemManager.GetTableName("AppLog");
   
 
@@ -617,7 +617,7 @@ namespace Common
                     while (_eventLogInputBuffer.Count > 0 && batchCount <= 50)
                     {
                         logItem = _eventLogInputBuffer.Dequeue();
-                        logItem.ToSQL(tblName, _executionID, batchbuilder, batchCount == 0);
+                        logItem.ToSQL(_executionID, batchbuilder, batchCount == 0);
                         batchCount++;
                     }
                 }
@@ -631,7 +631,7 @@ namespace Common
             
         }
 
-        private void ResetEventBatch(StringBuilder sb, string table)
+        private static void ResetEventBatch(StringBuilder sb, string table)
         {
             sb.Clear();
             sb.Append("Insert INTO ");
@@ -641,9 +641,9 @@ namespace Common
 
 
 
-        private void _bgCommsLogger_DoWork(object sender, DoWorkEventArgs e)
+        private void BGCommsLogger_DoWork(object sender, DoWorkEventArgs e)
         {
-            StringBuilder batchBuilder = new StringBuilder();
+            StringBuilder batchBuilder = new();
             string tblName = Globals.SystemManager.GetTableName("CommsLog");
             CommsLogItemBase logItem;
             string query;
@@ -674,7 +674,7 @@ namespace Common
             }         
         }
 
-        private void ResetCommsBatch(StringBuilder sb, string table)
+        private static void ResetCommsBatch(StringBuilder sb, string table)
         {
             sb.Clear();
             sb.Append("Insert INTO ");
@@ -741,7 +741,7 @@ namespace Common
             {
                 if (disposing)
                 {
-                    Stopwatch stopwatch = new Stopwatch();
+                    Stopwatch stopwatch = new();
 
                     Cleanup();
 
@@ -799,7 +799,7 @@ namespace Common
             // Do not change this code. Put cleanup code in Dispose(bool disposing) above.
             Dispose(true);
             // TODO: uncomment the following line if the finalizer is overridden above.
-            // GC.SuppressFinalize(this);
+            GC.SuppressFinalize(this);
         }
         #endregion
 

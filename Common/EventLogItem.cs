@@ -43,7 +43,7 @@ namespace Common
                 EventType = AppEventType.Debug;
         }
 
-        public void ToSQL(string tablename,Guid executionID,StringBuilder sb,bool firstItem)
+        public void ToSQL(Guid executionID,StringBuilder sb,bool firstItem)
         {
             string objname;
             string desc;
@@ -63,7 +63,7 @@ namespace Common
             //            sb.Append(tablename);
             //            sb.Append(" (FDAExecutionID,Timestamp,EventType,ObjectType,ObjectName,Description,ErrorCode,StackTrace) VALUES ('");
             if (!firstItem)
-                sb.Append(",");
+                sb.Append(',');
             sb.Append("('");
             sb.Append(executionID);
             sb.Append("','");

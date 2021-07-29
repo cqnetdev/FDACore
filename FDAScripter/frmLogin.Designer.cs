@@ -145,7 +145,7 @@ namespace FDAScripter
             this.cbRecent.Name = "cbRecent";
             this.cbRecent.Size = new System.Drawing.Size(312, 33);
             this.cbRecent.TabIndex = 9;
-            this.cbRecent.SelectedIndexChanged += new System.EventHandler(this.cbRecent_SelectedIndexChanged);
+            this.cbRecent.SelectedIndexChanged += new System.EventHandler(this.CB_Recent_SelectedIndexChanged);
             // 
             // label5
             // 
@@ -172,7 +172,7 @@ namespace FDAScripter
             this.btnConnect.TabIndex = 11;
             this.btnConnect.Text = "Connect";
             this.btnConnect.UseVisualStyleBackColor = true;
-            this.btnConnect.Click += new System.EventHandler(this.btnConnect_Click);
+            this.btnConnect.Click += new System.EventHandler(this.BTN_Connect_Click);
             // 
             // frmLogin
             // 

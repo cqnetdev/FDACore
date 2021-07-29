@@ -44,7 +44,7 @@ namespace Common
 
         public Object Clone()
         {
-            RequestGroup groupCopy = new RequestGroup()
+            RequestGroup groupCopy = new()
             {
                 ID = this.ID,
                 Description = this.Description,

@@ -14,8 +14,8 @@ namespace FDA
 {
     public class DataAcqManager : IDisposable
     {
-        public static Dictionary<Guid, RRConnectionManager> _RRconnectionsDictionary;
-        public static Dictionary<Guid, PubSubConnectionManager> _PubSubConnectionsDictionary;
+        private static Dictionary<Guid, RRConnectionManager> _RRconnectionsDictionary;
+        private static Dictionary<Guid, PubSubConnectionManager> _PubSubConnectionsDictionary;
         private readonly Dictionary<Guid,FDAScheduler> _schedulersDictionary;
         private string _dbConnectionString;
         private readonly DBManager _dbManager;
@@ -59,6 +59,16 @@ namespace FDA
             }
 
            
+        }
+
+        public static Dictionary<Guid, RRConnectionManager> GetRRConnections()
+        {
+            return _RRconnectionsDictionary;
+        }
+
+        public static Dictionary<Guid, PubSubConnectionManager> GetPubSubConnections()
+        {
+            return _PubSubConnectionsDictionary;
         }
 
         private void HandleUserScriptCompileError(string scriptID, List<string> errors)
@@ -1470,7 +1480,7 @@ namespace FDA
                             DateTime fromTime = toTime.AddHours(-1 * hoursBack);
                             */
                             string error;
-                            List<Object> commsStatsParams = _dbManager.ParseStatsCalcParams(task.task_details,out error);
+                            List<Object> commsStatsParams = DBManager.ParseStatsCalcParams(task.task_details,out error);
                             if (error == "" && commsStatsParams != null)
                             {
                                 Globals.SystemManager.LogApplicationEvent(this, "", "Calculating communications statistics (requested by schedule " + scheduler.ID);

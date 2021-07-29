@@ -12,12 +12,12 @@ namespace ControllerService
 {
     class BasicServicesClient : IDisposable
     {
-        private ILogger<Worker> _logger;
+        private readonly ILogger<Worker> _logger;
         private TcpClient _FDA;
         NetworkStream FDAstream;
 
-        private int _port;
-        private Queue<string> _sendQueue;
+        private readonly int _port;
+        private readonly Queue<string> _sendQueue;
         public int FDAQueueCount;
         public string FDAMode = "";
         public string FDAVersion = "";
@@ -27,7 +27,7 @@ namespace ControllerService
 
         public bool FDAConnected { get { if (_FDA == null) return false; else return _FDA.Connected;} }
 
-        private BackgroundWorker _bgWorker;
+        private readonly BackgroundWorker _bgWorker;
 
         public BasicServicesClient(int port,ILogger<Worker> logger)
         {
@@ -38,10 +38,12 @@ namespace ControllerService
 
             FDAQueueCount = -1;
 
-            _bgWorker = new BackgroundWorker();
-            _bgWorker.WorkerSupportsCancellation = true;
-            _bgWorker.DoWork += _bgWorker_DoWork;
-            _bgWorker.RunWorkerCompleted += _bgWorker_RunWorkerCompleted;
+            _bgWorker = new BackgroundWorker
+            {
+                WorkerSupportsCancellation = true
+            };
+            _bgWorker.DoWork += BGWorker_DoWork;
+            _bgWorker.RunWorkerCompleted += BGWorker_RunWorkerCompleted;
         }
 
         public void Send(string message)
@@ -52,15 +54,15 @@ namespace ControllerService
             }
         }
 
-        private void _bgWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
+        private void BGWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
         {
             _FDA?.Dispose();
         }
 
-        private void _bgWorker_DoWork(object sender, DoWorkEventArgs e)
+        private void BGWorker_DoWork(object sender, DoWorkEventArgs e)
         {
 
-            Stopwatch stopwatch = new Stopwatch();
+            Stopwatch stopwatch = new();
             string message;
             string responseStr;
 
@@ -142,7 +144,7 @@ namespace ControllerService
             return responseStr;
         }
 
-        private void WaitForResponse(NetworkStream stream,int limit)
+        private static void WaitForResponse(NetworkStream stream,int limit)
         {
             int wait = 0;
             while (!stream.DataAvailable && wait < limit)

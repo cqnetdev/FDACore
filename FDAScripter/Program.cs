@@ -58,7 +58,7 @@ namespace FDAScripter
             string[] recentsArray = recentsString.Split(";",StringSplitOptions.RemoveEmptyEntries);
             foreach (string recent in recentsArray)
             {
-                RecentConn conn = new RecentConn(recent);
+                RecentConn conn = new(recent);
                 RecentConnections.Add(conn.server, conn);
             }
         }
@@ -110,7 +110,7 @@ namespace FDAScripter
             if (!RecentConnections.ContainsKey(instance))
             {
                 string conn = instance + "," + dbname + "," + user + "," + password;
-                RecentConn newconn = new RecentConn(conn);
+                RecentConn newconn = new(conn);
                 RecentConnections.Add(instance, newconn);
 
                 Properties.Settings.Default.RecentConnections += conn + ";";
@@ -120,12 +120,12 @@ namespace FDAScripter
 
         internal static DataTable QueryDB(string query)
         {
-            DataTable result = new DataTable();
+            DataTable result = new();
 
             string safequery = GetSafeQuery(query);
             if (ConnectedDBType == DB.SQL)
             {
-                using (SqlDataAdapter da = new SqlDataAdapter(safequery, SQL))
+                using (SqlDataAdapter da = new(safequery, SQL))
                 {
                     da.Fill(result);
                 }

@@ -1,7 +1,7 @@
 ﻿
 namespace FDAScripter
 {
-    partial class frmFDAObjects
+    partial class FrmFDAObjects
     {
         /// <summary>
         /// Required designer variable.
@@ -54,7 +54,7 @@ namespace FDAScripter
             this.dgvFDAObjects.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
             this.dgvFDAObjects.Size = new System.Drawing.Size(1117, 459);
             this.dgvFDAObjects.TabIndex = 0;
-            this.dgvFDAObjects.CellMouseDown += new System.Windows.Forms.DataGridViewCellMouseEventHandler(this.dgvFDAObjects_CellMouseDown);
+            this.dgvFDAObjects.CellMouseDown += new System.Windows.Forms.DataGridViewCellMouseEventHandler(this.DGV_FDAObjects_CellMouseDown);
             // 
             // rbConn
             // 
@@ -66,7 +66,7 @@ namespace FDAScripter
             this.rbConn.TabStop = true;
             this.rbConn.Text = "Connections";
             this.rbConn.UseVisualStyleBackColor = true;
-            this.rbConn.CheckedChanged += new System.EventHandler(this.rbConn_CheckedChanged);
+            this.rbConn.CheckedChanged += new System.EventHandler(this.RBConn_CheckedChanged);
             // 
             // panel1
             // 
@@ -87,7 +87,7 @@ namespace FDAScripter
             this.rbTags.TabStop = true;
             this.rbTags.Text = "Tags";
             this.rbTags.UseVisualStyleBackColor = true;
-            this.rbTags.CheckedChanged += new System.EventHandler(this.rbTags_CheckedChanged);
+            this.rbTags.CheckedChanged += new System.EventHandler(this.RBTags_CheckedChanged);
             // 
             // ctxMenu
             // 
@@ -102,7 +102,7 @@ namespace FDAScripter
             this.menuItemInsert.Name = "menuItemInsert";
             this.menuItemInsert.Size = new System.Drawing.Size(240, 32);
             this.menuItemInsert.Text = "Insert into Script";
-            this.menuItemInsert.Click += new System.EventHandler(this.menuItemInsert_Click);
+            this.menuItemInsert.Click += new System.EventHandler(this.MI_Insert_Click);
             // 
             // frmFDAObjects
             // 

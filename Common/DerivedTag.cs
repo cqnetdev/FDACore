@@ -20,7 +20,6 @@ namespace Common
         protected string _arguments;
 
         public static Dictionary<Guid, FDADataPointDefinitionStructure> Tags;
-
         public delegate void OnUpdateHandler(object sender, EventArgs e);
         public event OnUpdateHandler OnUpdate;
 
@@ -105,7 +104,7 @@ namespace Common
 
         public virtual void Dispose()
         {
-
+            GC.SuppressFinalize(this);
         }
 
     }
@@ -248,10 +247,10 @@ namespace Common
             UInt32 intVal = Convert.ToUInt32(dblVal);
 
             // break out the bits
-            BitArray sourceBits = new BitArray(BitConverter.GetBytes(intVal));
+            BitArray sourceBits = new(BitConverter.GetBytes(intVal));
 
             // copy the requested bits into a new array
-            BitArray dstBits = new BitArray(32);
+            BitArray dstBits = new(32);
             int destIdx = 0;
             for (int srcIdx = _startBit; srcIdx < (_startBit + _numBits); srcIdx++)
             {
@@ -286,6 +285,7 @@ namespace Common
             {
                 _sourceTag.PropertyChanged -= SourceTag_PropertyChanged;
             }
+            GC.SuppressFinalize(this);
         }
 
         public override void AlterArguments(string newArguments)
@@ -440,6 +440,8 @@ namespace Common
         {
             if (_sourceTag != null)
                 _sourceTag.PropertyChanged -= SourceTag_PropertyChanged;
+
+            GC.SuppressFinalize(this);
         }
 
         public override void AlterArguments(string newArguments)

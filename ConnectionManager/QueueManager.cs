@@ -31,10 +31,10 @@ namespace FDA
         private readonly int _priorityCount;
         public int PriorityCount { get => _priorityCount; }
 
-        private List<Dictionary<Guid,RequestGroup>> _queuedGroups; 
+        private readonly List<Dictionary<Guid,RequestGroup>> _queuedGroups; 
 
-        private dynamic _owner;
-        private List<Queue<RequestGroup>> _queues;
+        private readonly dynamic _owner;
+        private readonly List<Queue<RequestGroup>> _queues;
         //private List<CircularBuffer<RequestGroup>> _recentDequeues;
         private RequestGroup superPriorityGroup;
         //private int _totalCount;

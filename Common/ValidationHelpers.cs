@@ -8,7 +8,7 @@ namespace Support
     {
         public static bool IsValidGuid(string guidString)
         {
-            return Guid.TryParse(guidString, out Guid guid);
+            return Guid.TryParse(guidString, out _);
         }
     }
 }

@@ -64,7 +64,7 @@ namespace FDAManager
 
         public void NewDataPoint(int priority, int value,DateTime timestamp)
         {
-            DataPoint newPoint = new DataPoint();
+            DataPoint newPoint = new();
             newPoint.SetValueXY(timestamp, value);
 
             // add a label to the new point
@@ -120,7 +120,7 @@ namespace FDAManager
 
         private void btn_Export_Click(object sender, EventArgs e)
         {
-            SaveFileDialog dlg = new SaveFileDialog();
+            SaveFileDialog dlg = new();
             dlg.AddExtension = true;
             dlg.DefaultExt = "csv";
             dlg.Filter = "CSV|*.csv";

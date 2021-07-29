@@ -18,13 +18,14 @@ namespace Support
             return bits;
         }
 
-        public static byte ByteFromBits(byte[] bits)
-        {
-            byte byteValue = 0;
-            for (int i = 0; i < 8; i++)
-                byteValue += (byte)Math.Pow(2, i);
+        // not used
+        //public static byte ByteFromBits(byte[] bits)
+        //{
+        //    byte byteValue = 0;
+        //    for (int i = 0; i < 8; i++)
+        //        byteValue += (byte)Math.Pow(2, i);
 
-            return byteValue;
-        }
+        //    return byteValue;
+        //}
     }
 }

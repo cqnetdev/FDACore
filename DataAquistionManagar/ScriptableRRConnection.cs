@@ -13,7 +13,7 @@ namespace FDA
     {
         public static List<ScriptableRRConnection> WrapConn(Dictionary<Guid, RRConnectionManager> toWrap)
         {
-            List<ScriptableRRConnection> output = new List<ScriptableRRConnection>();
+            List<ScriptableRRConnection> output = new();
             foreach (RRConnectionManager connMgr in toWrap.Values)
             {
                 output.Add(new ScriptableRRConnection(connMgr));
@@ -24,7 +24,7 @@ namespace FDA
 
 
 
-        private RRConnectionManager _connMgr;
+        private readonly RRConnectionManager _connMgr;
 
 
         public bool ConnectionEnabled { get => _connMgr.ConnectionEnabled; set { _connMgr.ConnectionEnabled = value; OnPropertyChanged(); } }

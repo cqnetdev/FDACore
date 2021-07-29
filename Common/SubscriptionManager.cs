@@ -13,7 +13,7 @@ namespace Common
 {
     public class SubscriptionManager
     {
-        List<Subscription> Subscriptions;
+        private readonly List<Subscription> Subscriptions;
         public delegate void SubscriptionTriggerEventHandler(object sender, SubscriptionEventArgs eventArgs);
         public event SubscriptionTriggerEventHandler SubscriptionTriggered;
 
@@ -73,7 +73,7 @@ namespace Common
 
         public void RemoveSubscriber(Guid subscriber)
         {
-            List<Subscription> subsToRemove = new List<Subscription>();
+            List<Subscription> subsToRemove = new();
             foreach (Subscription sub in Subscriptions)
             {
                 if (sub.Subscriber == subscriber)
@@ -124,18 +124,18 @@ namespace Common
             private string _ID;
             private string _type;
             private bool _MQTTEnabled;
-            private Type _derivedType;
+            private readonly Type _derivedType;
             public string ID { get { return _ID; } set { _ID = value.ToLower(); } }
             public string ObjectType {  get { return _type; } set { _type = value.ToLower(); } }
             public bool MQTTEnabled { get => _MQTTEnabled; set { if (_MQTTEnabled != value) { _MQTTEnabled = value; if (value) PublishAll(); else UnpublishAll(); } } }
-            private HashSet<string> MQTTRetainProperties;
-            private HashSet<string> MQTTincludeTimestamp;
-            private HashSet<string> MQTTalwaysPublishProperties;
+            private readonly HashSet<string> MQTTRetainProperties;
+            private readonly HashSet<string> MQTTincludeTimestamp;
+            private readonly HashSet<string> MQTTalwaysPublishProperties;
 
             public event PropertyChangedEventHandler PropertyChanged;
 
             private static Dictionary<Type, int> DataTypes;
-            private Dictionary<string,PropertyInfo> propertyDictionary;
+            private readonly Dictionary<string,PropertyInfo> propertyDictionary;
 
             public SubscribeableObject()
             {
@@ -156,12 +156,14 @@ namespace Common
 
                 if (DataTypes == null)
                 {
-                    DataTypes = new Dictionary<Type, int>();
-                    DataTypes.Add(typeof(string),0);
-                    DataTypes.Add(typeof(double), 1);
-                    DataTypes.Add(typeof(int), 2);
-                    DataTypes.Add(typeof(DateTime), 3);
-                    DataTypes.Add(typeof(bool), 4);
+                    DataTypes = new Dictionary<Type, int>
+                    {
+                        { typeof(string), 0 },
+                        { typeof(double), 1 },
+                        { typeof(int), 2 },
+                        { typeof(DateTime), 3 },
+                        { typeof(bool), 4 }
+                    };
                 }
                 
             }
@@ -239,7 +241,7 @@ namespace Common
                     MQTTincludeTimestamp.Add(prop);
             }
 
-            private byte[] AppendTimestamp(byte[] original,long timestamp)
+            private static byte[] AppendTimestamp(byte[] original,long timestamp)
             {
                 byte[] appended = new byte[original.Length + 8];
                 Array.Copy(original, 0, appended, 0, original.Length);
@@ -278,7 +280,7 @@ namespace Common
             public void UnpublishAll() // unpublish all retained values
             {
                 string topic;
-                byte[] empty = new byte[0];
+                byte[] empty = Array.Empty<byte>();
                 foreach (PropertyInfo prop in propertyDictionary.Values)
                 {      
                     topic = ObjectType + "/" + ID.ToLower() + "/" + prop.Name.ToLower();
@@ -286,7 +288,7 @@ namespace Common
                 }
             }
 
-            private byte[] ObjectToByteArray(Object obj,long timestamp = 0)
+            private static byte[] ObjectToByteArray(Object obj,long timestamp = 0)
             {
                 if (obj == null)
                     return null;
@@ -301,9 +303,9 @@ namespace Common
                 }
                 else
                 {
-                    timestampBytes = new byte[0];
+                    timestampBytes = Array.Empty<byte>();
                 }
-                byte[] databytes = new byte[0];
+                byte[] databytes;
                 byte[] messagebytes;
                 if (DataTypes.ContainsKey(dataType))
                 {
@@ -462,6 +464,8 @@ namespace Common
                 Trigger.Obj = null;
                 if (ReportProperties != null)
                     ReportProperties.Clear();
+
+                GC.SuppressFinalize(this);
             }
         }
 

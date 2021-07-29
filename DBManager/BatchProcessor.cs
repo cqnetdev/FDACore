@@ -14,7 +14,7 @@ namespace FDA
 {
     public class CacheManager : IDisposable
     {
-        private Dictionary<string, Cache> _caches;
+        private readonly Dictionary<string, Cache> _caches;
 
         private int _cacheTimeout;
         private int _cacheLimit;
@@ -42,7 +42,7 @@ namespace FDA
             {
                 lock (_caches)
                 {
-                    Cache newCache = new Cache(destination, CacheTimeout, CacheLimit);
+                    Cache newCache = new(destination, CacheTimeout, CacheLimit);
                     newCache.CacheMaxSizeReached += HandleCacheMaxSize;
                     newCache.CacheTimeout += HandleCacheTimeout;
                     _caches.Add(destination, newCache);
@@ -99,7 +99,7 @@ namespace FDA
 
         public List<string> FlushAll()
         {
-            List<string> BatchList = new List<string>();
+            List<string> BatchList = new();
 
 
             foreach (Cache cache in _caches.Values)
@@ -117,8 +117,8 @@ namespace FDA
         }
 
         public void Dispose()
-        { 
-            
+        {
+            GC.SuppressFinalize(this);
             //_cacheCheckTimer.Dispose();
             //_cacheCheckTimer = null;
         }
@@ -144,7 +144,7 @@ namespace FDA
         public long Age = 0;// { get { if (_stopwatch != null) return _stopwatch.ElapsedMilliseconds; else return 0; } }
         public int Count;
  
-        private Stopwatch _stopwatch;
+        private readonly Stopwatch _stopwatch;
         private Timer _ageTimer;
 
         public int Timeout;
@@ -163,7 +163,7 @@ namespace FDA
             SQL = new StringBuilder();
             lock (SQL)
             {
-                resetBatch();
+                ResetBatch();
             }
 
             Timeout = timeout;
@@ -196,7 +196,7 @@ namespace FDA
                 lock (SQL)
                 {
                     if (Count > 0)
-                        SQL.Append(",");
+                        SQL.Append(',');
 
                     SQL.Append("('");
                     SQL.Append(tag.TagID);
@@ -204,9 +204,9 @@ namespace FDA
                     SQL.Append(DateTimeHelpers.FormatDateTime(tag.Timestamp));
                     SQL.Append("',");
                     SQL.Append(tag.Value);
-                    SQL.Append(",");
+                    SQL.Append(',');
                     SQL.Append(tag.Quality);
-                    SQL.Append(")");
+                    SQL.Append(')');
                 }
 
                     Count++;
@@ -229,7 +229,7 @@ namespace FDA
                     lock (SQL)
                     {
                         batchSQL = SQL.ToString(); 
-                        resetBatch();
+                        ResetBatch();
                     }
 
                     _stopwatch.Stop();
@@ -248,7 +248,7 @@ namespace FDA
             }
         }
 
-        private void resetBatch()
+        private void ResetBatch()
         {
             SQL.Clear();
             SQL.Append("Insert INTO ");

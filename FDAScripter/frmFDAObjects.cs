@@ -10,14 +10,14 @@ using System.Windows.Forms;
 
 namespace FDAScripter
 {
-    public partial class frmFDAObjects : Form
+    public partial class FrmFDAObjects : Form
     {
-        public frmFDAObjects()
+        public FrmFDAObjects()
         {
             InitializeComponent();
         }
 
-        private void rbTags_CheckedChanged(object sender, EventArgs e)
+        private void RBTags_CheckedChanged(object sender, EventArgs e)
         {
             if (rbTags.Checked)
             {
@@ -26,7 +26,7 @@ namespace FDAScripter
             }
         }
 
-        private void rbConn_CheckedChanged(object sender, EventArgs e)
+        private void RBConn_CheckedChanged(object sender, EventArgs e)
         {
             if (rbConn.Checked)
             {
@@ -36,7 +36,7 @@ namespace FDAScripter
         }
 
         
-        private void dgvFDAObjects_CellMouseDown(object sender, DataGridViewCellMouseEventArgs e)
+        private void DGV_FDAObjects_CellMouseDown(object sender, DataGridViewCellMouseEventArgs e)
         {
             if (e.ColumnIndex != -1 && e.RowIndex != -1 && e.Button == System.Windows.Forms.MouseButtons.Right)
             {
@@ -53,11 +53,11 @@ namespace FDAScripter
             }
         }
 
-        private void menuItemInsert_Click(object sender, EventArgs e)
+        private void MI_Insert_Click(object sender, EventArgs e)
         {
             // insert the selected item into the script on the script editor form
             string objectType = "";
-            string objectID = "";
+            string objectID;
             string IDColName = "";
 
             frmScriptEditor editor = (frmScriptEditor)this.Owner;

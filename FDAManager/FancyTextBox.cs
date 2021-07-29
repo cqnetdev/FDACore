@@ -12,8 +12,8 @@ namespace FDAManager
 {
     public partial class FancyTextBox : TextBox
     {
-        private Color _textcolor;
-        private Color _backcolor;
+        private readonly Color _textcolor;
+        private readonly Color _backcolor;
         
         public int FlashTime { get { return flashtimer.Interval; } set { flashtimer.Interval = value; } }
         public Color FlashForeColor { get; set; }
@@ -49,7 +49,7 @@ namespace FDAManager
         }
 
 
-        private void flashtimer_Tick(object sender, EventArgs e)
+        private void Flashtimer_Tick(object sender, EventArgs e)
         {
             flashtimer.Enabled = false;
             this.ForeColor = _textcolor;
@@ -66,7 +66,7 @@ namespace FDAManager
                 inhibitTimer.Enabled = false;
             inhibitTimer.Enabled = true;
         }
-        private void inhibitTimer_Tick(object sender, EventArgs e)
+        private void InhibitTimer_Tick(object sender, EventArgs e)
         {
             inhibitTimer.Enabled = false;
         }

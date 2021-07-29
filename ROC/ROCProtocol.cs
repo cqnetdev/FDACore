@@ -13,8 +13,8 @@ namespace ROC
         private const ushort CRCInitial = 0x0000;
         private const ushort CRCPoly = 0xA001;
         private const bool CRCSwapOutputBytes = false;
-        private readonly static List<string> supportedOpcodes = new List<string>(new string[] { "180", "181", "+181", "17", "120", "121", "+121", "122", "+122" });
-        private readonly static List<string> OpcodesRequiringTagList = new List<string>(new string[] { "180", "181", "+181" });
+        private readonly static List<string> supportedOpcodes = new(new string[] { "180", "181", "+181", "17", "120", "121", "+121", "122", "+122" });
+        private readonly static List<string> OpcodesRequiringTagList = new(new string[] { "180", "181", "+181" });
         private static List<string> validationErrors;
         private class TLP
         {
@@ -53,7 +53,7 @@ namespace ROC
 
         public static List<RequestGroup> BackfillTag(FDADataPointDefinitionStructure tagInfo, DataRequest request)
         {
-            List<RequestGroup> RequestGroups = new List<RequestGroup>();
+            List<RequestGroup> RequestGroups = new();
 
             // let's gather up all the info we're going to need
             int HPN = tagInfo.backfill_data_ID;
@@ -1099,7 +1099,7 @@ namespace ROC
 
                     // GenerateReadRequest now returns a list of DataRequests, 
                     //in the event that the definition would result in an oversized response message and needs to be broken up into multiple requests 
-                    List<DataRequest> subRequestList = new List<DataRequest>();
+                    List<DataRequest> subRequestList = new();
                     byte[] ptrs;
                     ushort lastRead;
                     ushort current;
@@ -1257,7 +1257,7 @@ namespace ROC
                     }
                     requestGroup.ProtocolRequestList.AddRange(subRequestList);
 
-                    List<DataRequest> readbackSubRequestList = new List<DataRequest>();
+                    List<DataRequest> readbackSubRequestList = new();
                     if (OpcodePlus)
                     {
                         readbackSubRequestList = GenerateReadRequest(requestGroup.ID, "", groupNum, devNum, 1, 1, tlpList.ToArray(), tagConfigsList, tagList, requestIdx + 1, maxDataSize, DataRequest.RequestType.ReadbackAfterWrite);
@@ -1439,7 +1439,7 @@ namespace ROC
                 int hour = int.Parse(DTStr[3]);
                 int minute = int.Parse(DTStr[4]);
 
-                DateTime dt = new DateTime(year, month, day, hour, minute,0);
+                DateTime dt = new(year, month, day, hour, minute,0);
                 return dt;
 
             } catch(Exception ex)
@@ -1466,9 +1466,9 @@ namespace ROC
         /// <returns></returns>
         private static List<DataRequest> GenerateOpcode120Request(Guid RequestGroup, string reqID, byte group, byte unit, byte hostGroup, byte hostUnit, int groupIdx,bool systemRequest,DataRequest.RequestType reqType)
         {
-            DataRequest OC120Request = new DataRequest();
+            DataRequest OC120Request = new();
 
-            List<byte> requestBytes = new List<byte>() { unit, group, hostUnit, hostGroup, 120,0};
+            List<byte> requestBytes = new() { unit, group, hostUnit, hostGroup, 120,0};
 
             // calculate the checksum
             ushort CRC16 = CRCHelpers.CalcCRC16(requestBytes.ToArray(), CRCInitial, CRCPoly, CRCSwapOutputBytes);
@@ -1478,7 +1478,7 @@ namespace ROC
             requestBytes.Add(IntHelpers.GetHighByte(CRC16));        // CRC High Byte
 
 
-            DataRequest request = new DataRequest()
+            DataRequest request = new()
             {
                 RequestBytes = requestBytes.ToArray(),
                 GroupIdxNumber = groupIdx.ToString(),
@@ -1494,7 +1494,7 @@ namespace ROC
             }
 
 
-            List<DataRequest> requestList = new List<DataRequest>
+            List<DataRequest> requestList = new()
             {
                 request
             };
@@ -1504,7 +1504,7 @@ namespace ROC
 
         public static List<DataRequest> GenerateAlarmEventsRequests(Guid requestGroupID,string requestID,byte groupNum,byte devNum,byte hostGroupNum, byte HostDevNum,byte opCode, ushort lastReadRecord,ushort currentPointer,bool inclusive,string requestIdx)
         {
-            List<DataRequest> requestList = new List<DataRequest>();
+            List<DataRequest> requestList = new();
 
             if (lastReadRecord < 0 || lastReadRecord > 239 || currentPointer < 0 || currentPointer > 239)
             {
@@ -1655,15 +1655,15 @@ namespace ROC
 
         private static List<DataRequest> GeneratePreWriteRead(Guid RequestGroupID, string reqID, byte group, byte unit, byte hostGroup, byte hostUnit, TLP[] TLPs, List<FDADataPointDefinitionStructure> tagsconfigList, List<Tag> tagList, int groupIdx, int maxDataSize)
         {
-            List<DataRequest> subRequestList = new List<DataRequest>();
+            List<DataRequest> subRequestList = new();
 
             // find unique BIN TLPs, create a tag/config/TLP entry for each one
-            List<string> uniquifier = new List<string>();
+            List<string> uniquifier = new();
 
             // strip out any non BIN tags for the pre-write read
-            List<TLP> BinaryTLPs = new List<TLP>();
-            List<Tag> BinaryTags = new List<Tag>();
-            List<FDADataPointDefinitionStructure> BinaryTagConfigs = new List<FDADataPointDefinitionStructure>();
+            List<TLP> BinaryTLPs = new();
+            List<Tag> BinaryTags = new();
+            List<FDADataPointDefinitionStructure> BinaryTagConfigs = new();
 
 
             // go through the original TLP list, pull out unique binary TLPs, convert them to UINT8's and generate new lists for the pre-write read
@@ -1708,7 +1708,7 @@ namespace ROC
 
         private static List<DataRequest> GenerateOpcode128Request(Guid requestGroup, Guid connectionID, byte groupNum, byte devNum, byte hostGroup, byte hostDev, string opCode, string login, short pwd, string[] historyPointRequests)
         {
-            List<DataRequest> subRequestList = new List<DataRequest>();
+            List<DataRequest> subRequestList = new();
             string[] historyRequestData;
             byte historyPointNumber;
             byte requestedDay;
@@ -1762,7 +1762,7 @@ namespace ROC
                 }
 
 
-                List<byte> requestByteList = new List<byte>()
+                List<byte> requestByteList = new()
                 {
                     devNum,
                     groupNum,
@@ -1781,7 +1781,7 @@ namespace ROC
                 requestByteList.Add(IntHelpers.GetLowByte(CRC));
                 requestByteList.Add(IntHelpers.GetHighByte(CRC));
 
-                DataRequest thisRequest = new DataRequest()
+                DataRequest thisRequest = new()
                 {
                     DeviceLogin = login,
                     DevicePass = pwd,
@@ -1798,7 +1798,7 @@ namespace ROC
 
                 for (int idx = 0; idx < tagCount; idx++)
                 {
-                    Tag tag = new Tag(tagID) { ProtocolDataType = ROCDataType };
+                    Tag tag = new(tagID) { ProtocolDataType = ROCDataType };
                     thisRequest.TagList.Add(tag);
                 }
                 thisRequest.RequestBytes = requestByteList.ToArray();
@@ -1818,7 +1818,7 @@ namespace ROC
 
         private static List<DataRequest> GenerateOpcode130Request(Guid requestGroup, Guid connectionID, byte groupNum, byte devNum, byte hostGroup, byte hostDev, string login, short pwd, string[] historyPointRequest,double recordStep = 60)
         {
-            List<DataRequest> subRequestList = new List<DataRequest>();
+            List<DataRequest> subRequestList = new();
             byte historyPointNumber = 0;
             byte historyType = 0;
             ushort startIdx = 1;
@@ -1848,7 +1848,7 @@ namespace ROC
             startIdx = ushort.Parse(historyPointRequest[4]);
             recordCount = byte.Parse(historyPointRequest[5]);
     
-            List<byte> requestByteList = new List<byte>()
+            List<byte> requestByteList = new()
             {
                 devNum,
                 groupNum,
@@ -1869,9 +1869,9 @@ namespace ROC
 
             requestByteList.Add(IntHelpers.GetLowByte(CRC));
             requestByteList.Add(IntHelpers.GetHighByte(CRC));
-            Opcode130params OC130Params = new Opcode130params() { StartIdx = startIdx, RecordCount = recordCount, Interval = recordStep };
+            Opcode130params OC130Params = new() { StartIdx = startIdx, RecordCount = recordCount, Interval = recordStep };
 
-            DataRequest thisRequest = new DataRequest()
+            DataRequest thisRequest = new()
             {
                 DeviceLogin = login,
                 DevicePass = pwd,
@@ -1886,7 +1886,7 @@ namespace ROC
             // add the required # of tags to the tag list 
             for (int idx = 0; idx < recordCount; idx += 1)
             {
-                Tag tag = new Tag(tagID) { ProtocolDataType = ROCDataType };
+                Tag tag = new(tagID) { ProtocolDataType = ROCDataType };
                 thisRequest.TagList.Add(tag);
             }
             thisRequest.RequestBytes = requestByteList.ToArray();
@@ -1915,7 +1915,7 @@ namespace ROC
         private static List<DataRequest> GenerateOpcode126Request(Guid requestGroup, Guid connectionID, byte groupNum, byte devNum, byte hostGroup, byte hostDev,string login, short pwd, string[] historyPointRequests)
         {
             // the history for each point results in a max length response, so each history point requested gets it's own request
-            List<DataRequest> subRequestList = new List<DataRequest>();
+            List<DataRequest> subRequestList = new();
             string[] historyRequestData;
             byte historyPointNumber;
             byte minutesRequested = 60;
@@ -1961,7 +1961,7 @@ namespace ROC
                         minutesStep = byte.Parse(historyRequestData[5]);
                 }
 
-                List<byte> requestByteList = new List<byte>()
+                List<byte> requestByteList = new()
                 {
                     devNum,
                     groupNum,
@@ -1984,7 +1984,7 @@ namespace ROC
 
 
 
-                DataRequest thisRequest = new DataRequest()
+                DataRequest thisRequest = new()
                 {
                     DeviceLogin = login,
                     DevicePass = pwd,
@@ -1999,7 +1999,7 @@ namespace ROC
                 // create 60 tags to handle the full response from the device
                 for (int idx = 0; idx < 60; idx++)
                 {
-                    Tag tag = new Tag(tagID) { ProtocolDataType = ROCDataType };
+                    Tag tag = new(tagID) { ProtocolDataType = ROCDataType };
                     thisRequest.TagList.Add(tag);
                 }
                 thisRequest.RequestBytes = requestByteList.ToArray();
@@ -2019,7 +2019,7 @@ namespace ROC
 
         private static List<DataRequest> GenerateWriteRequest(string reqID, byte group, byte unit, byte hostGroup, byte hostUnit, object protocolParams, List<FDADataPointDefinitionStructure> tagsconfigList,Dictionary<Guid,double> writeValues,List<Tag> preReadValues, int groupIdx, int maxDataSize)
         {
-            List<DataRequest> requestList = new List<DataRequest>();
+            List<DataRequest> requestList = new();
 
             try
             {
@@ -2030,7 +2030,7 @@ namespace ROC
 
                 byte dataSize = 1;
 
-                List<byte> dataBlock = new List<byte>();
+                List<byte> dataBlock = new();
 
                 Guid pointID;
                 byte parameterCount = 0;
@@ -2106,7 +2106,7 @@ namespace ROC
 
                 // put the whole message together
                 
-                List<byte> message = new List<byte>()
+                List<byte> message = new()
                 {
                     unit,                        // Device Unit    (1 byte)
                     group,                       // Device Group   (1 byte)
@@ -2130,7 +2130,7 @@ namespace ROC
                 byte[] requestBytes = (Byte[])message.ToArray();
 
                 // create a request object
-                DataRequest request = new DataRequest
+                DataRequest request = new()
                 {
                     RequestBytes = requestBytes,
                     ExpectedResponseSize = 8,
@@ -2157,7 +2157,7 @@ namespace ROC
         // Standard read request (OpCode 180)
         private static List<DataRequest> GenerateReadRequest(Guid RequestGroup, string reqID, byte group, byte unit, byte hostGroup, byte hostUnit, TLP[] TLPs, List<FDADataPointDefinitionStructure> tagsconfigList, List<Tag> tagList, int groupIdx, int maxDataSize, DataRequest.RequestType requestType)
         {
-            List<DataRequest> subRequestList = new List<DataRequest>();
+            List<DataRequest> subRequestList = new();
 
 
             try
@@ -2185,7 +2185,7 @@ namespace ROC
 
 
                     // build message header (minus the data block size, we don't know that yet)
-                    List<byte> message = new List<byte>
+                    List<byte> message = new()
                     {
                         unit,                         // Device Unit    (1 byte)
                         group,                        // Device Group   (1 byte)
@@ -2194,7 +2194,7 @@ namespace ROC
                         (byte)0xB4,                   // Operation Code (1 byte)
                     };
 
-                    List<byte> datablock = new List<byte>();
+                    List<byte> datablock = new();
 
 
                     // ---------------------------------- add each parameter (until we reach the max response size)
@@ -2246,7 +2246,7 @@ namespace ROC
                     int expectedResponseSize = 8 + responseDataSize;
 
                     // build a datarequest object
-                    DataRequest request = new DataRequest
+                    DataRequest request = new()
                     {
                         RequestBytes = requestBytes,
                         ExpectedResponseSize = expectedResponseSize,
@@ -2365,7 +2365,7 @@ namespace ROC
                 message.Add(IntHelpers.GetHighByte(CRC16));
 
                 // build a request object
-                DataRequest request = new DataRequest
+                DataRequest request = new()
                 {
                     RequestBytes = (Byte[])message.ToArray(typeof(Byte)),
                     ExpectedResponseSize = 8,
@@ -2385,7 +2385,7 @@ namespace ROC
         private static DateTime GetHistoryBaseTime(DataRequest req)
         {
             DateTime respTime = req.ResponseTimestamp;
-            DateTime baseTime = new DateTime(respTime.Year, respTime.Month, respTime.Day, respTime.Hour - 1, respTime.Minute, 0);
+            DateTime baseTime = new(respTime.Year, respTime.Month, respTime.Day, respTime.Hour - 1, respTime.Minute, 0);
             baseTime = baseTime.AddMinutes(1);
 
             return baseTime;
@@ -2439,14 +2439,14 @@ namespace ROC
                         // break out the 22 bytes for each alarm record and generate a AlarmRecord objects                       
                         numRecords = request.ResponseBytes[6];
                         firstRecord = request.ResponseBytes[7];
-                        List<RocAlarmRecord> almRecordList = new List<RocAlarmRecord>();
+                        List<RocAlarmRecord> almRecordList = new();
  
                         for(int recordIdx = 0; recordIdx < numRecords; recordIdx++)
                         {
                             recordBytes = request.ResponseBytes.Skip(11 + recordIdx * 22).Take(22).ToArray();
                             recordPos = firstRecord + recordIdx;
                             if (recordPos > 239) recordPos = recordPos - 240;
-                            RocAlarmRecord record = new RocAlarmRecord(request.ResponseTimestamp, request.ConnectionID, NodeID,recordPos, Convert.ToInt16(request.TagList[1].Value), recordBytes,request.Destination, manualMode);
+                            RocAlarmRecord record = new(request.ResponseTimestamp, request.ConnectionID, NodeID,recordPos, Convert.ToInt16(request.TagList[1].Value), recordBytes,request.Destination, manualMode);
                             //if (record.Valid)
                             almRecordList.Add(record);
                         }
@@ -2462,13 +2462,13 @@ namespace ROC
                         // break out the 22 bytes for each event record and generate a AlarmRecord objects 
                         numRecords = request.ResponseBytes[6];
                         firstRecord = request.ResponseBytes[7];
-                        List<RocEventRecord> evtRecordList = new List<RocEventRecord>();
+                        List<RocEventRecord> evtRecordList = new();
                         for (int recordIdx = 0; recordIdx < numRecords; recordIdx++)
                         {
                             recordBytes = request.ResponseBytes.Skip(11 + recordIdx * 22).Take(22).ToArray();
                             recordPos = firstRecord + recordIdx;
                             if (recordPos > 239) recordPos = recordPos - 240;
-                            RocEventRecord record = new RocEventRecord(request.ResponseTimestamp, request.ConnectionID, NodeID, recordPos, Convert.ToInt16(request.TagList[1].Value), recordBytes,request.Destination,manualMode);
+                            RocEventRecord record = new(request.ResponseTimestamp, request.ConnectionID, NodeID, recordPos, Convert.ToInt16(request.TagList[1].Value), recordBytes,request.Destination,manualMode);
                             //if (record.Valid)
                             evtRecordList.Add(record);
                         }
@@ -2523,7 +2523,7 @@ namespace ROC
                         }
 
                         // filter the full response from the device for only those values needed
-                        List<Tag> filtered = new List<Tag>();
+                        List<Tag> filtered = new();
 
 
 
@@ -2611,7 +2611,7 @@ namespace ROC
                         
 
                         // filter the full response from the device for only those values needed to fill the hole in the recorded data
-                        List<Tag> filteredList = new List<Tag>();
+                        List<Tag> filteredList = new();
 
 
                         // go through the tags, find the index that corresponds with the start hour
@@ -2756,7 +2756,7 @@ namespace ROC
 
 
                         //temporary structures to hold the values as they're converted from bytes
-                        List<object> values = new List<object>();
+                        List<object> values = new();
                         object value = null;
 
                         // first data byte is the number of parameters in the data
@@ -3175,20 +3175,20 @@ namespace ROC
 
         public sealed class DataType : DataTypeBase
         {
-            public static readonly DataType AC10 = new DataType("AC10", 10, typeof(string));
-            public static readonly DataType AC20 = new DataType("AC20", 20, typeof(string));
-            public static readonly DataType AC30 = new DataType("AC30", 30, typeof(string));
-            public static readonly DataType BIN = new DataType("BIN", 1, typeof(byte));
-            public static readonly DataType INT8 = new DataType("INT8", 1, typeof(SByte));
-            public static readonly DataType INT16 = new DataType("INT16", 2, typeof(Int16));
-            public static readonly DataType INT32 = new DataType("INT32", 4, typeof(Int32));
-            public static readonly DataType UINT8 = new DataType("UINT8", 1, typeof(Int16));
-            public static readonly DataType UINT16 = new DataType("UINT16", 2, typeof(UInt16));
-            public static readonly DataType UINT32 = new DataType("UINT32", 4, typeof(UInt32));
-            public static readonly DataType FL = new DataType("FL", 4, typeof(float));
-            public static readonly DataType TLP = new DataType("TLP", 3, typeof(byte[]));
-            public static readonly DataType DT = new DataType("DT", 4, typeof(float));
-            private static readonly List<string> TypeList = new List<string>(new string[] { "AC10","AC20","AC30","BIN","INT8","INT32","UINT8","UINT16","UINT32","FL","TLP","DT"});
+            public static readonly DataType AC10 = new("AC10", 10, typeof(string));
+            public static readonly DataType AC20 = new("AC20", 20, typeof(string));
+            public static readonly DataType AC30 = new("AC30", 30, typeof(string));
+            public static readonly DataType BIN = new("BIN", 1, typeof(byte));
+            public static readonly DataType INT8 = new("INT8", 1, typeof(SByte));
+            public static readonly DataType INT16 = new("INT16", 2, typeof(Int16));
+            public static readonly DataType INT32 = new("INT32", 4, typeof(Int32));
+            public static readonly DataType UINT8 = new("UINT8", 1, typeof(Int16));
+            public static readonly DataType UINT16 = new("UINT16", 2, typeof(UInt16));
+            public static readonly DataType UINT32 = new("UINT32", 4, typeof(UInt32));
+            public static readonly DataType FL = new("FL", 4, typeof(float));
+            public static readonly DataType TLP = new("TLP", 3, typeof(byte[]));
+            public static readonly DataType DT = new("DT", 4, typeof(float));
+            private static readonly List<string> TypeList = new(new string[] { "AC10","AC20","AC30","BIN","INT8","INT32","UINT8","UINT16","UINT32","FL","TLP","DT"});
 
             private DataType(string name, byte size, Type hostDataType) : base(name, size, hostDataType)
             {
@@ -3847,7 +3847,7 @@ namespace ROC
                     {
                         AlarmCodeLookup = new Dictionary<byte, Dictionary<byte, string>>();
 
-                        Dictionary<byte, string> AlarmCode = new Dictionary<byte, string>
+                        Dictionary<byte, string> AlarmCode = new()
                         {
                             { 0, "Low Alarm" },
                             { 1, "Lo Lo Alarm" },

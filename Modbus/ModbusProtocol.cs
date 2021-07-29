@@ -16,7 +16,7 @@ namespace Modbus
 
         private static List<string> validationErrors;
 
-        static internal Dictionary<Byte, String> _errorMessages = new Dictionary<byte, string>
+        static internal Dictionary<Byte, String> _errorMessages = new()
         {
             { 1, "Illegal Function" },
             { 2, "Illegal Data Address" },
@@ -68,8 +68,8 @@ namespace Modbus
                     ushort numRegisters = 0;
                     byte opCode = 0;
                     ushort byteCount = 0;
-                    List<FDADataPointDefinitionStructure> tagConfigsList = new List<FDADataPointDefinitionStructure>();
-                    List<Tag> tagList = new List<Tag>();
+                    List<FDADataPointDefinitionStructure> tagConfigsList = new();
+                    List<Tag> tagList = new();
                     Tag newTag;
                     string dataTypeName;
                     Guid tagID;
@@ -308,7 +308,7 @@ namespace Modbus
                     // if a readback was requested (+ in front of the opcode), generate a read request for the same register(s) and insert it into the request list right after the write
                     if (readback)
                     {
-                        List<DataRequest> readbackSubRequestList = new List<DataRequest>();
+                        List<DataRequest> readbackSubRequestList = new();
                         byte readbackOpCode = 3;
                         if (opCode == 5 || opCode == 15)
                             readbackOpCode = 1;
@@ -903,10 +903,10 @@ namespace Modbus
 
         private static List<DataRequest> GenerateReadRequest(byte opCode, ushort slave, ushort startRegister, int groupIndex, bool tcp,bool enron, int maxDataSize, List<FDADataPointDefinitionStructure> tagconfigs, List<Tag> tagList, DataRequest.RequestType requestType)
         {
-            List<DataRequest> subRequestList = new List<DataRequest>();
-            List<byte> requestBytes = new List<byte>();
-            List<Tag> subRequestTagList = new List<Tag>();
-            List <FDADataPointDefinitionStructure> subRequestTagConfigList = new List<FDADataPointDefinitionStructure>();
+            List<DataRequest> subRequestList = new();
+            List<byte> requestBytes = new();
+            List<Tag> subRequestTagList = new();
+            List <FDADataPointDefinitionStructure> subRequestTagConfigList = new();
             try
             {
                 // special case opcode 7 - this will never be oversized, so let's just get that out of the way
@@ -935,7 +935,7 @@ namespace Modbus
                         requestBytes.Add(IntHelpers.GetLowByte(CRC));
                     }
 
-                    DataRequest request = new DataRequest()
+                    DataRequest request = new()
                     {
                         RequestBytes = requestBytes.ToArray(),
                         GroupIdxNumber = groupIndex.ToString(),
@@ -1081,7 +1081,7 @@ namespace Modbus
 
                     // generate a new DataRequest object: set the protocol, request bytes, and expected response size
 
-                    DataRequest request = new DataRequest()
+                    DataRequest request = new()
                     {
                         RequestBytes = requestBytes.ToArray(),
                         Protocol = protocolName,
@@ -1177,7 +1177,7 @@ namespace Modbus
             string tag;
 
 
-            StringBuilder sb = new StringBuilder();
+            StringBuilder sb = new();
 
             string[] tagdetails;
             bool MTMode = true;
@@ -1219,7 +1219,7 @@ namespace Modbus
         {
             try
             {
-                List<DataRequest> subRequestList = new List<DataRequest>();
+                List<DataRequest> subRequestList = new();
 
                 int tagIdx = 0;
                 int dataBytecount;
@@ -1240,7 +1240,7 @@ namespace Modbus
                     subrequestCount++;
                     subRequestTagList = new List<Tag>();
                     subRequestTagConfigs = new List<FDADataPointDefinitionStructure>();
-                    List<byte> requestBytes = new List<byte>();
+                    List<byte> requestBytes = new();
                     dataBytecount = 0;
 
                     // build the message header                             
@@ -1285,7 +1285,7 @@ namespace Modbus
 
 
                     // build a datarequest object
-                    DataRequest subRequest = new DataRequest
+                    DataRequest subRequest = new()
                     {
                         RequestBytes = requestBytes.ToArray(),                  // this is just the header, the rest needs to be filled in by CompleteWriteRequest laster
                         ProtocolSpecificParams = adjStartReg,
@@ -1305,7 +1305,7 @@ namespace Modbus
                 foreach (DataRequest writeRequest in subRequestList)
                 {
                     // bring in the previously generated header bytes
-                    List<byte> requestBytes = new List<byte>();
+                    List<byte> requestBytes = new();
                     requestBytes.AddRange(writeRequest.RequestBytes);
 
                     tcp = (writeRequest.Protocol == "MODBUSTCP");
@@ -1414,7 +1414,7 @@ namespace Modbus
                             byte tagValue;
 
                             // make a list of the 1's and 0's "dataBytes" in order of the tags
-                            List<byte> bitValues = new List<byte>();
+                            List<byte> bitValues = new();
                             foreach (Tag currentTag in writeRequest.TagList)
                             {
                                 if (valuesToWrite.ContainsKey(currentTag.TagID))
@@ -1506,22 +1506,22 @@ namespace Modbus
 
         public sealed class DataType : DataTypeBase
         {
-            public static readonly DataType BIN = new DataType("BIN", 1, typeof(byte));
-            public static readonly DataType FL = new DataType("FL", 4, typeof(float));
+            public static readonly DataType BIN = new("BIN", 1, typeof(byte));
+            public static readonly DataType FL = new("FL", 4, typeof(float));
             //public static readonly DataType AC = new DataType("AC",???, typeof(string)); // doesn't have a fixed size....
-            public static readonly DataType INT8 = new DataType("INT8", 1, typeof(sbyte));
-            public static readonly DataType INT16 = new DataType("INT16", 2, typeof(Int16));
-            public static readonly DataType INT32 = new DataType("INT32", 4, typeof(Int32));
-            public static readonly DataType UINT8 = new DataType("UINT8", 1, typeof(byte));
-            public static readonly DataType UINT16 = new DataType("UINT16", 2, typeof(UInt16));
-            public static readonly DataType UINT32 = new DataType("UINT32", 4, typeof(UInt32));
-            public static readonly DataType BCD16 = new DataType("BCD16", 2, typeof(UInt16));
-            public static readonly DataType BCDP16 = new DataType("BCDP16", 2, typeof(UInt16));
-            public static readonly DataType BCD32 = new DataType("BCD32", 4, typeof(UInt32));
-            public static readonly DataType BCDP32 = new DataType("BCDP32", 4, typeof(UInt32));
-            public static readonly DataType MT1 = new DataType("MT1", 0, typeof(DBNull));
-            public static readonly DataType MT16 = new DataType("MT16", 2, typeof(DBNull));
-            public static readonly DataType MT32 = new DataType("MT32", 4, typeof(DBNull));
+            public static readonly DataType INT8 = new("INT8", 1, typeof(sbyte));
+            public static readonly DataType INT16 = new("INT16", 2, typeof(Int16));
+            public static readonly DataType INT32 = new("INT32", 4, typeof(Int32));
+            public static readonly DataType UINT8 = new("UINT8", 1, typeof(byte));
+            public static readonly DataType UINT16 = new("UINT16", 2, typeof(UInt16));
+            public static readonly DataType UINT32 = new("UINT32", 4, typeof(UInt32));
+            public static readonly DataType BCD16 = new("BCD16", 2, typeof(UInt16));
+            public static readonly DataType BCDP16 = new("BCDP16", 2, typeof(UInt16));
+            public static readonly DataType BCD32 = new("BCD32", 4, typeof(UInt32));
+            public static readonly DataType BCDP32 = new("BCDP32", 4, typeof(UInt32));
+            public static readonly DataType MT1 = new("MT1", 0, typeof(DBNull));
+            public static readonly DataType MT16 = new("MT16", 2, typeof(DBNull));
+            public static readonly DataType MT32 = new("MT32", 4, typeof(DBNull));
             public double Registers { get { return GetRegisterCount(); } }
 
             private DataType(string name, byte size, Type hostDataType) : base(name, size, hostDataType)

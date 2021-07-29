@@ -8,7 +8,7 @@ namespace Common
 {
     public class DataType : DataTypeBase
     {
-        public static readonly DataType UNKNOWN = new DataType("UNKNOWN", 1, typeof(byte));
+        public static readonly DataType UNKNOWN = new("UNKNOWN", 1, typeof(byte));
         private DataType(string name, byte size, Type hostDataType) : base(name, size, hostDataType)
         {
         }

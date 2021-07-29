@@ -7,19 +7,30 @@ using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 
+// suppress warnings about properties that don't start with capital letters, these property names must match the column names in the database
+#pragma warning disable IDE1006
+
 namespace Common
 {
 
     public class DataSubscription
-    {
+    {        
         public Guid subscription_id { get; set; }
+        
         public Guid source_connection_ref { get; set; }
+        
         public string monitored_items { get; set; }
+        
         public string destination_table { get; set; }
+        
         public bool enabled { get; set; }
+        
         public int interval { get; set; }
+        
         public string deadband_type { get; set; }
+        
         public Double deadband { get; set; }
+        
         public bool report_on_timestamp_change { get; set; }
     }
 
@@ -35,7 +46,7 @@ namespace Common
 
         public object Clone()
         {
-            FDADataBlockRequestGroup copy = new FDADataBlockRequestGroup()
+            FDADataBlockRequestGroup copy = new()
             {
                 DRGUID = DRGUID,
                 Description = Description,
@@ -107,7 +118,7 @@ namespace Common
             private readonly DataTypeBase _dataType;
             private readonly DataRequest.WriteMode _writeMode;
 
-            public readonly static Datapoint Empty = new Datapoint(0, 32, Globals.FDANow(), "", Common.DataType.UNKNOWN, DataRequest.WriteMode.Insert);
+            public readonly static Datapoint Empty = new(0, 32, Globals.FDANow(), "", Common.DataType.UNKNOWN, DataRequest.WriteMode.Insert);
 
             public Datapoint(double value, int quality, DateTime timestamp, string destination, DataTypeBase datatype, DataRequest.WriteMode writeMode)
             {
@@ -167,6 +178,7 @@ namespace Common
         public Guid DPDUID { get => _DPDUID; set { if (_DPDUID != value) { _DPDUID = value; base.ID = value.ToString(); NotifyPropertyChanged(); } } }
         public Boolean DPDSEnabled { get => _DPDSEnabled; set { if (_DPDSEnabled != value) { _DPDSEnabled = value; NotifyPropertyChanged(); } } }
         public string DPSType { get => _dPSType; set { if (_dPSType != value) { _dPSType = value; NotifyPropertyChanged(); } } }
+
         public Boolean read_scaling { get => _read_scaling; set { if (_read_scaling != value) { _read_scaling = value; NotifyPropertyChanged(); } } }
 
         public Double read_scale_raw_low { get => _read_scale_raw_low; set { if (_read_scale_raw_low != value) { _read_scale_raw_low = value; NotifyPropertyChanged(); } } }
@@ -194,7 +206,7 @@ namespace Common
 
         public Datapoint LastRead { get => _lastread;
             set {
-                if (_lastread != value) { _lastread = value; NotifyPropertyChanged("LastRead", 0); }
+                if (_lastread != value) { _lastread = value; NotifyPropertyChanged(nameof(LastRead), 0); }
             }
         }
 

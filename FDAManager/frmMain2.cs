@@ -392,7 +392,7 @@ namespace FDAManager
                                 Guid ID;
                                 string[] connparts;
                                 ConnectionNode newConnNode;
-                                List<Guid> updatedConnList = new List<Guid>();
+                                List<Guid> updatedConnList = new();
 
 
 
@@ -879,7 +879,7 @@ namespace FDAManager
 
                 ID = Guid.Parse(connOverviewArr[2]);
 
-                List<ushort> qCountList = new List<ushort>();
+                List<ushort> qCountList = new();
                 for (int i = 5; i < connOverviewArr.Length; i++)
                 {
                     qCountList.Add(UInt16.Parse(connOverviewArr[i]));
@@ -950,13 +950,13 @@ namespace FDAManager
         //==========================================
         private void mQTTQueryTestToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            frmCustomQuery testForm = new frmCustomQuery(MQTT);
+            frmCustomQuery testForm = new(MQTT);
             testForm.Show();
         }
 
         private void communicationsStatsToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            frmCommsStats statsForm = new frmCommsStats(MQTT, DBType);
+            frmCommsStats statsForm = new(MQTT, DBType);
             statsForm.SetConnectionList(_connOverviewDict);
             statsForm.Show();
         }
@@ -967,7 +967,7 @@ namespace FDAManager
             Connection selectedConnection;
             if (selectedItem.Text == "New Connection")  // creating a new connection
             {
-                frmAddFDADialog dlg = new frmAddFDADialog();
+                FrmAddFDADialog dlg = new();
                 if (dlg.ShowDialog() == DialogResult.OK)
                 {
                     selectedConnection = dlg.connection;
@@ -1010,7 +1010,7 @@ namespace FDAManager
                 if (!initial)
                     FDAManagerContext.ConnHistory.RecentConnections.Add(connection);
 
-                ToolStripMenuItem newMenuItem = new ToolStripMenuItem(connection.Description + " (" + connection.Host + ")");
+                ToolStripMenuItem newMenuItem = new(connection.Description + " (" + connection.Host + ")");
                 newMenuItem.Click += ConnectionToolStripMenuItem_Click;
                 newMenuItem.Tag = connection;
                 recentToolStripMenuItem.DropDownItems.Add(newMenuItem);

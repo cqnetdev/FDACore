@@ -1,7 +1,7 @@
 ﻿
 namespace FDAScripter
 {
-    partial class frmNewScriptName
+    partial class FrmNewScriptName
     {
         /// <summary>
         /// Required designer variable.
@@ -59,7 +59,7 @@ namespace FDAScripter
             this.button1.TabIndex = 2;
             this.button1.Text = "Continue";
             this.button1.UseVisualStyleBackColor = true;
-            this.button1.Click += new System.EventHandler(this.btnContinue);
+            this.button1.Click += new System.EventHandler(this.BTN_Continue);
             // 
             // btnCancel
             // 
@@ -69,7 +69,7 @@ namespace FDAScripter
             this.btnCancel.TabIndex = 3;
             this.btnCancel.Text = "Cancel";
             this.btnCancel.UseVisualStyleBackColor = true;
-            this.btnCancel.Click += new System.EventHandler(this.btnCancel_Click);
+            this.btnCancel.Click += new System.EventHandler(this.BTN_Cancel_Click);
             // 
             // frmNewScriptName
             // 

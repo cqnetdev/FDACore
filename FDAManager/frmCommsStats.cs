@@ -14,10 +14,10 @@ namespace FDAManager
 {
     public partial class frmCommsStats : Form
     {
-        private MqttClient _mqtt;
+        private readonly MqttClient _mqtt;
         private delegate void DataReceivedHandler(byte[] data);
         private string _queryID;
-        private string _dbtype;
+        private readonly string _dbtype;
 
         private delegate void ThreadsafeUpdateText(string text);
 
@@ -27,7 +27,7 @@ namespace FDAManager
 
             _dbtype = DBType;
             _mqtt = mqtt;
-            _mqtt.MqttMsgPublishReceived += _mqtt_MqttMsgPublishReceived;
+            _mqtt.MqttMsgPublishReceived += MqttMsgPublishReceived;
             _mqtt.Subscribe(new string[] { "FDA/DefaultCommsStatsTable" }, new byte[] { 1 });
 
         }
@@ -135,7 +135,7 @@ namespace FDAManager
                 lbl_defaultOutput.Text = text;
         }
 
-        private void _mqtt_MqttMsgPublishReceived(object sender, uPLibrary.Networking.M2Mqtt.Messages.MqttMsgPublishEventArgs e)
+        private void MqttMsgPublishReceived(object sender, uPLibrary.Networking.M2Mqtt.Messages.MqttMsgPublishEventArgs e)
         {
             if (e.Topic == "FDA/DefaultCommsStatsTable")
             {
@@ -171,8 +171,8 @@ namespace FDAManager
                 {
                     // convert the XML to a dataset that can be displayed in a datagridview
                     string XMLresult = Encoding.UTF8.GetString(result);
-                    StringReader theReader = new StringReader(XMLresult);
-                    DataSet theDataSet = new DataSet();
+                    StringReader theReader = new(XMLresult);
+                    DataSet theDataSet = new();
                     theDataSet.ReadXml(theReader);
 
                     if (theDataSet.Tables.Count == 0)
@@ -198,7 +198,7 @@ namespace FDAManager
 
         }
 
-        private void btn_export_Click(object sender, EventArgs e)
+        private void Btn_export_Click(object sender, EventArgs e)
         {
             DataTable table = (DataTable)dataGridView1.DataSource;
             string desc = description.Text;
@@ -212,7 +212,7 @@ namespace FDAManager
             }
 
             // build the csv from the datatable
-            StringBuilder sb = new StringBuilder();
+            StringBuilder sb = new();
             string[] columnNames = table.Columns.Cast<DataColumn>().Select(column => column.ColumnName).ToArray();
             sb.AppendLine(string.Join(",", columnNames));
             foreach (DataRow row in table.Rows)
@@ -230,7 +230,7 @@ namespace FDAManager
                 filename = desc;
 
                 // but be sure to remove any invalid characters
-                string invalid = new string(Path.GetInvalidFileNameChars());
+                string invalid = new(Path.GetInvalidFileNameChars());
                 foreach (char c in invalid)
                 {
                     filename = filename.Replace(c.ToString(), "");
@@ -252,13 +252,13 @@ namespace FDAManager
 
      
 
-        private void frmCommsStats_Load(object sender, EventArgs e)
+        private void FrmCommsStats_Load(object sender, EventArgs e)
         {
             string displayString = DateTime.Now.AddDays(-365).ToString("yyyy-MM-dd hh:mm:ss tt");
             startTime.Text =displayString;
         }
 
-        private void dataGridView1_DataSourceChanged(object sender, EventArgs e)
+        private void DataGridView1_DataSourceChanged(object sender, EventArgs e)
         {
             btn_export.Enabled = (dataGridView1.DataSource != null);
             if (btn_export.Enabled)
@@ -274,7 +274,7 @@ namespace FDAManager
 
         private class ComboBoxConnection
         {
-            private string Description;
+            private readonly string Description;
             public string ID;
 
            
@@ -297,22 +297,22 @@ namespace FDAManager
                 cb_connection.Items.Add(new ComboBoxConnection(item.ID.ToString(),item.Description));
         }
 
-        private void btnSetStart_Click(object sender, EventArgs e)
+        private void BtnSetStart_Click(object sender, EventArgs e)
         {
             int hoursago = (int)dayshoursago.Value;
             if (rbdays.Checked)
-                hoursago = hoursago * 24;
+                hoursago *= 24;
 
             DateTime calcstartTime = DateTime.Now.Subtract(new TimeSpan(hoursago, 0, 0));
             startTime.Value = calcstartTime;
         }
 
-        private void btnSetEnd_Click(object sender, EventArgs e)
+        private void BtnSetEnd_Click(object sender, EventArgs e)
         {
             endtime.Value = DateTime.Now;
         }
 
-        private void chkSaveToDB_CheckedChanged(object sender, EventArgs e)
+        private void ChkSaveToDB_CheckedChanged(object sender, EventArgs e)
         {
             outputtable.Enabled = chkSaveToDB.Checked;
             outputtable.ReadOnly = !chkSaveToDB.Checked;

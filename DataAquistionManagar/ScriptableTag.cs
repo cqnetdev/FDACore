@@ -11,7 +11,7 @@ namespace FDA
     {
         public static List<ScriptableTag> WrapDPD(Dictionary<Guid,FDADataPointDefinitionStructure> toWrap)
         {
-            List<ScriptableTag> output = new List<ScriptableTag>();
+            List<ScriptableTag> output = new();
             foreach (FDADataPointDefinitionStructure fdaTag in toWrap.Values)
             {
                 output.Add(new ScriptableTag(fdaTag));
@@ -20,7 +20,7 @@ namespace FDA
             return output;
         }
          
-        private FDADataPointDefinitionStructure _fdaTag;
+        private readonly FDADataPointDefinitionStructure _fdaTag;
 
         public override event PropertyChangedEventHandler PropertyChanged;
 

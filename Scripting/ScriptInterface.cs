@@ -6,7 +6,7 @@ namespace Scripting
 {
     public class ScriptInterface
     {
-        Dictionary<string, ScriptableObject> _scriptables = new Dictionary<string, ScriptableObject>();
+        Dictionary<string, ScriptableObject> _scriptables = new();
        
         public dynamic GetTag(string ID)
         {

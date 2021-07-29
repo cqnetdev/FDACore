@@ -10,10 +10,10 @@ namespace Support
 {
     public static class AsyncConsole
     {
-        private static readonly StringBuilder _sb = new StringBuilder();
+        private static readonly StringBuilder _sb = new();
         private static volatile CancellationTokenSource _cts;
         private static int _count;
-        private static int _flushRate = 500;
+        private readonly static int _flushRate = 500;
 
         public static void Write(string value)
         {

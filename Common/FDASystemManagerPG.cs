@@ -9,23 +9,23 @@ namespace Common
 {
     public class FDASystemManagerPG : FDASystemManager, IDisposable
     {
-        private PostgreSQLListener<FDAConfig> _appConfigMonitor;
-        PostgreSQLListener<RocDataTypes> _rocDataTypesMonitor;
-        PostgreSQLListener<RocEventFormats> _RocEventsFormatsMonitor;
+        private readonly PostgreSQLListener<FDAConfig> _appConfigMonitor;
+        private readonly PostgreSQLListener<RocDataTypes> _rocDataTypesMonitor;
+        private readonly PostgreSQLListener<RocEventFormats> _RocEventsFormatsMonitor;
 
         public FDASystemManagerPG(string DBInstance, string systemDBName, string login, string pass, string version, Guid executionID) : base(DBInstance, systemDBName, login, pass, version, executionID)
         {
             // ************ PostgreSQL version *******************
             _appConfigMonitor = new PostgreSQLListener<FDAConfig>(SystemDBConnectionString, "FDAConfig");
-            _appConfigMonitor.Notification += _appConfigMonitor_Notification;
+            _appConfigMonitor.Notification += AppConfigMonitor_Notification;
 
             // set up monitoring of RocDataTypes tables (PostgreSQL version)
             _rocDataTypesMonitor = new PostgreSQLListener<RocDataTypes>(SystemDBConnectionString, "rocdatatypes");
-            _rocDataTypesMonitor.Notification += _rocDataTypesMonitor_Notification;
+            _rocDataTypesMonitor.Notification += RocDataTypesMonitor_Notification;
 
             // set up monitoring of the RocEventFormats table (PostgreSQL version)
             _RocEventsFormatsMonitor = new PostgreSQLListener<RocEventFormats>(SystemDBConnectionString, "RocEventFormats");
-            _RocEventsFormatsMonitor.Notification += _RocEventsFormatsMonitor_Notification;
+            _RocEventsFormatsMonitor.Notification += RocEventsFormatsMonitor_Notification;
 
             StartListening();
         }
@@ -35,9 +35,9 @@ namespace Common
         {
             int retries = 0;
             int maxRetries = 3;
-            DataTable result = new DataTable();
+            DataTable result = new();
         Retry:
-            using (NpgsqlConnection conn = new NpgsqlConnection(dbConnString))
+            using (NpgsqlConnection conn = new(dbConnString))
             {
                 try
                 {
@@ -51,7 +51,7 @@ namespace Common
 
                 try
                 {
-                    using (NpgsqlDataAdapter da = new NpgsqlDataAdapter(sql, conn))
+                    using (NpgsqlDataAdapter da = new(sql, conn))
                     {
                         da.Fill(result);
                     }
@@ -82,7 +82,7 @@ namespace Common
             int maxRetries = 3;
         Retry:
 
-            using (NpgsqlConnection conn = new NpgsqlConnection(dbConnString))
+            using (NpgsqlConnection conn = new(dbConnString))
             {
                 try
                 {
@@ -131,7 +131,7 @@ namespace Common
             int retries = 0;
 
         Retry:
-            using (NpgsqlConnection conn = new NpgsqlConnection(dbConnString))
+            using (NpgsqlConnection conn = new(dbConnString))
             {
                 try
                 {
@@ -173,17 +173,17 @@ namespace Common
             }
         }
 
-        private void _appConfigMonitor_Notification(object sender, PostgreSQLListener<FDAConfig>.PostgreSQLNotification notifyEvent)
+        private void AppConfigMonitor_Notification(object sender, PostgreSQLListener<FDAConfig>.PostgreSQLNotification notifyEvent)
         {
             AppConfigNotification(notifyEvent.Notification.operation, notifyEvent.Notification.row);
         }
 
-        private void _rocDataTypesMonitor_Notification(object sender, PostgreSQLListener<RocDataTypes>.PostgreSQLNotification notifyEvent)
+        private void RocDataTypesMonitor_Notification(object sender, PostgreSQLListener<RocDataTypes>.PostgreSQLNotification notifyEvent)
         {
             ROCDataTypes_Notification(notifyEvent.Notification.operation, notifyEvent.Notification.row);
         }
 
-        private void _RocEventsFormatsMonitor_Notification(object sender, PostgreSQLListener<RocEventFormats>.PostgreSQLNotification notifyEvent)
+        private void RocEventsFormatsMonitor_Notification(object sender, PostgreSQLListener<RocEventFormats>.PostgreSQLNotification notifyEvent)
         {
             ROCEventsNotification(notifyEvent.Notification.operation, notifyEvent.Notification.row);
 

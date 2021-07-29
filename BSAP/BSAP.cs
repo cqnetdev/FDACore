@@ -79,10 +79,9 @@ namespace BSAP
                 if (headerElement1.Length > 1)
                 {
                     deviceRefString = headerElement1[1];
-                    Guid deviceRefID;
 
                     // is a valid GUID
-                    if (!Guid.TryParse(deviceRefString, out deviceRefID))
+                    if (!Guid.TryParse(deviceRefString, out Guid deviceRefID))
                     {
                         RecordValidationError(obj, groupID, requestor, "contains a request with an invalid device ID '" + deviceRefString + ", the correct format is xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx.");
                         valid = false;
@@ -202,8 +201,7 @@ namespace BSAP
                     }
 
                     //tagData[2] is the tag ID
-                    Guid id;
-                    if (!Guid.TryParse(tagData[2], out id)) // tag has a valid ID
+                    if (!Guid.TryParse(tagData[2], out Guid id)) // tag has a valid ID
                     {
                         RecordValidationError(obj, groupID, requestor, "Tag " + i + " has an invalid element (tag ID '" + tagData[2] + "' is not a valid UID, should be in the format xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx");
                         valid = false;
@@ -221,10 +219,9 @@ namespace BSAP
                             referencedTags?.Add(id);
 
                             // the DPSType of the tag matches the DPStype of the RequestGroup
-                            Guid result;
                             FDADataPointDefinitionStructure tag = pointDefs[id];
-                            if (Guid.TryParse(groupID,out result))
-                            {                            
+                            if (Guid.TryParse(groupID, out Guid result))
+                            {
                                 string tagDPSType = tag.DPSType.ToUpper();
                                 string groupDPSType = ((DBManager)(Globals.DBManager)).GetRequestGroup(result).DPSType;
                                 if (tagDPSType != groupDPSType)
@@ -289,7 +286,7 @@ namespace BSAP
             }
         }
 
-        public static void CreateRequests(RequestGroup requestGroup, object protocolOptions = null)
+        public static void CreateRequests(RequestGroup requestGroup)
         {
             //BSAP    -> Global Address (req) : Local Address (req) : READ/WRITE (req): Login1 (opt): Login2 (opt) : Max Data Size (opt)|tagname:type:ID|.....
             //BSAPUDP ->  IPAddress (req) : Port (req) : READ/WRITE (req): Login1 (opt): Login2 (opt) : Max Data Size (opt)|tagname:type:ID|.....
@@ -298,21 +295,27 @@ namespace BSAP
             string[] requestStrings;     // delimited by $
             string[] HeaderAndBody;      // delimited by |
             string[] Header;             // delimited by :
-            byte globalAddress = 0;
+            
+            // not currently used
+            //byte globalAddress = 0;
+            
             byte localAddress = 0;
             string ip = String.Empty;
 
             string operation;
             string signalName;
-            string login1 = "";
-            string login2 = "";
+            
+            // not currently used
+            //string login1;
+            //string login2;
+            
             FDADevice deviceSettings = null;
 
             Guid tagID;
             List<ushort> MSDRequestList = new();
-            List<Tag> MSDTagList = new List<Tag>();
-            List<string> SignalNameRequestList = new List<string>();
-            List<Tag> SignalNameTagList = new List<Tag>();
+            List<Tag> MSDTagList = new();
+            List<string> SignalNameRequestList = new();
+            List<Tag> SignalNameTagList = new();
             int maxRequestLength = absoluteMaxMessageLength;
             // check for null or empty group definition, exit if found
             if (requestString == null || requestString == string.Empty)
@@ -343,8 +346,10 @@ namespace BSAP
                 string[] address;
                 if (requestGroup.Protocol == "BSAP")
                 {
-                    address = Header[0].Split('^');
-                    globalAddress = byte.Parse(address[0]);                    
+                    // global address not currently used
+                    // address = Header[0].Split('^');
+                    // globalAddress = byte.Parse(address[0]);                    
+                    
                     localAddress = byte.Parse(Header[1]);
                 }
                 else
@@ -356,11 +361,12 @@ namespace BSAP
                 
                     operation = Header[2].ToUpper();
 
-                if (Header.Length > 3)
-                    login1 = Header[3];
+                // not currently used
+                //if (Header.Length > 3)
+                //    login1 = Header[3];
 
-                if (Header.Length > 4)
-                    login2 = Header[4];
+                //if (Header.Length > 4)
+                //    login2 = Header[4];
 
                 if (Header.Length > 5)
                     maxRequestLength = int.Parse(Header[5]);
@@ -377,16 +383,16 @@ namespace BSAP
                     dataType = tagInfo[1];
                     tagID = Guid.Parse(tagInfo[2]);
 
-                    // do we already know the MSD for this signal?
-                    int MSDtemp = int.Parse(requestGroup.TagsRef[tagID].DeviceTagAddress);
+                    // do we already know the MSD for this signal? (request by MSD currently disabled)
+                    //int MSDtemp = int.Parse(requestGroup.TagsRef[tagID].DeviceTagAddress);
 
                     // double check.. does the signal name match? only use this address if the signal name matches
-                    string recordedSigname = requestGroup.TagsRef[tagID].DeviceTagName;
-                    if (recordedSigname != signalName)
-                        MSDtemp = -1;
+                    //string recordedSigname = requestGroup.TagsRef[tagID].DeviceTagName;
+                    //if (recordedSigname != signalName)
+                    //    MSDtemp = -1;
 
                     // temporary override, never request by MSD (we need the ACCOL Load version # to be able to request by MSD)
-                    MSDtemp = -1;
+                    int MSDtemp = -1;
                     // ********************************************************************************************************
                     
                     if (MSDtemp >= 0)
@@ -397,10 +403,12 @@ namespace BSAP
                         if (!(operation == "WRITE" && double.IsNaN(requestGroup.writeLookup[tagID])))
                         {
                             MSDRequestList.Add(MSD);
-                            newTag = new Tag(tagID);
-                            newTag.DeviceTagName = signalName;
-                            newTag.DeviceTagAddress = MSD.ToString();
-                            newTag.ProtocolDataType = DataType.GetType(dataType);
+                            newTag = new Tag(tagID)
+                            {
+                                DeviceTagName = signalName,
+                                DeviceTagAddress = MSD.ToString(),
+                                ProtocolDataType = DataType.GetType(dataType)
+                            };
                             MSDTagList.Add(newTag);
                         }
                     }
@@ -412,10 +420,12 @@ namespace BSAP
                         if (!(operation == "WRITE" && double.IsNaN(requestGroup.writeLookup[tagID])))
                         {
                             SignalNameRequestList.Add(signalName);
-                            newTag = new Tag(tagID);
-                            newTag.DeviceTagName = signalName;
-                            newTag.DeviceTagAddress = signalName;
-                            newTag.ProtocolDataType = DataType.GetType(dataType);
+                            newTag = new(tagID)
+                            {
+                                DeviceTagName = signalName,
+                                DeviceTagAddress = signalName,
+                                ProtocolDataType = DataType.GetType(dataType)
+                            };
                             SignalNameTagList.Add(newTag);
                         }
                     }
@@ -423,7 +433,7 @@ namespace BSAP
 
                 if (MSDRequestList.Count > 0)
                 {
-                    List<DataRequest> MSDRequests = new List<DataRequest>();
+                    List<DataRequest> MSDRequests = new();
                     if (operation == "READ")
                     {   
                         if (requestGroup.Protocol.ToUpper() == "BSAP")
@@ -448,8 +458,8 @@ namespace BSAP
 
                     if (operation == "WRITE")
                     {
-                        List<float> values = new List<float>();
-                        List<string> types = new List<string>();
+                        List<float> values = new();
+                        List<string> types = new();
 
                         foreach (Tag tag in MSDTagList)
                         {
@@ -476,7 +486,7 @@ namespace BSAP
 
                 if (SignalNameRequestList.Count > 0)
                 {
-                    List<DataRequest> SignalNameRequests = new List<DataRequest>();
+                    List<DataRequest> SignalNameRequests = new();
                     if (operation == "READ")
                     {
                         if (requestGroup.Protocol.ToUpper()=="BSAP")
@@ -503,8 +513,8 @@ namespace BSAP
 
                     if (operation == "WRITE")
                     {
-                        List<float> values = new List<float>();
-                        List<string> types = new List<string>();
+                        List<float> values = new();
+                        List<string> types = new();
 
 
                         foreach (Tag tag in SignalNameTagList)
@@ -680,7 +690,7 @@ namespace BSAP
                     byte badcount = 0;
                     byte errorCode = response[9];
                     requestObj.SetStatus(DataRequest.RequestStatus.Error);
-                    List<string> errorMessages = new List<string>();
+                    List<string> errorMessages = new();
                     if (IntHelpers.GetBit(errorCode, 7)) // bit 7 is on (remote is reporting an error)
                     {
 
@@ -857,7 +867,7 @@ namespace BSAP
                     byte badcount = 0;
 
                     requestObj.SetStatus(DataRequest.RequestStatus.Error);
-                    List<string> errorMessages = new List<string>();
+                    List<string> errorMessages = new();
                     if (IntHelpers.GetBit(errorCode, 7)) // bit 7 is on (remote is reporting an error)
                     {
                         if (IntHelpers.GetBit(errorCode, 6))
@@ -1195,9 +1205,9 @@ namespace BSAP
 
         public sealed class DataType : DataTypeBase
         {
-            public static readonly DataType Analog = new DataType("FL", 4, typeof(float));
-            public static readonly DataType Logical = new DataType("BIN", 1, typeof(byte));
-            private static readonly List<string> TypeList = new List<string>(new string[] { "FL", "BIN" });
+            public static readonly DataType Analog = new("FL", 4, typeof(float));
+            public static readonly DataType Logical = new("BIN", 1, typeof(byte));
+            private static readonly List<string> TypeList = new(new string[] { "FL", "BIN" });
             private DataType(string name, byte size, Type hostDataType) : base(name, size, hostDataType)
             {
 
@@ -1267,7 +1277,7 @@ namespace BSAP
 
         public static List<DataRequest> UDPReadValuesByMSD(string ipaddress,FDADevice deviceSettings, ushort[] signalList, int maxMessageSize = absoluteMaxMessageLength)
         {
-            List<DataRequest> output = new List<DataRequest>();
+            List<DataRequest> output = new();
             if (maxMessageSize > absoluteMaxMessageLength)
                 maxMessageSize = absoluteMaxMessageLength;
 
@@ -1290,7 +1300,7 @@ namespace BSAP
                 perMessageSignalCount = MaxSignalsPerMessage;
 
             // build the message header template (serial and sequence numbers to be filled in later)
-            List<byte> header = new List<byte>(new byte[]
+            List<byte> header = new(new byte[]
             {
               0x0E, // request init
               0x00,
@@ -1326,11 +1336,11 @@ namespace BSAP
               0x00  // signal count                  - to update for specific request
             });
 
-            List<byte> thisMessage = new List<byte>(header);
+            List<byte> thisMessage = new(header);
 
             byte thisMessageSignalCount = 0;
             DataRequest request;
-            List<Tag> tags = new List<Tag>();
+            //List<Tag> tags = new();
             for (int i = 0; i < signalList.Length; i++)
             {
 
@@ -1372,13 +1382,13 @@ namespace BSAP
             if (maxMessageSize > absoluteMaxMessageLength)
                 maxMessageSize = absoluteMaxMessageLength;
 
-            List<DataRequest> output = new List<DataRequest>();
+            List<DataRequest> output = new();
 
-            int totalSignalCount = signalList.Length;
+            //int totalSignalCount = signalList.Length;
 
 
             // build the message header
-            List<byte> header = new List<byte>(new byte[]
+            List<byte> header = new(new byte[]
             {
               0x0E,     // request init
               0x00,
@@ -1413,7 +1423,7 @@ namespace BSAP
               0x00  // signal count                  - to update for specific request
             });
 
-            List<byte> thisMessage = new List<byte>(header);
+            List<byte> thisMessage = new(header);
 
             int thisMessageSize = header.Count; 
             byte thisMessageSignalCount = 0;
@@ -1481,10 +1491,10 @@ namespace BSAP
 
         public static List<DataRequest> UDPWriteValuesByMSD(string ipaddress,FDADevice deviceSettings, ushort[] signalList, string[] types, float[] values, int maxMessageSize = absoluteMaxMessageLength)
         {
-            List<DataRequest> output = new List<DataRequest>();
+            List<DataRequest> output = new();
 
             // build the message header
-            List<byte> header = new List<byte>(new byte[]
+            List<byte> header = new(new byte[]
             {
               0x0E,     // request init (6 bytes)
               0x00,
@@ -1519,7 +1529,7 @@ namespace BSAP
             });
 
 
-            List<byte> thisMessage = new List<byte>(header);
+            List<byte> thisMessage = new(header);
             int thisMessageSize = thisMessage.Count;
             byte thisMessageDataSize = 16;
             byte thisMessageSignalCount = 0;
@@ -1610,10 +1620,10 @@ namespace BSAP
 
         public static List<DataRequest> UDPWriteValuesByName(string ipaddress,FDADevice deviceSettings, string[] signalList, string[] types, float[] values, int maxMessageSize = absoluteMaxMessageLength)
         {
-            List<DataRequest> output = new List<DataRequest>();
+            List<DataRequest> output = new();
 
             // build the message header
-            List<byte> header = new List<byte>(new byte[]
+            List<byte> header = new(new byte[]
             {
               0x0E,     // request init (6 bytes)
               0x00,
@@ -1646,7 +1656,7 @@ namespace BSAP
             });
 
 
-            List<byte> thisMessage = new List<byte>(header);
+            List<byte> thisMessage = new(header);
             int thisMessageSize = thisMessage.Count;
             byte thisMessageSignalCount = 0;
             byte thisMessageDataSize = 14;
@@ -1763,13 +1773,13 @@ namespace BSAP
             if (maxMessageSize > absoluteMaxMessageLength)
                 maxMessageSize = absoluteMaxMessageLength;
 
-            List<DataRequest> output = new List<DataRequest>();
+            List<DataRequest> output = new();
 
-            int totalSignalCount = signalList.Length;
+            //int totalSignalCount = signalList.Length;
 
 
             // build the message header
-            List<byte> header = new List<byte>(new byte[]
+            List<byte> header = new(new byte[]
             {
               localAddr,
               0x00,         // serial number
@@ -1786,7 +1796,7 @@ namespace BSAP
             });
 
 
-            List<byte> thisMessage = new List<byte>(header);
+            List<byte> thisMessage = new(header);
             List<byte> finalized;
 
             thisMessage.Add(0x00); // placeholder for the number of signals (to be updated later)
@@ -1814,8 +1824,10 @@ namespace BSAP
                         output.Add(request);
 
                     // and reset for the next one
-                    thisMessage = new List<byte>(header);
-                    thisMessage.Add(0x00); // placeholder for the number of signals (to be updated later)
+                    thisMessage = new List<byte>(header)
+                    {
+                        0x00 // placeholder for the number of signals (to be updated later)
+                    };
                     thisMessageSize = 19;
                     thisMessageSignalCount = 0;
                 }
@@ -1848,7 +1860,7 @@ namespace BSAP
             if (maxMessageSize > absoluteMaxMessageLength)
                 maxMessageSize = absoluteMaxMessageLength;
 
-            List<DataRequest> output = new List<DataRequest>();
+            List<DataRequest> output = new();
 
             int totalSignalCount = signalList.Length;
 
@@ -1868,7 +1880,7 @@ namespace BSAP
                 perMessageSignalCount = MaxSignalsPerMessage;
 
             // build the message header template (serial and sequence numbers to be filled in later)
-            List<byte> header = new List<byte>(new byte[]
+            List<byte> header = new(new byte[]
             {
               localAddr,
               0x00,         // serial number
@@ -1887,12 +1899,12 @@ namespace BSAP
             });
 
 
-            List<byte> thisMessage = new List<byte>(header);
+            List<byte> thisMessage = new(header);
             List<byte> finalized;
 
             byte thisMessageSignalCount = 0;
             DataRequest request;
-            List<Tag> tags = new List<Tag>();
+            //List<Tag> tags = new();
 
             for (int i = 0; i < signalList.Length; i++)
             {
@@ -1933,12 +1945,12 @@ namespace BSAP
             if (maxMessageSize > absoluteMaxMessageLength)
                 maxMessageSize = absoluteMaxMessageLength;
 
-            List<DataRequest> output = new List<DataRequest>();
+            List<DataRequest> output = new();
 
 
 
             // build the message header (starting at local address)
-            List<byte> header = new List<byte>(new byte[]
+            List<byte> header = new(new byte[]
             {
               localAddress,
               0x00, // serial number
@@ -1955,7 +1967,7 @@ namespace BSAP
             });
   
 
-            List<byte> thisMessage = new List<byte>(header);
+            List<byte> thisMessage = new(header);
             int thisMessageSize = thisMessage.Count;
             byte thisMessageSignalCount = 0;
             List<byte> finalized;
@@ -2036,12 +2048,12 @@ namespace BSAP
             if (maxMessageSize > absoluteMaxMessageLength)
                 maxMessageSize = absoluteMaxMessageLength;
 
-            List<DataRequest> output = new List<DataRequest>();
+            List<DataRequest> output = new();
 
 
 
             // build the message header (starting at local address)
-            List<byte> header = new List<byte>(new byte[]
+            List<byte> header = new(new byte[]
             {
               localAddress,
               0x00,   // serial # to be filled in later
@@ -2056,7 +2068,7 @@ namespace BSAP
             });
 
 
-            List<byte> thisMessage = new List<byte>(header);
+            List<byte> thisMessage = new(header);
             int thisMessageSize = thisMessage.Count;
             byte thisMessageSignalCount = 0;
             List<byte> finalized;
@@ -2154,7 +2166,7 @@ namespace BSAP
             List<byte> escapedMessageBody = EscapeDLE(partialMessage);
 
             // put the whole message together
-            List<byte> final = new List<byte>();
+            List<byte> final = new();
             final.Add(DLE);
             final.Add(STX);
             final.AddRange(escapedMessageBody);
@@ -2212,7 +2224,7 @@ namespace BSAP
 
         private static DataRequest CreateDataRequestObject(byte[] requestBytes)
         {
-            DataRequest request = new DataRequest()
+            DataRequest request = new()
             {
                 //Protocol = "BSAP",
                 RequestBytes = requestBytes,
@@ -2227,7 +2239,7 @@ namespace BSAP
 
         public static List<byte> UnescapeDLE(List<byte> original)
         {
-            List<byte> unescaped = new List<byte>();
+            List<byte> unescaped = new();
             byte previous = 0x00;
             foreach (byte b in original)
             {
@@ -2246,7 +2258,7 @@ namespace BSAP
 
         public static List<byte> EscapeDLE(List<byte> original)
         {
-            List<byte> escaped = new List<byte>();
+            List<byte> escaped = new();
             foreach (byte b in original)
             {
                 escaped.Add(b);

@@ -13,14 +13,14 @@ namespace ControllerService
 {
     class OMPassthough : IDisposable
     {
-        TcpClient OMClient;
-        int _fdaPort;
-        int _clientPort;
-        readonly string _FDAAddress = "127.0.0.1";
+        private TcpClient OMClient;
+        private readonly int _fdaPort;
+        private readonly int  _clientPort;
+        private readonly string _FDAAddress = "127.0.0.1";
 
-        TCPServer OMServer;
-        BackgroundWorker worker;
-        ILogger<Worker> _logger;
+        private TCPServer OMServer;
+        private BackgroundWorker worker;
+        private readonly ILogger<Worker> _logger;
 
         public OMPassthough(int fdaPort,int clientPort, ILogger<Worker> logger)
         {
@@ -56,12 +56,14 @@ namespace ControllerService
             byte[] buffer = new byte[1048576]; // 1 MB input buffer for operational messages
             string messages;
             string logmessage = "";
-            Stopwatch quietTimer = new Stopwatch();
-            TimeSpan quietLimit = new TimeSpan(0, 0, 5); // 5 seconds
+            Stopwatch quietTimer = new();
+            TimeSpan quietLimit = new(0, 0, 5); // 5 seconds
             bool FDAConnectionHalfOpen = false;
 
-            OMClient = new TcpClient();                      // FDA operational messages port    
-            OMClient.ReceiveTimeout = 1; 
+            OMClient = new TcpClient
+            {
+                ReceiveTimeout = 1
+            };                      // FDA operational messages port    
 
             OMServer = TCPServer.NewTCPServer(_clientPort);  // server for external clients who wish to receive operational messages
             OMServer.ClientConnected += OMServer_ClientConnected;
