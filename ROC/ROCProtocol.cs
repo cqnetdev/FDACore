@@ -149,8 +149,8 @@ namespace ROC
             else
             {
                 // check if a device reference (device specific settings) is present in header element 1
-                string deviceRefString = null;
-                string groupString = null;
+                string deviceRefString;
+                string groupString;
                 string[] headerElement1 = header[0].Split('^');
                 groupString = headerElement1[0];
 
@@ -416,7 +416,7 @@ namespace ROC
                     }
 
                     // HPN is in range
-                    int.TryParse(tagInfo[0], out int n);
+                    int n = int.Parse(tagInfo[0]);
                     if (n < 1 || n > 255)
                     {
                         //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with  invalid information (The HPN value of '" + tagInfo[5] + "' is out of range, valid values are 0 - 254).", true);
@@ -1108,14 +1108,14 @@ namespace ROC
                     {
                         // current pointers request
                         case "120":
-                            subRequestList = GenerateOpcode120Request(requestGroup.ID, "", groupNum, devNum, 1, 1, requestIdx + 1,false,DataRequest.RequestType.AlarmEventPointers);
+                            subRequestList = GenerateOpcode120Request("", groupNum, devNum, 1, 1, requestIdx + 1,false,DataRequest.RequestType.AlarmEventPointers);
                             break;
                         // alarms request
                         case "121":
                             if (OpcodePlus)
                             {
                                 // Generate an Opcode 120 request, the Opcode 121 will be run when the 120 request is complete
-                                subRequestList = GenerateOpcode120Request(requestGroup.ID, "", groupNum, devNum, 1, 1, requestIdx + 1, true,DataRequest.RequestType.AlarmEventPointers);                                
+                                subRequestList = GenerateOpcode120Request("", groupNum, devNum, 1, 1, requestIdx + 1, true,DataRequest.RequestType.AlarmEventPointers);                                
                                 break;
                             }
 
@@ -1140,10 +1140,8 @@ namespace ROC
                             // use the pointers that were specified in the request string
                             if (TagData.Length >= 2)
                             {
-                                int start;
-                                int end;
-                                int.TryParse(TagData[0], out start);
-                                int.TryParse(TagData[1], out end);
+                                int start = int.Parse(TagData[0]);
+                                int end = int.Parse(TagData[1]);
 
                                 // adjust the supplied pointers to a 0 based system
                                 start = MiscHelpers.AddCircular(start, -1, 0, 239);
@@ -1165,7 +1163,7 @@ namespace ROC
                             if (OpcodePlus)
                             {
                                 // Generate an Opcode 120 request, the Opcode 121 will be run when the 120 request is complete
-                                subRequestList = GenerateOpcode120Request(requestGroup.ID, "", groupNum, devNum, 1, 1, requestIdx + 1, true,DataRequest.RequestType.AlarmEventPointers);
+                                subRequestList = GenerateOpcode120Request("", groupNum, devNum, 1, 1, requestIdx + 1, true,DataRequest.RequestType.AlarmEventPointers);
                                 break;
                             }
 
@@ -1194,10 +1192,8 @@ namespace ROC
                             // use the pointers that were specified in the request string
                             if (TagData.Length >= 2)
                             {
-                                int start;
-                                int end;
-                                int.TryParse(TagData[0], out start);
-                                int.TryParse(TagData[1], out end);
+                                int start  = int.Parse(TagData[0]);
+                                int end = int.Parse(TagData[1]);
 
                                 // convert to zero based
                                 start = MiscHelpers.AddCircular(start, -1, 0, 239);
@@ -1330,7 +1326,7 @@ namespace ROC
             if (currentPtr == -1)
             {
                 // we need to find where the current hour history pointer is, return an Opcode 120 request for that
-                List<DataRequest> ptrRetrievalReq = GenerateOpcode120Request(requestGroup.ID, "", deviceGroup, deviceNum, 1, 1, 1, true, DataRequest.RequestType.HourHistoryPtr);
+                List<DataRequest> ptrRetrievalReq = GenerateOpcode120Request("", deviceGroup, deviceNum, 1, 1, 1, true, DataRequest.RequestType.HourHistoryPtr);
 
                 // link the opcode 120 request with this group, so the group can be re-run once we have the ptr value
                 foreach (DataRequest req in ptrRetrievalReq)
@@ -1409,7 +1405,7 @@ namespace ROC
                 opCode130Body[4] = startIdx.ToString();
                 opCode130Body[5] = thisReqCount.ToString();
                 // now we can go to GenerateOpcode130Request() to get the actual request(s) built
-                List<DataRequest> requests = null;
+                List<DataRequest> requests;
                 requests = GenerateOpcode130Request(requestGroup.ID, requestGroup.ConnectionID, deviceGroup, deviceNum, 1, 1, login, pwd, opCode130Body,step);
 
                 foreach (DataRequest req in requests)
@@ -1464,9 +1460,9 @@ namespace ROC
         /// <param name="groupIdx">The index number of this request within the group</param>
         /// <param name="systemRequest">mark the request as system generated (not directly triggered by a schedule or demand)</param>
         /// <returns></returns>
-        private static List<DataRequest> GenerateOpcode120Request(Guid RequestGroup, string reqID, byte group, byte unit, byte hostGroup, byte hostUnit, int groupIdx,bool systemRequest,DataRequest.RequestType reqType)
+        private static List<DataRequest> GenerateOpcode120Request(string reqID, byte group, byte unit, byte hostGroup, byte hostUnit, int groupIdx,bool systemRequest,DataRequest.RequestType reqType)
         {
-            DataRequest OC120Request = new();
+           
 
             List<byte> requestBytes = new() { unit, group, hostUnit, hostGroup, 120,0};
 
@@ -1480,6 +1476,7 @@ namespace ROC
 
             DataRequest request = new()
             {
+                RequestID = reqID,
                 RequestBytes = requestBytes.ToArray(),
                 GroupIdxNumber = groupIdx.ToString(),
                 ExpectedResponseSize = 34,
@@ -1655,7 +1652,7 @@ namespace ROC
 
         private static List<DataRequest> GeneratePreWriteRead(Guid RequestGroupID, string reqID, byte group, byte unit, byte hostGroup, byte hostUnit, TLP[] TLPs, List<FDADataPointDefinitionStructure> tagsconfigList, List<Tag> tagList, int groupIdx, int maxDataSize)
         {
-            List<DataRequest> subRequestList = new();
+            List<DataRequest> subRequestList;
 
             // find unique BIN TLPs, create a tag/config/TLP entry for each one
             List<string> uniquifier = new();
@@ -1819,10 +1816,10 @@ namespace ROC
         private static List<DataRequest> GenerateOpcode130Request(Guid requestGroup, Guid connectionID, byte groupNum, byte devNum, byte hostGroup, byte hostDev, string login, short pwd, string[] historyPointRequest,double recordStep = 60)
         {
             List<DataRequest> subRequestList = new();
-            byte historyPointNumber = 0;
-            byte historyType = 0;
-            ushort startIdx = 1;
-            byte recordCount = 1;
+            byte historyPointNumber;
+            byte historyType;
+            ushort startIdx;
+            byte recordCount;
 
             recordStep /= 60; // step is in minutes and we're working with hours here
         
@@ -2445,7 +2442,7 @@ namespace ROC
                         {
                             recordBytes = request.ResponseBytes.Skip(11 + recordIdx * 22).Take(22).ToArray();
                             recordPos = firstRecord + recordIdx;
-                            if (recordPos > 239) recordPos = recordPos - 240;
+                            if (recordPos > 239) recordPos -= 240;
                             RocAlarmRecord record = new(request.ResponseTimestamp, request.ConnectionID, NodeID,recordPos, Convert.ToInt16(request.TagList[1].Value), recordBytes,request.Destination, manualMode);
                             //if (record.Valid)
                             almRecordList.Add(record);
@@ -2467,7 +2464,7 @@ namespace ROC
                         {
                             recordBytes = request.ResponseBytes.Skip(11 + recordIdx * 22).Take(22).ToArray();
                             recordPos = firstRecord + recordIdx;
-                            if (recordPos > 239) recordPos = recordPos - 240;
+                            if (recordPos > 239) recordPos -= 240;
                             RocEventRecord record = new(request.ResponseTimestamp, request.ConnectionID, NodeID, recordPos, Convert.ToInt16(request.TagList[1].Value), recordBytes,request.Destination,manualMode);
                             //if (record.Valid)
                             evtRecordList.Add(record);
@@ -3428,7 +3425,7 @@ namespace ROC
 
             // private properties
             private byte CalibrationType;
-            private string CalibrationTypeString;
+            //private string CalibrationTypeString;
             private byte CalibrationPointType;
             private string CalibrationPointTypeString;
             private byte MVSInput;
@@ -3576,7 +3573,7 @@ namespace ROC
                 
                 Operator = System.Text.Encoding.ASCII.GetString(eventData.Skip(9).Take(3).ToArray());
 
-                DataType ROCDatatype = null;
+                DataType ROCDatatype;
                 if (rocDataTypeEntry != null)
                 {
                     ROCDatatype = DataType.GetType(rocDataTypeEntry.DataType);
@@ -3663,7 +3660,7 @@ namespace ROC
                 }
 
                 CalibrationType = eventData[1];
-                CalibrationTypeString = CalibrationTypes[CalibrationType];
+                //CalibrationTypeString = CalibrationTypes[CalibrationType];
                 PtNum = eventData[8];
                 Operator = System.Text.Encoding.ASCII.GetString(eventData.Skip(9).Take(3).ToArray());
 

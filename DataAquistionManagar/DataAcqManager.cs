@@ -216,7 +216,7 @@ namespace FDA
                 Scripter.AddScriptableObject(ScriptablePubSubConnection.WrapConn(_PubSubConnectionsDictionary));
                 Scripter.AddScriptableObject(ScriptableTag.WrapDPD(_dbManager.GetAllTagDefs()));
                 LoadUserScripts();
-                Scripter.Enabled = true;
+                Scripter.SetEnabled(true);
 
 
                 Globals.SystemManager.LogApplicationEvent(this, "", "FDA initialization complete");
@@ -1414,6 +1414,7 @@ namespace FDA
 
         private void DemandRequestHandler(object sender, DBManagerPG.DemandEventArgs e)
         {
+ 
             if (Globals.FDAStatus == Globals.AppState.ShuttingDown || Globals.FDAStatus == Globals.AppState.Pausing || Globals.FDAStatus == Globals.AppState.Paused)
                 return;
 

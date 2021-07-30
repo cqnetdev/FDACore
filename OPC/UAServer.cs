@@ -10,7 +10,7 @@ namespace OPC
     {
         private OpcServer _server;
         //private OpcNodeManager _nodeManager;
-        OpcDataVariableNode<double> _temperatureNode;
+        private readonly OpcDataVariableNode<double> _temperatureNode;
 
         public UAServer(string host)
         {
@@ -28,6 +28,8 @@ namespace OPC
             _server?.Stop();
             _server?.Dispose();
             _server = null;
+
+            GC.SuppressFinalize(this);
         }
 
         private void TemperatureMaker()

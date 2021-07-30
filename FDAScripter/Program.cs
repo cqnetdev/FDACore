@@ -22,7 +22,7 @@ namespace FDAScripter
 
         private enum DB {SQL,PG };
 
-        private static frmScriptEditor scriptEditor;
+        private static FrmScriptEditor scriptEditor;
         private static frmLogin loginForm;
 
         private static SqlConnection SQL;
@@ -80,7 +80,7 @@ namespace FDAScripter
                 AddToRecent(instance, dbname, user);
 
 
-            scriptEditor = new frmScriptEditor();
+            scriptEditor = new FrmScriptEditor();
             scriptEditor.FormClosed += ScriptEditor_FormClosed;
             scriptEditor.Show();
             loginForm.Hide();          

@@ -178,7 +178,7 @@ namespace Scripting
 
         public void Run()
         {
-            if (!_enabled || !Scripter.Enabled) return;
+            if (!_enabled || !Scripter.IsEnabled()) return;
 
             // if it hasn't been run before, compile it
             if (_script is null)

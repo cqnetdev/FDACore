@@ -12,13 +12,13 @@ using System.Windows.Forms;
 
 namespace FDAScripter
 {
-    public partial class frmScriptEditor : Form
+    public partial class FrmScriptEditor : Form
     {
         private bool inhibitTextChangedTrigger = true;
         private string _currentScriptName;
         private FrmFDAObjects objectsForm;
 
-        public frmScriptEditor()
+        public FrmScriptEditor()
         {
             InitializeComponent();
 
@@ -38,7 +38,7 @@ namespace FDAScripter
         }
 
     
-        private void dgvScripts_SelectionChanged(object sender, EventArgs e)
+        private void DGV_Scripts_SelectionChanged(object sender, EventArgs e)
         {
             if (dgvScripts.SelectedRows.Count < 1) return;
 
@@ -54,7 +54,7 @@ namespace FDAScripter
            
         }
 
-        private void tbCodeEditor_TextChanged(object sender, EventArgs e)
+        private void CodeEditor_TextChanged(object sender, EventArgs e)
         {
             if (inhibitTextChangedTrigger)
             {
@@ -67,7 +67,7 @@ namespace FDAScripter
             }
         }
 
-        private void btnSave_Click(object sender, EventArgs e)
+        private void Save_Click(object sender, EventArgs e)
         {
             string scriptName = MakeStringQuerySafe(_currentScriptName);
             string code = MakeStringQuerySafe(tbCodeEditor.Text);
@@ -82,7 +82,7 @@ namespace FDAScripter
                 Close();
         }
 
-        private void btnAddAscript_Click(object sender, EventArgs e)
+        private void AddAscript_Click(object sender, EventArgs e)
         {
             FrmNewScriptName nameDlg = new();
             if (nameDlg.ShowDialog() == DialogResult.OK)
@@ -101,7 +101,7 @@ namespace FDAScripter
         }
 
 
-        private string MakeStringQuerySafe(string unsafeString)
+        private static string MakeStringQuerySafe(string unsafeString)
         {
             return unsafeString.Replace("'", "''");
         }
@@ -118,7 +118,7 @@ namespace FDAScripter
                 DialogResult response = MessageBox.Show("Save changes to the script '" + _currentScriptName + "'?", "Confirmation", MessageBoxButtons.YesNoCancel);
                 if (response == DialogResult.Yes)
                 {
-                    btnSave_Click(this, new EventArgs());
+                    Save_Click(this, new EventArgs());
                     return true;
                 }
                 else if (response == DialogResult.No)
@@ -153,7 +153,7 @@ namespace FDAScripter
             }
         }
 
-        private void btnCheck_Click(object sender, EventArgs e)
+        private void CheckScript_Click(object sender, EventArgs e)
         {
             ImmutableArray<Diagnostic> result = Program.CheckScript(tbCodeEditor.Text);
 
@@ -166,7 +166,7 @@ namespace FDAScripter
             }
         }
 
-        private void btnOpenFDAObjects_Click(object sender, EventArgs e)
+        private void OpenFDAObjects_Click(object sender, EventArgs e)
         {
             if (objectsForm == null)
             {
@@ -186,7 +186,7 @@ namespace FDAScripter
             }
         }
 
-        private void frmScriptEditor_FormClosing(object sender, FormClosingEventArgs e)
+        private void ScriptEditor_FormClosing(object sender, FormClosingEventArgs e)
         {
             if (!DiscardCheckandConfirm())
                 e.Cancel = true;

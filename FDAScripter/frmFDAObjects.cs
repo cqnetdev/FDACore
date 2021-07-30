@@ -60,7 +60,7 @@ namespace FDAScripter
             string objectID;
             string IDColName = "";
 
-            frmScriptEditor editor = (frmScriptEditor)this.Owner;
+            FrmScriptEditor editor = (FrmScriptEditor)this.Owner;
 
             if (rbTags.Checked)
             {

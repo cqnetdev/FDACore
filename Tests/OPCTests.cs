@@ -70,7 +70,7 @@ namespace Tests
         [TestMethod]
         public void PubSubConnectionManagerTest()
         {
-            FDA.PubSubConnectionManager connMgr = new FDA.PubSubConnectionManager(Guid.NewGuid(), "Kepware connection");
+            FDA.PubSubConnectionManager connMgr = new(Guid.NewGuid(), "Kepware connection");
             connMgr.ConfigureAsOPCUA("127.0.0.1", 49320);
             connMgr.CommunicationsEnabled = true;
             connMgr.ConnectionEnabled = true;

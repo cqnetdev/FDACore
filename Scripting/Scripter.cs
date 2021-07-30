@@ -31,11 +31,21 @@ namespace Scripting
         public delegate void RuntimeErrorHandler(string scriptID, string error);
         public static event RuntimeErrorHandler RunTimeError;
 
-        public static bool Enabled = false;
+        private static bool Enabled = false;
 
         static Scripter()
         {
             _references.Add("Microsoft.CSharp.dll");
+        }
+
+        public static bool IsEnabled()
+        {
+            return Enabled;
+        }
+
+        public static void SetEnabled(bool enb)
+        {
+            Enabled = enb;
         }
 
         public static void AddScriptableObject(ScriptableObject obj)

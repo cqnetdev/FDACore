@@ -32,7 +32,7 @@ namespace FDA
             {
                 ScheduleID = schedID;
                 Type = type;
-                eventRequestGroupList = RequestGroupList;
+                RequestGroupList = eventRequestGroupList;
             }
 
         
@@ -78,13 +78,14 @@ namespace FDA
                 Timer.Dispose();
                 Timer = null;
             }
+            GC.SuppressFinalize(this);
         }
     }
 
     //******************************************************************** Oneshot scheduler *******************************************
     public class FDASchedulerOneshot : FDAScheduler
     {
-        private int delayms = 500;
+        private readonly int delayms = 500;
         public FDASchedulerOneshot(Guid TimerID, string description, List<RequestGroup> RequestGroupList, List<FDATask> tasksList,bool suppressExecution=false) : base(TimerID, description, RequestGroupList, tasksList)
         {
             ScheduleType = ScheduleType.OneShot;
@@ -100,7 +101,7 @@ namespace FDA
         private int _TimerSeconds;
         public DateTime NextTick { get; private set; }
         private TimeSpan TickInterval;
-        private TimeSpan InitialDelay;
+        private readonly TimeSpan InitialDelay;
 
         public int TimerSeconds { get { return _TimerSeconds; } set { _TimerSeconds = value; UpdateTimer(_TimerSeconds); }  }
 
@@ -166,8 +167,8 @@ namespace FDA
         
         public void Update(int minute,int second)
         {
-            TimeSpan timeToFirstRun = TimeSpan.MinValue;
-            TimeSpan delayTime = TimeSpan.FromHours(1);
+            TimeSpan timeToFirstRun;
+            //TimeSpan delayTime = TimeSpan.FromHours(1);
 
             DateTime currentTime = DateTime.Now;
             DateTime nextScheduledTime;
@@ -211,8 +212,8 @@ namespace FDA
         
         public void Update(int hour,int minute,int second)
         {
-            TimeSpan timeToFirstRun = TimeSpan.MinValue;
-            TimeSpan delayTime = TimeSpan.MaxValue;
+            TimeSpan timeToFirstRun;
+            TimeSpan delayTime;
 
             DateTime currentTime = Globals.FDANow();
             DateTime nextScheduledTime;

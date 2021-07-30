@@ -1,7 +1,7 @@
 ﻿
 namespace FDAScripter
 {
-    partial class frmScriptEditor
+    partial class FrmScriptEditor
     {
         /// <summary>
         /// Required designer variable.
@@ -58,7 +58,7 @@ namespace FDAScripter
             this.tbCodeEditor.Name = "tbCodeEditor";
             this.tbCodeEditor.Size = new System.Drawing.Size(739, 569);
             this.tbCodeEditor.TabIndex = 2;
-            this.tbCodeEditor.TextChanged += new System.EventHandler(this.tbCodeEditor_TextChanged);
+            this.tbCodeEditor.TextChanged += new System.EventHandler(this.CodeEditor_TextChanged);
             // 
             // dgvScripts
             // 
@@ -81,7 +81,7 @@ namespace FDAScripter
             this.dgvScripts.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
             this.dgvScripts.Size = new System.Drawing.Size(264, 569);
             this.dgvScripts.TabIndex = 6;
-            this.dgvScripts.SelectionChanged += new System.EventHandler(this.dgvScripts_SelectionChanged);
+            this.dgvScripts.SelectionChanged += new System.EventHandler(this.DGV_Scripts_SelectionChanged);
             // 
             // btnAddAscript
             // 
@@ -91,7 +91,7 @@ namespace FDAScripter
             this.btnAddAscript.TabIndex = 7;
             this.btnAddAscript.Text = "+";
             this.btnAddAscript.UseVisualStyleBackColor = true;
-            this.btnAddAscript.Click += new System.EventHandler(this.btnAddAscript_Click);
+            this.btnAddAscript.Click += new System.EventHandler(this.AddAscript_Click);
             // 
             // btnSave
             // 
@@ -103,7 +103,7 @@ namespace FDAScripter
             this.btnSave.TabIndex = 4;
             this.btnSave.Text = "Save Changes";
             this.btnSave.UseVisualStyleBackColor = true;
-            this.btnSave.Click += new System.EventHandler(this.btnSave_Click);
+            this.btnSave.Click += new System.EventHandler(this.Save_Click);
             // 
             // btnCheck
             // 
@@ -114,7 +114,7 @@ namespace FDAScripter
             this.btnCheck.TabIndex = 8;
             this.btnCheck.Text = "Check Script";
             this.btnCheck.UseVisualStyleBackColor = true;
-            this.btnCheck.Click += new System.EventHandler(this.btnCheck_Click);
+            this.btnCheck.Click += new System.EventHandler(this.CheckScript_Click);
             // 
             // btnOpenFDAObjects
             // 
@@ -124,7 +124,7 @@ namespace FDAScripter
             this.btnOpenFDAObjects.TabIndex = 9;
             this.btnOpenFDAObjects.Text = "FDA Items";
             this.btnOpenFDAObjects.UseVisualStyleBackColor = true;
-            this.btnOpenFDAObjects.Click += new System.EventHandler(this.btnOpenFDAObjects_Click);
+            this.btnOpenFDAObjects.Click += new System.EventHandler(this.OpenFDAObjects_Click);
             // 
             // frmScriptEditor
             // 
@@ -140,7 +140,7 @@ namespace FDAScripter
             this.Controls.Add(this.label1);
             this.Name = "frmScriptEditor";
             this.Text = "FDA Script Editor";
-            this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.frmScriptEditor_FormClosing);
+            this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.ScriptEditor_FormClosing);
             ((System.ComponentModel.ISupportInitialize)(this.dgvScripts)).EndInit();
             this.ResumeLayout(false);
             this.PerformLayout();

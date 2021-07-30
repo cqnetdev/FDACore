@@ -273,7 +273,7 @@ namespace Modbus
 
                         if (opCode == 1 || opCode == 2 || opCode == 5 || opCode == 15)
                         {
-                            numRegisters = (ushort)tagList.Count();
+                            numRegisters = (ushort)tagList.Count;
                             byteCount = (ushort)(Math.Ceiling(numRegisters / 8.0));
                         }
 
@@ -643,7 +643,7 @@ namespace Modbus
             }
         }
 
-        public static string[] ValidateRequestString(string request, Dictionary<Guid, FDADataPointDefinitionStructure> tags, Dictionary<Guid, FDADevice> devices, ref HashSet<Guid> referencedTags)
+        public static string[] ValidateRequestString(string request, Dictionary<Guid, FDADataPointDefinitionStructure> tags,ref HashSet<Guid> referencedTags)
         {
             validationErrors = new List<string>();
 
@@ -683,7 +683,7 @@ namespace Modbus
             else
             {
                 string[] headerElement0 = header[0].Split('^');
-                string slaveString = headerElement0[0];
+                //string slaveString = headerElement0[0];
                 string deviceRefString;
 
                 // if a device reference is present, check that the ID is valid and references an existing device
@@ -692,7 +692,7 @@ namespace Modbus
                     deviceRefString = headerElement0[1];
 
                     // it's a valid GUID?
-                    if (!Guid.TryParse(deviceRefString, out Guid deviceRefID))
+                    if (!Guid.TryParse(deviceRefString, out _))
                     {
                         // Globals.SystemManager.LogApplicationEvent(obj, "", "The group " + groupID + ", reqested by " + requestor + " contains an request with an invalid device ID '" + deviceRefString + ", the correct format is xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx. This request group will not be processed", true);
                         RecordValidationError(obj, groupID, requestor, "contains a request with an invalid device ID '" + deviceRefString + ", the correct format is xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx");
@@ -706,7 +706,7 @@ namespace Modbus
                     }
                 }
 
-                // header lement 0 (minus the device reference, if it was present) is numeric
+                // header element 0 (minus the device reference, if it was present) is numeric
                 if (!int.TryParse(headerElement0[0], out _))
                 {
                    // Globals.SystemManager.LogApplicationEvent(obj, "", "The group " + groupID + ", reqested by " + requestor + " contains an request with an invalid element in the header (SlaveAddress '" + header[0] + "' is not a number). This request group will not be processed",true);
@@ -746,7 +746,7 @@ namespace Modbus
                 // opcode is supported
                 if (opCodeIsNumeric)
                 {
-                    int.TryParse(opCodewithNoPlus, out int n);
+                    int n = int.Parse(opCodewithNoPlus);
                     if ( n < 1 || (n > 7 && n!=15 && n!= 16))
                     {
                         //Globals.SystemManager.LogApplicationEvent(obj, "", "The group " + groupID + ", reqested by " + requestor + " contains an request with an invalid element in the header (Opcode '" + header[1] + "' is not supported). This request group will not be processed",true);
@@ -1194,15 +1194,15 @@ namespace Modbus
                         if (sb.Length > 0)
                         {
                             sb.Remove(sb.Length - 1, 1);
-                            sb.Append("$");
+                            sb.Append('$');
                         }
                         sb.Append(device + ":" + opCode + ":" + register);
-                        sb.Append("|");
+                        sb.Append('|');
                     }
 
                     // add the tag to the request string
                     sb.Append(tag);
-                    sb.Append("|");
+                    sb.Append('|');
                     MTMode = false;
                 }
                 else
@@ -1692,7 +1692,7 @@ namespace Modbus
                 {
                     Byte highByte = bytes[0];
                     Byte lowByte = bytes[1];
-                    Int16 value = (Int16)((bytes[0] << 8) | lowByte); 
+                    Int16 value = (Int16)((highByte << 8) | lowByte); 
    
                     return value;
                 }
