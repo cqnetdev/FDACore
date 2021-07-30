@@ -61,9 +61,9 @@ namespace BSAP
 
 
             // the header has the correct number of elements
-            if (header.Length < 3) // header can be 3,4,5 or 6. less than 3 is invalid, elements 7+ will just be ignored
+            if (header.Length < 5) // header should be global:local:ip:port:read/write
             {
-                RecordValidationError(obj, groupID, requestor, "contains a request with an invalid header(should be 'GlobalAddr/IPAddress^deviceref(optional):LocalAddr/Port:READ/WRITE:login1(optional):login2(optional):MaxDataSize(optional)'");
+                RecordValidationError(obj, groupID, requestor, "contains a request with an invalid header(should be 'GlobalAddr:LocalAddress:IPAddress:Port:read/write')"); // //GlobalAddress/IPAddress^deviceref(optional):LocalAddr/Port:READ/WRITE:login1(optional):login2(optional):MaxDataSize(optional)'");
                 valid = false;
             }
             else
@@ -101,12 +101,19 @@ namespace BSAP
                 
                 int n;
 
-                // UDP has IP:port as the first two elements
+                // UDP has IP:port as elements 2 and 3
                 if (isUDP)
                 {
-                    if (!IPAddress.TryParse(header[0], out _))
+                    if (!IPAddress.TryParse(header[2], out _))
                     {
-                        RecordValidationError(obj, groupID, requestor, "contains a request with an invalid IP address in the header '" + header[0] + "'");
+                        RecordValidationError(obj, groupID, requestor, "contains a request with an invalid IP address in the header '" + header[2] + "'");
+                        valid = false;
+                    }
+
+                    int dotcount = header[2].Count(c => c == '.');
+                    if (dotcount != 4)
+                    {
+                        RecordValidationError(obj, groupID, requestor, "contains a request with an invalid IP address in the header '" + header[2] + "'");
                         valid = false;
                     }
 
@@ -147,13 +154,14 @@ namespace BSAP
                 }
 
                 // operation is either 'read' or 'write'
-                string operation = header[2].ToUpper();
+                string operation = header[4].ToUpper();
                 if (operation != "READ" && operation != "WRITE")
                 {
-                    RecordValidationError(obj, groupID, requestor, "contains a request with an invalid element in the header (Operation '" + header[2] + "' is not a recognized, should be READ or WRITE).");
+                    RecordValidationError(obj, groupID, requestor, "contains a request with an invalid element in the header (Operation '" + header[4] + "' is not a recognized, should be READ or WRITE).");
                     valid = false;
                 }
 
+                // optional maximum packet size parameter
                 if (header.Length > 5)
                 {
                     if (!int.TryParse(header[5],out n))
@@ -180,7 +188,7 @@ namespace BSAP
 
                 if (tagData.Length != 3)
                 {
-                    RecordValidationError(obj, groupID, requestor, "Tag " + i + " is missing element(s), should be 'Name:DataType:ID'");
+                    RecordValidationError(obj, groupID, requestor, "Tag " + i + " is missing element(s), should be 'Name:DataType:DPDUID'");
                     valid = false;
                 }
                 else
@@ -250,7 +258,7 @@ namespace BSAP
         {
             if (requestor != "DBValidator" && !isWarning)
             {
-                error = "The group '" + groupID + "', requested by " + requestor + ": " + error + ". This request group will not be processed";
+                error = "The group '" + groupID + "', requested by " + requestor + ": " + error + ". This request group will not be processed";               
                 Globals.SystemManager.LogApplicationEvent(obj, "", error, true);
             }
             else
@@ -290,6 +298,10 @@ namespace BSAP
         {
             //BSAP    -> Global Address (req) : Local Address (req) : READ/WRITE (req): Login1 (opt): Login2 (opt) : Max Data Size (opt)|tagname:type:ID|.....
             //BSAPUDP ->  IPAddress (req) : Port (req) : READ/WRITE (req): Login1 (opt): Login2 (opt) : Max Data Size (opt)|tagname:type:ID|.....
+
+            // new unified request string structure
+            // BSAP & BSAPUDP -> Global Address : Local Address : IPAddress : Port : READ/WRITE: login1 (opt): login2(opt) : Max data size (opt)| tagname:type:ID|....
+
             string requestString = requestGroup.DBGroupRequestConfig.DataPointBlockRequestListVals;
 
             string[] requestStrings;     // delimited by $
@@ -355,21 +367,21 @@ namespace BSAP
                 else
                 {
                     // BSAP UDP
-                    address = Header[0].Split('^');
+                    address = Header[2].Split('^');
                     ip = address[0];
                 }
                 
-                    operation = Header[2].ToUpper();
+                operation = Header[4].ToUpper();
 
                 // not currently used
-                //if (Header.Length > 3)
-                //    login1 = Header[3];
+                //if (Header.Length > 5)
+                //    login1 = Header[5];
 
-                //if (Header.Length > 4)
-                //    login2 = Header[4];
+                //if (Header.Length > 6)
+                //    login2 = Header[6];
 
-                if (Header.Length > 5)
-                    maxRequestLength = int.Parse(Header[5]);
+                if (Header.Length > 7)
+                    maxRequestLength = int.Parse(Header[7]);
 
                 string dataType;
                 ushort MSD;
