@@ -51,7 +51,7 @@ namespace BSAP
 
 
         // obj is a reference to the DataAcqManager if the requestor is the FDA
-        // obj is a reference to the string[] error list if the requestor is the Database Validator tool
+        // obj is a reference to a string[] error list if the requestor is the Database Validator tool
         public static bool ValidateRequestString(object obj, string groupID, string requestor, string request, Dictionary<Guid, FDADataPointDefinitionStructure> pointDefs, Dictionary<Guid, FDADevice> deviceParams,bool isUDP, HashSet<Guid> referencedTags = null)
         {
             bool valid = true;
@@ -61,24 +61,21 @@ namespace BSAP
 
 
             // the header has the correct number of elements
-            if (header.Length < 5) // header should be global:local:ip:port:read/write
+            if (header.Length < 4) // minimal header is global:local:ip:read/write
             {
-                RecordValidationError(obj, groupID, requestor, "contains a request with an invalid header(should be 'GlobalAddr:LocalAddress:IPAddress:Port:read/write')"); // //GlobalAddress/IPAddress^deviceref(optional):LocalAddr/Port:READ/WRITE:login1(optional):login2(optional):MaxDataSize(optional)'");
+                RecordValidationError(obj, groupID, requestor, "contains a request with an invalid header(should be 'GlobalAddr:LocalAddress:IPAddress:read/write:login1(opt):login2(opt):maxsize(opt)')"); // //GlobalAddress/IPAddress^deviceref(optional):LocalAddr/Port:READ/WRITE:login1(optional):login2(optional):MaxDataSize(optional)'");
                 valid = false;
             }
             else
             {
-                // check if a device reference is present in header element 1
+                //--------------------------- ELEMENT 0 (global address + optional device reference) ------------------------
                 string deviceRefString;
-                string localAddrStr;
-                string[] headerElement1 = header[1].Split('^');
-                localAddrStr = headerElement1[0];
+                string[] headerElement0 = header[0].Split('^');
 
-                
                 // if a device reference is present, check that the ID is valid and references an existing device
-                if (headerElement1.Length > 1)
+                if (headerElement0.Length > 1)
                 {
-                    deviceRefString = headerElement1[1];
+                    deviceRefString = headerElement0[1];
 
                     // is a valid GUID
                     if (!Guid.TryParse(deviceRefString, out Guid deviceRefID))
@@ -98,32 +95,12 @@ namespace BSAP
                         }
                     }
                 }
-                
+
                 int n;
-
-                // UDP has IP:port as elements 2 and 3
-                if (isUDP)
+                if (!isUDP)
                 {
-                    if (!IPAddress.TryParse(header[2], out _))
-                    {
-                        RecordValidationError(obj, groupID, requestor, "contains a request with an invalid IP address in the header '" + header[2] + "'");
-                        valid = false;
-                    }
-
-                    int dotcount = header[2].Count(c => c == '.');
-                    if (dotcount != 4)
-                    {
-                        RecordValidationError(obj, groupID, requestor, "contains a request with an invalid IP address in the header '" + header[2] + "'");
-                        valid = false;
-                    }
-
-                    // port doesn't really matter, we aren't looking at it anyways
-                }
-                else
-                {  // for serial BSAP, the first two elements are the global and local addresses
-
-                    // global address is an number and in range
-                    if (!int.TryParse(header[0], out n))
+                    // global address is a number and in range
+                    if (!int.TryParse(headerElement0[0], out n))
                     {
                         RecordValidationError(obj, groupID, requestor, "contains a request with an invalid element in the header (Global Address '" + header[0] + "' is not a number).");
                         valid = false;
@@ -137,50 +114,88 @@ namespace BSAP
                         }
                     }
 
-                    // local address is an number and in range
-                    if (!int.TryParse(localAddrStr, out n))
+                }
+
+
+                //------------------------------- ELEMENT 1 (local address) ------------------------
+                // local address is an number and in range
+                if (!isUDP)
+                {
+                    if (!int.TryParse(header[1], out n))
                     {
-                        RecordValidationError(obj, groupID, requestor, "contains a request with an invalid element in the header (Local Address '" + localAddrStr + "' is not a number).");
+                        RecordValidationError(obj, groupID, requestor, "contains a request with an invalid element in the header (Local Address '" + header[1] + "' is not a number).");
                         valid = false;
                     }
                     else
                     {
                         if (n < 0 || n > 255)
                         {
-                            RecordValidationError(obj, groupID, requestor, "contains a request with an invalid element in the header (Local Address '" + localAddrStr + "' is out of range (0-255).");
+                            RecordValidationError(obj, groupID, requestor, "contains a request with an invalid element in the header (Local Address '" + header[1] + "' is out of range (0-255).");
                             valid = false;
                         }
                     }
                 }
 
+                //------------------------------- ELEMENT 2 (ip address) --------------------------------
+                if (isUDP)
+                {
+                    if (!IPAddress.TryParse(header[2], out _))
+                    {
+                        RecordValidationError(obj, groupID, requestor, "contains a request with an invalid IP address in the header '" + header[2] + "'");
+                        valid = false;
+                    }
+
+                    int dotcount = header[2].Count(c => c == '.');
+                    if (dotcount != 3)
+                    {
+                        RecordValidationError(obj, groupID, requestor, "contains a request with an invalid IP address in the header '" + header[2] + "'");
+                        valid = false;
+                    }
+
+                }
+              
+                //------------------------------- ELEMENT 3 (operation) ------------------------------------------
+
                 // operation is either 'read' or 'write'
-                string operation = header[4].ToUpper();
+                string operation = header[3].ToUpper();
                 if (operation != "READ" && operation != "WRITE")
                 {
-                    RecordValidationError(obj, groupID, requestor, "contains a request with an invalid element in the header (Operation '" + header[4] + "' is not a recognized, should be READ or WRITE).");
+                    RecordValidationError(obj, groupID, requestor, "contains a request with an invalid element in the header (Operation '" + header[3] + "' is not a recognized, should be READ or WRITE).");
                     valid = false;
                 }
+             
 
-                // optional maximum packet size parameter
-                if (header.Length > 5)
+                //---------------------------- optional ELEMENTS 4 & 5 (login1 and login 2)---------------------------------------------------
+                if (header.Length > 5)  
                 {
-                    if (!int.TryParse(header[5],out n))
+                    // accept anything for login1 and login2 (elements 4 and 5) (not currently used)
+                }
+
+                // --------------------------- optional ELEMENT 6 (max packet size) -----------------------------------------------
+
+                // is integer with a value of at least 30
+                if (header.Length > 6)
+                {
+                    if (!int.TryParse(header[6],out n))
                     {
-                        RecordValidationError(obj, groupID, requestor, "contains a request with an invalid element in the header (Maximum packet size '" + header[5] + "' is not a number).");
+                        RecordValidationError(obj, groupID, requestor, "contains a request with an invalid element in the header (Maximum packet size '" + header[6] + "' is not a number).");
                         valid = false;
                     }
                     else
                     {
                         if (n < 30)
                         {
-                            RecordValidationError(obj, groupID, requestor, "contains a request with an invalid element in the header (Maximum packet size '" + header[5] + "' is too low, minimum of 30).");
+                            RecordValidationError(obj, groupID, requestor, "contains a request with an invalid element in the header (Maximum packet size '" + header[6] + "' is too low, minimum of 30).");
                             valid = false;
                         }
                     }
                 }
             }
 
-            // check each tag
+
+
+            //----------------------------------------   tag information ------------------------------------------------------------
+            // check that each tag has a valid signal name, data type, and dpduid
             string[] tagData;
             for (int i = 1; i < headerAndTagList.Length; i++)
             {
@@ -231,7 +246,7 @@ namespace BSAP
                             if (Guid.TryParse(groupID, out Guid result))
                             {
                                 string tagDPSType = tag.DPSType.ToUpper();
-                                string groupDPSType = ((DBManager)(Globals.DBManager)).GetRequestGroup(result).DPSType;
+                                string groupDPSType = ((DBManager)(Globals.DBManager))?.GetRequestGroup(result).DPSType;
                                 if (tagDPSType != groupDPSType)
                                 {
                                     RecordValidationError(obj, groupID, requestor, "Tag " + i + " references DataPointDefinitionStructure '" + tagData[2] + "' with an incorrect DPSType '" + tagDPSType + "'. The tag DPSType must match the RequestGroup DPSType");
@@ -259,7 +274,7 @@ namespace BSAP
             if (requestor != "DBValidator" && !isWarning)
             {
                 error = "The group '" + groupID + "', requested by " + requestor + ": " + error + ". This request group will not be processed";               
-                Globals.SystemManager.LogApplicationEvent(obj, "", error, true);
+                Globals.SystemManager?.LogApplicationEvent(obj, "", error, true);
             }
             else
             {
@@ -296,11 +311,8 @@ namespace BSAP
 
         public static void CreateRequests(RequestGroup requestGroup)
         {
-            //BSAP    -> Global Address (req) : Local Address (req) : READ/WRITE (req): Login1 (opt): Login2 (opt) : Max Data Size (opt)|tagname:type:ID|.....
-            //BSAPUDP ->  IPAddress (req) : Port (req) : READ/WRITE (req): Login1 (opt): Login2 (opt) : Max Data Size (opt)|tagname:type:ID|.....
-
             // new unified request string structure
-            // BSAP & BSAPUDP -> Global Address : Local Address : IPAddress : Port : READ/WRITE: login1 (opt): login2(opt) : Max data size (opt)| tagname:type:ID|....
+            // BSAP & BSAPUDP -> Global Address : Local Address : IPAddress : READ/WRITE: login1 (opt): login2(opt) : Max data size (opt)| tagname:type:ID|....
 
             string requestString = requestGroup.DBGroupRequestConfig.DataPointBlockRequestListVals;
 
@@ -329,6 +341,7 @@ namespace BSAP
             List<string> SignalNameRequestList = new();
             List<Tag> SignalNameTagList = new();
             int maxRequestLength = absoluteMaxMessageLength;
+
             // check for null or empty group definition, exit if found
             if (requestString == null || requestString == string.Empty)
                 return;
@@ -345,17 +358,16 @@ namespace BSAP
                 Header = HeaderAndBody[0].Split(':');
 
                 // check for a device reference in the first element of the request header, pull it out if present
-                string[] headerElement1 = Header[0].Split('^');
+                string[] headerElement0 = Header[0].Split('^');
                 {
-                    if (headerElement1.Length > 1)
+                    if (headerElement0.Length > 1)
                     {
-                        Guid deviceRef = Guid.Parse(headerElement1[1]);
+                        Guid deviceRef = Guid.Parse(headerElement0[1]);
                         if (Globals.DBManager != null)
                             deviceSettings = ((DBManager)Globals.DBManager).GetDevice(deviceRef);
                     }
                 }
 
-                string[] address;
                 if (requestGroup.Protocol == "BSAP")
                 {
                     // global address not currently used
@@ -366,22 +378,21 @@ namespace BSAP
                 }
                 else
                 {
-                    // BSAP UDP
-                    address = Header[2].Split('^');
-                    ip = address[0];
+                    // BSAP UDP                    
+                    ip = Header[2];
                 }
                 
-                operation = Header[4].ToUpper();
+                operation = Header[3].ToUpper();
 
                 // not currently used
+                //if (Header.Length > 4)
+                //    login1 = Header[4];
+
                 //if (Header.Length > 5)
-                //    login1 = Header[5];
+                //    login2 = Header[5];
 
-                //if (Header.Length > 6)
-                //    login2 = Header[6];
-
-                if (Header.Length > 7)
-                    maxRequestLength = int.Parse(Header[7]);
+                if (Header.Length > 6)
+                    maxRequestLength = int.Parse(Header[6]);
 
                 string dataType;
                 ushort MSD;
@@ -399,7 +410,7 @@ namespace BSAP
                     //int MSDtemp = int.Parse(requestGroup.TagsRef[tagID].DeviceTagAddress);
 
                     // double check.. does the signal name match? only use this address if the signal name matches
-                    //string recordedSigname = requestGroup.TagsRef[tagID].DeviceTagName;
+                    //string recordedSigname = requestGroup.TagsRef[tagID].DeviceTagName; 
                     //if (recordedSigname != signalName)
                     //    MSDtemp = -1;
 
@@ -604,6 +615,54 @@ namespace BSAP
             // for writes, the response should be 24 (unless there were errors)
 
             return totalbytes;
+        }
+
+        private static byte[] UDPGenerateACCOLVersionRequest(string deviceIP,int deviceport)
+        {
+  
+            List<byte> request = new(new byte[]
+            {
+                // HEADER
+                0x0E,     // request init
+                0x00,
+                0x01,
+                0x00,
+                0x06,
+                0x00,
+                0x00,      // application sequence number (low byte)        - to update for specific request
+                0x00,      // application sequence number                   - to update for specific request
+                0x00,      // application sequence number                   - to update for specific request
+                0x00,      // application sequence number (high byte)       - to update for specific request
+                0x00,      // last requence # received (low byte)           - to update for specific request
+                0x00,      // last requence # received                      - to update for specific request
+                0x00,      // last requence # received                      - to update for specific request
+                0x00,      // last requence # received (high byte)          - to update for specific request
+                0x00,      // number of bytes to follow (including this byte)  - to update for specific request
+                0x00,      // number of bytes to follow (including this byte)  - to update for specific request
+                0x00,      // type of data
+                0x00,      // type of data
+                0x00,      // message exchange code
+                0x00,      // application sequence # (low byte)  again (low byte)     - to update for specific request
+                0x00,      // application sequence # (low byte)  again (high byte)    - to update for specific request
+                0x00,      // local address of the device (use 0 for UDP)
+                0x00,      // local address of the device (high byte)
+                DSTFuncCode, // A0 = RDB access
+                0x00,         // routing table version    
+              
+                // REQUEST
+                0xA0,   // destination function code
+                0x00,   // sequence number
+                0x00,   // sequence number
+                0x00,   // message source function code
+                0x00,   // node status
+                0x70,   // function code
+                0x08,   // extended request function code
+                0x08,   // extended request sub-function code
+            });          
+
+            UDPFinalizeMessage(ref request, 8);
+
+            return request.ToArray();
         }
 
         public static void IdentifyWrites(RequestGroup requestGroup)
