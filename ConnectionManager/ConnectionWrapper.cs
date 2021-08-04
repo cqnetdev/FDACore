@@ -170,7 +170,19 @@ namespace FDA
             {
                 if (!IPAddress.TryParse(ipAddress, out IPAddress addr))
                     return false;
-                _UDPClient.Connect(new IPEndPoint(addr, _UDPPort));
+
+                string currentEndpoint = String.Empty;
+                if (_UDPClient.Client.RemoteEndPoint != null)
+                {
+                    currentEndpoint = _UDPClient.Client.RemoteEndPoint.ToString();
+                }
+
+                if (currentEndpoint != ipAddress + ":" + _UDPPort)  // if it's the same endpoint we're already connected to, just leave it, otherwise disconnect and connect to the new endpoint
+                {
+                    _UDPClient.Close();
+                    _UDPClient = new UdpClient(_UDPPort);
+                    _UDPClient.Connect(new IPEndPoint(addr, _UDPPort));
+                }
             }
 
             return true;

@@ -1496,16 +1496,18 @@ namespace FDA
             //udp.ExclusiveAddressUse = false;
             //udp.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
             UdpClient udp = new();
-           
-            try
-            {           
-                udp.Client.Bind(new IPEndPoint(IPAddress.Any, PortNumber));
-            }
-            catch (Exception ex)
+            if (!udp.Client.IsBound)
             {
-                Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Connection " + ConnectionID + " was unable to bind port " + PortNumber + ", because the port is already in use");
-                ConnectionStatus = Globals.ConnStatus.Disconnected;
-                return;
+                try
+                {
+                    udp.Client.Bind(new IPEndPoint(IPAddress.Any, PortNumber));
+                }
+                catch (Exception ex)
+                {
+                    Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Connection " + ConnectionID + " was unable to bind port " + PortNumber + ", because the port is already in use");
+                    ConnectionStatus = Globals.ConnStatus.Disconnected;
+                    return;
+                }
             }
 
             if (udp.Client.IsBound)
@@ -1526,7 +1528,7 @@ namespace FDA
             }
             else
             {
-                Globals.SystemManager.LogApplicationEvent(this, this.Description, "UDPConnect() success");
+                Globals.SystemManager.LogApplicationEvent(this, this.Description, "UDPConnect() success, bound port " + PortNumber);
                 ConnectionStatus = Globals.ConnStatus.Connected_Ready;
             }
     
