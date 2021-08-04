@@ -21,8 +21,6 @@ namespace BSAP
         private const byte DLE = 0x10;
         private const byte STX = 0x02;
         private const byte ETX = 0x03;
-        private const byte VersionHigh = 0xF3;
-        private const byte VersionLow  = 0xE6;
         private const byte DSTFuncCode = 0xA0;
         private const byte ReadMSDFuncCode = 0x00;
         private const byte ReadNameFuncCode = 0x04;
@@ -354,6 +352,11 @@ namespace BSAP
 
             for (int requestIdx = 0; requestIdx < requestStrings.Length; requestIdx++)
             {
+                MSDRequestList.Clear();
+                SignalNameRequestList.Clear();
+                MSDTagList.Clear();
+                SignalNameTagList.Clear();
+
                 HeaderAndBody = requestStrings[requestIdx].Split('|');
                 Header = HeaderAndBody[0].Split(':');
 
@@ -371,8 +374,8 @@ namespace BSAP
                 if (requestGroup.Protocol == "BSAP")
                 {
                    
-                    string[] address = Header[0].Split('^');
-                    byte globalAddress = byte.Parse(address[0]);                    
+                    //string[] address = Header[0].Split('^');
+                    //byte globalAddress = byte.Parse(address[0]);                    
                     
                     localAddress = byte.Parse(Header[1]);
                 }
@@ -395,7 +398,13 @@ namespace BSAP
                     maxRequestLength = int.Parse(Header[6]);
 
                 string dataType;
-                ushort MSD;
+                ushort VER = ushort.MaxValue;
+                ushort MSD = ushort.MaxValue;
+                bool sigNameMatch = false;
+                bool MSDandVerExists;
+                bool MSDCheck = false;
+                bool VERCheck = false;
+                string[] MSDandVER;
                 string[] tagInfo;
                 Tag newTag;
                 for (int tagIdx = 1; tagIdx < HeaderAndBody.Length; tagIdx++)
@@ -406,22 +415,22 @@ namespace BSAP
                     dataType = tagInfo[1];
                     tagID = Guid.Parse(tagInfo[2]);
 
-                    // do we already know the MSD for this signal? (request by MSD currently disabled)
-                    //int MSDtemp = int.Parse(requestGroup.TagsRef[tagID].DeviceTagAddress);
+                    // do we already know the MSD for this signal?
+                    MSDandVerExists = requestGroup.TagsRef[tagID].DeviceTagAddress.Contains(':');
+                    if (MSDandVerExists)
+                    {
+                        MSDandVER = requestGroup.TagsRef[tagID].DeviceTagAddress.Split(":");
+                        MSDCheck = ushort.TryParse(MSDandVER[0], out MSD);
+                        VERCheck = ushort.TryParse(MSDandVER[1], out VER);
+                        sigNameMatch = (requestGroup.TagsRef[tagID].DeviceTagName == signalName);
+                    }
 
-                    // double check.. does the signal name match? only use this address if the signal name matches
-                    //string recordedSigname = requestGroup.TagsRef[tagID].DeviceTagName; 
-                    //if (recordedSigname != signalName)
-                    //    MSDtemp = -1;
-
-                    // temporary override, never request by MSD (we need the ACCOL Load version # to be able to request by MSD)
-                    int MSDtemp = -1;
-                    // ********************************************************************************************************
                     bool isNaN = true;
                     if (requestGroup.writeLookup.ContainsKey(tagID)) { isNaN = double.IsNaN(requestGroup.writeLookup[tagID]); }
-                    if (MSDtemp >= 0)
+                    
+                    // check if we can request this tag by MSD
+                    if (MSDandVerExists && MSDCheck && VERCheck && sigNameMatch)  // MSD exists and is a valid ushort, version exists and is a valid ushort, and the previously recorded signal name matches the signal name we're reading now
                     {
-                        MSD = (ushort)MSDtemp;
                         // we can identify this one by MSD, so add the MSD to the MSD request list
                         // unless the operation is a write, and the value to write is NaN (the value to write wasn't found in the DB)...skip these                       
                         if (!(operation == "WRITE" && isNaN))
@@ -461,9 +470,9 @@ namespace BSAP
                     if (operation == "READ")
                     {   
                         if (requestGroup.Protocol.ToUpper() == "BSAP")
-                            MSDRequests = SerialReadValuesByMSD(localAddress, MSDRequestList.ToArray(), maxRequestLength);
+                            MSDRequests = SerialReadValuesByMSD(localAddress, MSDRequestList.ToArray(),VER, maxRequestLength);
                         if (requestGroup.Protocol.ToUpper() == "BSAPUDP")
-                            MSDRequests = UDPReadValuesByMSD(ip,deviceSettings, MSDRequestList.ToArray(), maxRequestLength);
+                            MSDRequests = UDPReadValuesByMSD(ip,deviceSettings, MSDRequestList.ToArray(),VER, maxRequestLength);
 
                         int tagIdx = 0;
                         foreach (DataRequest req in MSDRequests)
@@ -477,7 +486,9 @@ namespace BSAP
                                 }
                                 tagIdx++;
                             }
+                            req.ExpectedResponseSize = CalculateExpectedResponseSize(req);
                         }
+                        
                     }
 
                     if (operation == "WRITE")
@@ -496,10 +507,10 @@ namespace BSAP
                         }
 
                         if (requestGroup.Protocol.ToUpper() == "BSAP")
-                            MSDRequests = SerialWriteValuesByMSD(localAddress, MSDRequestList.ToArray(), types.ToArray(), values.ToArray());
+                            MSDRequests = SerialWriteValuesByMSD(localAddress, MSDRequestList.ToArray(), types.ToArray(), values.ToArray(),VER);
 
                         if (requestGroup.Protocol.ToUpper() == "BSAPUDP")
-                            MSDRequests = UDPWriteValuesByMSD(ip,deviceSettings,MSDRequestList.ToArray(), types.ToArray(), values.ToArray());
+                            MSDRequests = UDPWriteValuesByMSD(ip,deviceSettings,MSDRequestList.ToArray(), types.ToArray(), values.ToArray(),VER);
 
                     }
                     foreach (DataRequest req in MSDRequests)
@@ -600,7 +611,7 @@ namespace BSAP
             // for reads, the response size depends on the # of signals and their types
             if (isReadRequest)
             {
-                int nonValueBytes=1; // the type byte
+                int nonValueBytes=1; // extra byte for the data type
                 
                 if (expectMSD)
                     nonValueBytes += 2; // two extra bytes for the address
@@ -623,53 +634,7 @@ namespace BSAP
             return totalbytes;
         }
 
-        private static byte[] UDPGenerateACCOLVersionRequest(string deviceIP,int deviceport)
-        {
-  
-            List<byte> request = new(new byte[]
-            {
-                // HEADER
-                0x0E,     // request init
-                0x00,
-                0x01,
-                0x00,
-                0x06,
-                0x00,
-                0x00,      // application sequence number (low byte)        - to update for specific request
-                0x00,      // application sequence number                   - to update for specific request
-                0x00,      // application sequence number                   - to update for specific request
-                0x00,      // application sequence number (high byte)       - to update for specific request
-                0x00,      // last requence # received (low byte)           - to update for specific request
-                0x00,      // last requence # received                      - to update for specific request
-                0x00,      // last requence # received                      - to update for specific request
-                0x00,      // last requence # received (high byte)          - to update for specific request
-                0x00,      // number of bytes to follow (including this byte)  - to update for specific request
-                0x00,      // number of bytes to follow (including this byte)  - to update for specific request
-                0x00,      // type of data
-                0x00,      // type of data
-                0x00,      // message exchange code
-                0x00,      // application sequence # (low byte)  again (low byte)     - to update for specific request
-                0x00,      // application sequence # (low byte)  again (high byte)    - to update for specific request
-                0x00,      // local address of the device (use 0 for UDP)
-                0x00,      // local address of the device (high byte)
-                DSTFuncCode, // A0 = RDB access
-                0x00,         // routing table version    
-              
-                // REQUEST
-                0xA0,   // destination function code
-                0x00,   // sequence number
-                0x00,   // sequence number
-                0x00,   // message source function code
-                0x00,   // node status
-                0x70,   // function code
-                0x08,   // extended request function code
-                0x08,   // extended request sub-function code
-            });          
-
-            UDPFinalizeMessage(ref request, 8);
-
-            return request.ToArray();
-        }
+     
 
         public static void IdentifyWrites(RequestGroup requestGroup)
         {
@@ -1089,7 +1054,7 @@ namespace BSAP
                 string datatype;
 
 
-                bool includesMSD = (request[25] == 0x04); // we've set up all read-by-name requests to include the MSD in the response
+                bool includesMSDandVersion = (request[25] == 0x04); // we've set up all read-by-name requests to request the MSD and version in the response (byte 25 = 0x04 means read-by-name)
 
 
                 if (IntHelpers.GetBit(response[23], 7))  // if bit 7 of byte 9 is on, there is at least one signal specific error (an extra byte is included at the beginning of each signal data block to indcate the error)
@@ -1135,13 +1100,17 @@ namespace BSAP
                     requestObj.TagList[tagIdx].Quality = 192;
 
                     // get the MSD (if included), store it in the tag config for future use
-                    if (includesMSD)
+                    if (includesMSDandVersion)
                     {
                         ushort MSD = BitConverter.ToUInt16(response, byteIdx);
                         byteIdx += 2;
+
+                        ushort VER = BitConverter.ToUInt16(response, byteIdx);
+                        byteIdx += 2;
+
                         lock (requestObj.DataPointConfig[tagIdx])
                         {
-                            requestObj.DataPointConfig[tagIdx].DeviceTagAddress = MSD.ToString();
+                            requestObj.DataPointConfig[tagIdx].DeviceTagAddress = $"{MSD}:{VER}";
                             requestObj.DataPointConfig[tagIdx].DeviceTagName = requestObj.TagList[tagIdx].DeviceTagName;
                         }
                     }
@@ -1352,14 +1321,14 @@ namespace BSAP
         }
     
 
-        public static List<DataRequest> UDPReadValuesByMSD(string ipaddress,FDADevice deviceSettings, ushort[] signalList, int maxMessageSize = absoluteMaxMessageLength)
+        public static List<DataRequest> UDPReadValuesByMSD(string ipaddress,FDADevice deviceSettings, ushort[] signalList,ushort version, int maxMessageSize = absoluteMaxMessageLength)
         {
             List<DataRequest> output = new();
             if (maxMessageSize > absoluteMaxMessageLength)
                 maxMessageSize = absoluteMaxMessageLength;
 
             int totalSignalCount = signalList.Length;
-           
+          
 
             // find the maximum number of signals that we can put into a single request
             // 32 bytes of overhead, 2 bytes per MSD
@@ -1407,8 +1376,8 @@ namespace BSAP
               ReadMSDFuncCode,  // 0x00 = read by MSD    
               FSS,
               FS1_typeAndvalue,
-              VersionLow,
-              VersionHigh,
+              IntHelpers.GetLowByte(version),
+              IntHelpers.GetHighByte(version),
               0x0F,
               0x00  // signal count                  - to update for specific request
             });
@@ -1436,7 +1405,7 @@ namespace BSAP
                     request = CreateDataRequestObject(thisMessage.ToArray());
                     request.Protocol = "BSAPUDP";
                     request.TagList = new List<Tag>(thisMessageSignalCount);
-                    request.ExpectedResponseSize = CalculateExpectedResponseSize(request);
+                    //request.ExpectedResponseSize = CalculateExpectedResponseSize(request);
                     request.DeviceSettings = deviceSettings;
                     request.UDPIPAddr = ipaddress;
 
@@ -1554,8 +1523,8 @@ namespace BSAP
 
                     request = CreateDataRequestObject(thisMessage.ToArray());
                     request.Protocol = "BSAPUDP";
-                    request.ExpectedResponseSize = CalculateExpectedResponseSize(request);
                     request.TagList = new List<Tag>(thisMessageSignalCount);
+                    //request.ExpectedResponseSize = CalculateExpectedResponseSize(request);
                     request.DeviceSettings = deviceSettings;
                     request.UDPIPAddr = ip;
                     if (thisMessageSignalCount > 0)
@@ -1566,7 +1535,7 @@ namespace BSAP
             return output;
         }
 
-        public static List<DataRequest> UDPWriteValuesByMSD(string ipaddress,FDADevice deviceSettings, ushort[] signalList, string[] types, float[] values, int maxMessageSize = absoluteMaxMessageLength)
+        public static List<DataRequest> UDPWriteValuesByMSD(string ipaddress,FDADevice deviceSettings, ushort[] signalList, string[] types, float[] values,ushort version, int maxMessageSize = absoluteMaxMessageLength)
         {
             List<DataRequest> output = new();
 
@@ -1599,8 +1568,8 @@ namespace BSAP
               DSTFuncCode, // A0 = RDB access
               0x00,      // node status
               WriteByMSDFuncCode, // 0x80 = write by MSD
-              VersionLow,  // version # low byte      
-              VersionHigh, // version # high byte    
+              IntHelpers.GetLowByte(version),  // version # low byte      
+              IntHelpers.GetHighByte(version), // version # high byte    
               0x0f,        // Security byte
               0x00,      // signal count - to update for a spcific request               
             });
@@ -1932,7 +1901,7 @@ namespace BSAP
             return output;
         }
 
-        public static List<DataRequest> SerialReadValuesByMSD(byte localAddr, ushort[] signalList, int maxMessageSize = absoluteMaxMessageLength)
+        public static List<DataRequest> SerialReadValuesByMSD(byte localAddr, ushort[] signalList,ushort version, int maxMessageSize = absoluteMaxMessageLength)
         {
             if (maxMessageSize > absoluteMaxMessageLength)
                 maxMessageSize = absoluteMaxMessageLength;
@@ -1969,8 +1938,8 @@ namespace BSAP
               ReadMSDFuncCode,
               FSS,        
               FS1_typeAndvalue, 
-              VersionLow,  
-              VersionHigh,
+              IntHelpers.GetLowByte(version),  
+              IntHelpers.GetHighByte(version),
               0xFF,
               0x00  // signal count to be updated when message is complete
             });
@@ -2017,7 +1986,7 @@ namespace BSAP
         }
 
 
-        public static List<DataRequest> SerialWriteValuesByMSD(byte localAddress, ushort[] signalList,string[] types,float[] values, int maxMessageSize = absoluteMaxMessageLength)
+        public static List<DataRequest> SerialWriteValuesByMSD(byte localAddress, ushort[] signalList,string[] types,float[] values, ushort version,int maxMessageSize = absoluteMaxMessageLength)
         {
             if (maxMessageSize > absoluteMaxMessageLength)
                 maxMessageSize = absoluteMaxMessageLength;
@@ -2037,8 +2006,8 @@ namespace BSAP
               SRCFuncCode,
               NodeStatus,
               WriteByMSDFuncCode,
-              VersionLow,
-              VersionHigh,
+              IntHelpers.GetLowByte(version),
+              IntHelpers.GetHighByte(version),
               0xFF, // security level
               0x00 // number of signals (to be filled in later)
             });
