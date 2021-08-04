@@ -370,9 +370,9 @@ namespace BSAP
 
                 if (requestGroup.Protocol == "BSAP")
                 {
-                    // global address not currently used
-                    // address = Header[0].Split('^');
-                    // globalAddress = byte.Parse(address[0]);                    
+                   
+                    string[] address = Header[0].Split('^');
+                    byte globalAddress = byte.Parse(address[0]);                    
                     
                     localAddress = byte.Parse(Header[1]);
                 }
@@ -417,13 +417,14 @@ namespace BSAP
                     // temporary override, never request by MSD (we need the ACCOL Load version # to be able to request by MSD)
                     int MSDtemp = -1;
                     // ********************************************************************************************************
-                    
+                    bool isNaN = true;
+                    if (requestGroup.writeLookup.ContainsKey(tagID)) { isNaN = double.IsNaN(requestGroup.writeLookup[tagID]); }
                     if (MSDtemp >= 0)
                     {
                         MSD = (ushort)MSDtemp;
                         // we can identify this one by MSD, so add the MSD to the MSD request list
-                        // unless the operation is a write, and the value to write is NaN (the value to write wasn't found in the DB)...skip these
-                        if (!(operation == "WRITE" && double.IsNaN(requestGroup.writeLookup[tagID])))
+                        // unless the operation is a write, and the value to write is NaN (the value to write wasn't found in the DB)...skip these                       
+                        if (!(operation == "WRITE" && isNaN))
                         {
                             MSDRequestList.Add(MSD);
                             newTag = new Tag(tagID)
@@ -440,7 +441,7 @@ namespace BSAP
                         // we'll have to identify it by name and request the MSD for future use
                         // add the name to the signal name request list
                         // unless the operation is a write, and the value to write is NaN (the value to write wasn't found in the DB)...skip these
-                        if (!(operation == "WRITE" && double.IsNaN(requestGroup.writeLookup[tagID])))
+                        if (!(operation == "WRITE" && isNaN))
                         {
                             SignalNameRequestList.Add(signalName);
                             newTag = new(tagID)
@@ -556,9 +557,7 @@ namespace BSAP
                             SignalNameRequests = UDPWriteValuesByName(ip,deviceSettings, SignalNameRequestList.ToArray(), types.ToArray(), values.ToArray());  
                     }
 
-                    requestGroup.ProtocolRequestList.AddRange(SignalNameRequests);
-
-                    
+                    requestGroup.ProtocolRequestList.AddRange(SignalNameRequests);                   
                 }
             }
 
@@ -579,12 +578,14 @@ namespace BSAP
         {
             int totalbytes = 0;
             bool expectMSD = false;
+            bool expectVer = false;
             bool isReadRequest = true;
           
             if (req.Protocol.ToUpper()=="BSAPUDP")
             {
                 totalbytes = 25;
                 expectMSD = req.RequestBytes[27] == 0xD0;
+                expectVer = req.RequestBytes[28] == 0x01;
                 isReadRequest = req.RequestBytes[25] == 0x00 || req.RequestBytes[25] == 0x04;
             }
 
@@ -592,6 +593,7 @@ namespace BSAP
             {
                 totalbytes = 14;
                 expectMSD = req.RequestBytes[11] == 0xD0;
+                expectVer = req.RequestBytes[12] == 0x01;
                 isReadRequest = req.RequestBytes[9] == 0x00 || req.RequestBytes[9] == 0x04;
             }
 
@@ -599,8 +601,12 @@ namespace BSAP
             if (isReadRequest)
             {
                 int nonValueBytes=1; // the type byte
+                
                 if (expectMSD)
                     nonValueBytes += 2; // two extra bytes for the address
+
+                if (expectVer)
+                    nonValueBytes += 2; // two extra bytes for the RDB version number
 
                 foreach (Tag tag in req.TagList)
                 {
@@ -675,7 +681,7 @@ namespace BSAP
             // like this
 
             string header = requestGroup.DBGroupRequestConfig.DataPointBlockRequestListVals.Split('|')[0];
-            string operation = header.Split(':')[2];
+            string operation = header.Split(':')[3];
 
             if (operation.ToUpper() != "WRITE")
                 return;
@@ -1086,7 +1092,7 @@ namespace BSAP
                 bool includesMSD = (request[25] == 0x04); // we've set up all read-by-name requests to include the MSD in the response
 
 
-                if (IntHelpers.GetBit(response[23], 7))  // if bit 7 of byte 9 is on, there is at least one signal specific error (an extra byte is included at the beginning of each signal to indcate the error)
+                if (IntHelpers.GetBit(response[23], 7))  // if bit 7 of byte 9 is on, there is at least one signal specific error (an extra byte is included at the beginning of each signal data block to indcate the error)
                     includesEERByte = true;
 
                 int byteIdx = 25; // data starts at byte 25
@@ -1391,7 +1397,7 @@ namespace BSAP
               0x00,      // number of bytes to follow 
               0x00,      // data type
               0x00,      // data type
-              0x00,      // message exchange code
+              0x0C,      // message exchange code (why 0C? because kepware put a 0C in this byte)
               0x00,      // application sequence # again (low byte)     - to update for specific request
               0x00,      // application sequence # again (high byte)    - to update for specific request
               0x00,      // local address of the device (use 0 for BSAPUDP)
@@ -1482,14 +1488,14 @@ namespace BSAP
               0x00,      // message exchange code
               0x00,      // application sequence # (low byte)  again (low byte)     - to update for specific request
               0x00,      // application sequence # (low byte)  again (high byte)    - to update for specific request
-              0x00,      // local address of the device (use 0 for UDP)
-              0x00,      // local address of the device (high byte)
+              0x00,      // global address of the device (use 0 for UDP)
+              0x00,      // global address of the device (high byte)
               DSTFuncCode, // A0 = RDB access
               0x00,      // node status byte      
               ReadNameFuncCode,  // 0x04 = read by Name    
               0x03, // FSS
               FS1_typeAndvalueAndMSD,
-              0x00,
+              0x01,  // FS2 get DB version #
               0x0F,
               0x00  // signal count                  - to update for specific request
             });
@@ -1862,8 +1868,8 @@ namespace BSAP
               ReadNameFuncCode,
               0x03, // FSS has to use FS1 and FS2 when requesting by name (reason??), 
               FS1_typeAndvalueAndMSD,
-              0x00, // FS2 not used
-              0x0F, // FS3 not used, but needs to be 0F
+              0x01, // FS2 get RDB version #
+              0x0F, // FS3 not used, but needs to be 0F for some reason
             });
 
 
