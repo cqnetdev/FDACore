@@ -154,11 +154,11 @@ namespace BSAP
               
                 //------------------------------- ELEMENT 3 (operation) ------------------------------------------
 
-                // operation is either 'read' or 'write'
+                // operation is either 'read','write', or "+write"(read back after write)
                 string operation = header[3].ToUpper();
-                if (operation != "READ" && operation != "WRITE")
+                if (operation != "READ" && operation != "WRITE" && operation != "+WRITE")
                 {
-                    RecordValidationError(obj, groupID, requestor, "contains a request with an invalid element in the header (Operation '" + header[3] + "' is not a recognized, should be READ or WRITE).");
+                    RecordValidationError(obj, groupID, requestor, "contains a request with an invalid element in the header (Operation '" + header[3] + "' is not a recognized, should be READ, WRITE, or +WRITE).");
                     valid = false;
                 }
              
@@ -386,6 +386,8 @@ namespace BSAP
                 }
                 
                 operation = Header[3].ToUpper();
+                bool doReadback = (operation.StartsWith('+'));
+                operation = operation.Replace("+","");
 
                 // not currently used
                 //if (Header.Length > 4)
@@ -449,7 +451,7 @@ namespace BSAP
                     {
                         // we'll have to identify it by name and request the MSD for future use
                         // add the name to the signal name request list
-                        // unless the operation is a write, and the value to write is NaN (the value to write wasn't found in the DB)...skip these
+                        // unless the operation is a write and the value to write is NaN (the value to write wasn't found in the DB)...skip these
                         if (!(operation == "WRITE" && isNaN))
                         {
                             SignalNameRequestList.Add(signalName);
@@ -507,15 +509,34 @@ namespace BSAP
                         }
 
                         if (requestGroup.Protocol.ToUpper() == "BSAP")
-                            MSDRequests = SerialWriteValuesByMSD(localAddress, MSDRequestList.ToArray(), types.ToArray(), values.ToArray(),VER);
+                        {
+                            MSDRequests = SerialWriteValuesByMSD(localAddress, MSDRequestList.ToArray(), types.ToArray(), values.ToArray(), VER);
+                            if (doReadback)
+                            {
+                                List<DataRequest> readback = SerialReadValuesByMSD(localAddress, MSDRequestList.ToArray(), VER);
+                                ConfigureReadback(MSDTagList, allTagConfigs, ref readback);
+                                MSDRequests.AddRange(readback);
+                            }
+                        }
 
                         if (requestGroup.Protocol.ToUpper() == "BSAPUDP")
-                            MSDRequests = UDPWriteValuesByMSD(ip,deviceSettings,MSDRequestList.ToArray(), types.ToArray(), values.ToArray(),VER);
+                        {
+                            MSDRequests = UDPWriteValuesByMSD(ip, deviceSettings, MSDRequestList.ToArray(), types.ToArray(), values.ToArray(), VER);
+                            if (doReadback)
+                            {
+                                List<DataRequest> readback = UDPReadValuesByMSD(ip, deviceSettings, MSDRequestList.ToArray(), VER);
+                                ConfigureReadback(MSDTagList, allTagConfigs, ref readback);
+                                MSDRequests.AddRange(readback);
+                            }
+                        }
+
 
                     }
                     foreach (DataRequest req in MSDRequests)
-                        req.ValuesToWrite = requestGroup.writeLookup;
-
+                    {
+                        if (req.MessageType == DataRequest.RequestType.Write)
+                            req.ValuesToWrite = requestGroup.writeLookup;
+                    }
                     requestGroup.ProtocolRequestList.AddRange(MSDRequests);
                 }
 
@@ -561,11 +582,29 @@ namespace BSAP
                             }
                         }
 
-  
+
                         if (requestGroup.Protocol.ToUpper() == "BSAP")
+                        {
                             SignalNameRequests = SerialWriteValuesByName(localAddress, SignalNameRequestList.ToArray(), types.ToArray(), values.ToArray());
+                            if (doReadback)
+                            {
+                                List<DataRequest> readback = SerialReadValuesByName(localAddress, SignalNameRequestList.ToArray());
+                                ConfigureReadback(SignalNameTagList, allTagConfigs, ref readback);
+                                SignalNameRequests.AddRange(readback);
+
+                            }
+                        }
                         if (requestGroup.Protocol.ToUpper() == "BSAPUDP")
-                            SignalNameRequests = UDPWriteValuesByName(ip,deviceSettings, SignalNameRequestList.ToArray(), types.ToArray(), values.ToArray());  
+                        {
+                            SignalNameRequests = UDPWriteValuesByName(ip, deviceSettings, SignalNameRequestList.ToArray(), types.ToArray(), values.ToArray());
+                            
+                            if (doReadback)
+                            {
+                                List<DataRequest> readback = UDPReadValuesByName(ip, deviceSettings, SignalNameRequestList.ToArray());
+                                ConfigureReadback(SignalNameTagList, allTagConfigs, ref readback);
+                                SignalNameRequests.AddRange(readback);
+                            }
+                        }
                     }
 
                     requestGroup.ProtocolRequestList.AddRange(SignalNameRequests);                   
@@ -581,7 +620,29 @@ namespace BSAP
                 req.GroupIdxNumber = idx.ToString();
                 req.ParentGroup = requestGroup;
                 req.ExpectedResponseSize = CalculateExpectedResponseSize(req);
+                req.DeviceSettings = deviceSettings;
+                req.GroupIdxNumber = idx.ToString();
+                req.GroupSize = requestGroup.ProtocolRequestList.Count;
                 idx++;
+            }
+        }
+
+        private static void ConfigureReadback(List<Tag> tagsToAdd,Dictionary<Guid,FDADataPointDefinitionStructure> allTagConfigs, ref List<DataRequest> readback)
+        {
+            int tagIdx = 0;
+            foreach (DataRequest req in readback)
+            {
+                for (int i = 0; i < req.TagList.Capacity; i++)
+                {
+                    if (allTagConfigs != null)
+                    {
+                        req.TagList.Add(tagsToAdd[tagIdx]);
+                        req.DataPointConfig.Add(allTagConfigs[req.TagList[i].TagID]);
+                    }
+                    tagIdx++;
+                }
+                req.DBWriteMode = DataRequest.WriteMode.Update;
+                req.MessageType = DataRequest.RequestType.ReadbackAfterWrite;
             }
         }
 
@@ -646,9 +707,9 @@ namespace BSAP
             // like this
 
             string header = requestGroup.DBGroupRequestConfig.DataPointBlockRequestListVals.Split('|')[0];
-            string operation = header.Split(':')[3];
+            string operation = header.Split(':')[3].ToUpper();
 
-            if (operation.ToUpper() != "WRITE")
+            if (!(operation == "WRITE" || operation == "+WRITE"))
                 return;
 
             string[] tags = requestGroup.DBGroupRequestConfig.DataPointBlockRequestListVals.Split('|');
@@ -1602,6 +1663,7 @@ namespace BSAP
                     request.UDPIPAddr = ipaddress;
                     request.ExpectedResponseSize = CalculateExpectedResponseSize(request);
                     request.TagList = new List<Tag>(thisMessageSignalCount);
+                    request.MessageType = DataRequest.RequestType.Write;
 
                     // add it to the request list
                     output.Add(request);
@@ -1781,6 +1843,7 @@ namespace BSAP
                     request.ExpectedResponseSize = CalculateExpectedResponseSize(request);
                     request.TagList = new List<Tag>(thisMessageSignalCount);
                     request.RequestID = Guid.NewGuid().ToString();
+                    request.MessageType = DataRequest.RequestType.Write;
                     output.Add(request);
                 }
             }
@@ -2081,6 +2144,7 @@ namespace BSAP
                     request.Protocol = "BSAP";
                     request.ExpectedResponseSize = CalculateExpectedResponseSize(request);
                     request.TagList = new List<Tag>(thisMessageSignalCount);
+                    request.MessageType = DataRequest.RequestType.Write;
                     output.Add(request);
                 }
             }
@@ -2184,6 +2248,7 @@ namespace BSAP
                     request.ExpectedResponseSize = CalculateExpectedResponseSize(request);
                     request.TagList = new List<Tag>(thisMessageSignalCount);
                     request.RequestID = Guid.NewGuid().ToString();
+                    request.MessageType = DataRequest.RequestType.Write;
                     output.Add(request);
                 }
             }

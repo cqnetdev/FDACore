@@ -551,10 +551,11 @@ namespace FDA
                 // send it to the backfill manager for analysis (backfill manager will return it in a BackfillAnalysisComplete event with the results of the analysis)
                 if (e.RequestRef.MessageType == DataRequest.RequestType.Read)
                     _backfillManager.AnalyzeResponse(e.RequestRef);
+
             }  
             
-            // if this is a completed backfill request, send it to the dbManager to be saved in the DB
-            if (e.RequestRef.MessageType == DataRequest.RequestType.Backfill)
+            // if this is a completed backfill request or a readback-after-write, send it to the dbManager to be saved in the DB
+            if (e.RequestRef.MessageType == DataRequest.RequestType.Backfill || e.RequestRef.MessageType == DataRequest.RequestType.ReadbackAfterWrite)
                 _dbManager.WriteDataToDB(e.RequestRef);
         }
 

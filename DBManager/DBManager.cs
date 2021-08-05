@@ -436,10 +436,6 @@ namespace FDA
                             {
                                 if (transactionToLog.DBWriteMode == DataRequest.WriteMode.Insert || !firstDest) // always do an insert on additional destination tables (even if the writemode is set to update)
                                 {
-
-                                    // Globals.SystemManager.LogApplicationEvent(this, "","Caching " + transactionToLog.TagList.Count(p => p.TagID != Guid.Empty) + " data points to be written to the table '" + dest + "'");
-
-
                                     // cache inserts instead of writing them out right now
                                     _cacheManager.CacheDataPoint(dest, tag);
                                 }
@@ -484,15 +480,6 @@ namespace FDA
                             }
                         }
 
-                        // if this isn't a backfill request, update the last read value and timestamp in the DataPointDefinitions table
-                        // Feb 12, 2020: disabled writing last value to DataPointDefinitions table 
-                        /*
-                        if (transactionToLog.MessageType != DataRequest.RequestType.Backfill)
-                        {
-                            batch += "update " + Globals.SystemManager.GetTableName("DataPointDefinitionStructures") + " set LastReadDataValue = " + tag.Value + ", LastReadDataTimestamp = '" + DateTimeHelpers.FormatDateTime(tag.Timestamp) + "' "
-                                  + " where DPDUID = '" + tag.TagID.ToString() + "';";
-                        }
-                        */
 
                         // if tag quality is good, write the value and timestamp to the FDALastDataValues table (update if it already exists in the table, insert otherwise)
                         if (tag.Quality == 192)
@@ -526,18 +513,10 @@ namespace FDA
                     {
                         // note: retries and error messages are handled in ExecuteNonQuery() in child classes
                         int result = ExecuteNonQuery(batch.ToString());
-                        //if (result > 0)
-                        //{
-                        //    Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "DBManager", "Group " + transactionToLog.GroupID + ", index " + transactionToLog.GroupIdxNumber + " successfully recorded in the database");
-                        //}
-                        //else
-                        //{
-                        //    Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "DBManager", "Group " + transactionToLog.GroupID + ", index " + transactionToLog.GroupIdxNumber + " failed to write to the database");
-                        //}
 
                         lock (_writeQueue) { _writeQueue.Dequeue(); }
                     }
-                    Thread.Sleep(20); // slow down the queries a bit to reduce the load on SQL server while clearing a backlog 
+                    Thread.Sleep(20); // slow down the queries a tiny bit to reduce the load on the database while clearing a backlog 
 
                 }
             }
