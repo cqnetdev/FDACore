@@ -1228,7 +1228,7 @@ namespace ROC
                             }
                             else
                             { 
-                                subRequestList = GenerateWriteRequest("", groupNum, devNum, 1, 1, tlpList.ToArray(), tagConfigsList, requestGroup.writeLookup,PreReadValues,requestIdx + 1, maxDataSize);
+                                subRequestList = GenerateWriteRequest("", groupNum, devNum, 1, 1, tlpList.ToArray(), tagConfigsList, requestGroup.writeLookup,PreReadValues,requestIdx + 1);
                             }
                             break;
 
@@ -1684,7 +1684,6 @@ namespace ROC
             foreach (DataRequest req in subRequestList)
             {
                 req.GroupIdxNumber += " (pre-write read)";
-
             }
 
             return subRequestList;
@@ -2014,7 +2013,7 @@ namespace ROC
             return subRequestList;
         }
 
-        private static List<DataRequest> GenerateWriteRequest(string reqID, byte group, byte unit, byte hostGroup, byte hostUnit, object protocolParams, List<FDADataPointDefinitionStructure> tagsconfigList,Dictionary<Guid,double> writeValues,List<Tag> preReadValues, int groupIdx, int maxDataSize)
+        private static List<DataRequest> GenerateWriteRequest(string reqID, byte group, byte unit, byte hostGroup, byte hostUnit, object protocolParams, List<FDADataPointDefinitionStructure> tagsconfigList,Dictionary<Guid,double> writeValues,List<Tag> preReadValues, int groupIdx)
         {
             List<DataRequest> requestList = new();
 
@@ -3515,7 +3514,7 @@ namespace ROC
                             break;
                         case 3: ReadFormat3(eventData); break;
                         case 4: ReadFormat4(eventData); break;
-                        case 5: ReadFormat5(eventData); break;
+                        case 5: /*ReadFormat5(eventData);*/ break;
                         case 6: ReadFormat6(eventData); break;
                         default:
                             //Globals.SystemManager.LogApplicationEvent(Globals.GetOffsetUTC(), "ROCProtocol", "Invalid event format for point type " + PointType + " in RocEventFormats table.");
@@ -3626,11 +3625,11 @@ namespace ROC
                 // return "All power removed (event timestamp: " + EventTimestamp2 + ")";
             }
 
-            private void ReadFormat5(byte[] eventData)
-            {
-                //EventDesc = ;
-                //return ""; 
-            }
+            //private void ReadFormat5(byte[] eventData)
+            //{
+            //    //EventDesc = ;
+            //    //return ""; 
+            //}
 
             private void ReadFormat6(byte[] eventData)
             {
