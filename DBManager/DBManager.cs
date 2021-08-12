@@ -421,11 +421,18 @@ namespace FDA
                             continue;
                         if (!tagDef.DPDSEnabled)
                             continue;
-
+  
+                        // replace null values with the text string "null" for use in the query
                         if (tag.Value != null)
                             value = tag.Value.ToString();
                         else
                             value = "null";
+
+                        if (tag.Timestamp == DateTime.MinValue)
+                        {
+                            tag.Timestamp = new DateTime (1900,1,1,0,0,00,0,Calendar.CurrentEra);  /// oldest datetime for database is more recent than the .NET minimum datetime, .NET min date causes SQL error
+                        }
+                        
 
                         bool firstDest = true;
 
@@ -441,7 +448,7 @@ namespace FDA
                                 }
 
                                 // do an update on the first destination table, if write mode is update (if the tag isn't found in the table, do an insert instead)
-                                if (transactionToLog.DBWriteMode == DataRequest.WriteMode.Update && firstDest)
+                                if (transactionToLog.DBWriteMode == DataRequest.WriteMode.Update && firstDest && tag.Value != null)
                                 {
                                     batch.Append("if (select count(1) from ");
                                     batch.Append(dest);
