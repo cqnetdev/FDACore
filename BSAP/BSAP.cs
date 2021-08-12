@@ -204,8 +204,8 @@ namespace BSAP
                 }
 
                 operation = Header[3].ToUpper();
-                bool doReadback = (operation.StartsWith('+'));
-                operation = operation.Replace("+", "");
+                bool doReadback = (operation == "+WRITE");
+                if (doReadback) operation = "WRITE";
 
                 // not currently used
                 //if (Header.Length > 4)
