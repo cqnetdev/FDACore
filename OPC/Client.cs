@@ -2,11 +2,9 @@
 using Opc.UaFx.Client;
 using System;
 using System.Collections.Generic;
-using System.Text;
-using System.Threading.Tasks;
+
 namespace OPC
 {
-  
     public abstract class Client : IDisposable
     {
         protected string _connectionString;
@@ -15,19 +13,19 @@ namespace OPC
         public OpcSubscriptionReadOnlyCollection Subscriptions { get { if (_client != null) return _client.Subscriptions; else return new OpcSubscriptionReadOnlyCollection(new List<OpcSubscription>()); } }
 
         public delegate void DataChangeHandler(OpcMonitoredItem item);
+
         public event DataChangeHandler DataChange;
 
         public delegate void BreakDetectedHandler();
+
         public event BreakDetectedHandler BreakDetected;
 
         private bool _breakDetectionArmed = false;
 
-
         public bool Connected = false;
 
-        public Client ()
+        public Client()
         {
-
         }
 
         public bool Connect()
@@ -59,13 +57,10 @@ namespace OPC
             }
         }
 
-   
-
         public void Disconnect()
         {
             _client?.Disconnect();
             Connected = false;
-
         }
 
         public void GetNodes()
@@ -87,10 +82,9 @@ namespace OPC
                 Browse(childNode, level);
         }
 
+        public abstract OpcValue Read(string node, int ns);
 
-        public abstract OpcValue Read(string node,int ns);
-
-        public List<OpcValue> ReadNodes(string nodelist,out List<Guid> datapointdefs)
+        public List<OpcValue> ReadNodes(string nodelist, out List<Guid> datapointdefs)
         {
             List<OpcReadNode> toRead = new();
             List<Guid> datapoints = new();
@@ -104,7 +98,7 @@ namespace OPC
                 toRead.Add(new OpcReadNode(nodeparts[1], ns));
                 datapoints.Add(Guid.Parse(nodeparts[2]));
             }
-           List<OpcValue> values = new(_client.ReadNodes(toRead));
+            List<OpcValue> values = new(_client.ReadNodes(toRead));
             datapointdefs = datapoints;
             return values;
         }
@@ -130,7 +124,7 @@ namespace OPC
                 default: filter.DeadbandType = OpcDeadbandType.None; break;
             }
             filter.DeadbandValue = subscriptionDef.deadband;
-            
+
             // create an empty subscription
             OpcSubscription sub = _client.SubscribeNodes();
 
@@ -141,7 +135,7 @@ namespace OPC
                 nodeparts = node.Split(":");
                 ns = int.Parse(nodeparts[0]);
                 path = nodeparts[1];
-                thisItem = new OpcMonitoredItem(new OpcNodeId(path, ns),OpcAttribute.Value);
+                thisItem = new OpcMonitoredItem(new OpcNodeId(path, ns), OpcAttribute.Value);
                 thisItem.DataChangeReceived += DataChangeReceived;
                 thisItem.Tag = Guid.Parse(nodeparts[2]);
                 thisItem.Filter = filter;
@@ -151,7 +145,7 @@ namespace OPC
             //set the interval (milliseconds, 0 = whenever the value changes)
             sub.PublishingInterval = subscriptionDef.interval;
             sub.PublishingIsEnabled = true;
-            
+
             // make the server aware of the changes to the subscription
             sub.ApplyChanges();
 
@@ -169,11 +163,10 @@ namespace OPC
             return sub;
         }
 
-
         protected void DataChangeReceived(object sender, OpcDataChangeReceivedEventArgs e)
         {
             OpcMonitoredItem item = e.MonitoredItem;
-          
+
             DataChange?.Invoke(item);
         }
 
@@ -183,6 +176,4 @@ namespace OPC
             GC.SuppressFinalize(this);
         }
     }
-
-  
 }

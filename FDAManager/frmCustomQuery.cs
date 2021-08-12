@@ -1,15 +1,10 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
 using System.Data;
 using System.Drawing;
-using System.Drawing.Text;
 using System.IO;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
-using System.Windows.Forms.VisualStyles;
 using uPLibrary.Networking.M2Mqtt;
 
 namespace FDAManager
@@ -17,7 +12,9 @@ namespace FDAManager
     public partial class frmCustomQuery : Form
     {
         private MqttClient _mqtt;
+
         private delegate void DataReceivedHandler(byte[] data);
+
         private string _queryID;
 
         public frmCustomQuery(MqttClient mqtt)
@@ -25,7 +22,6 @@ namespace FDAManager
             InitializeComponent();
             _mqtt = mqtt;
             _mqtt.MqttMsgPublishReceived += _mqtt_MqttMsgPublishReceived;
-        
         }
 
         private void btnExecute_Click(object sender, EventArgs e)
@@ -33,8 +29,7 @@ namespace FDAManager
             string UCaseQuery = textBox1.Text.ToUpper();
             if (!UCaseQuery.StartsWith("SELECT") || UCaseQuery.Contains("INSERT") || UCaseQuery.Contains("UPDATE") || UCaseQuery.Contains("DELETE") || UCaseQuery.Contains("DROP") || UCaseQuery.Contains("CREATE") || UCaseQuery.Contains("ALTER"))
             {
-
-                MessageBox.Show("Only SELECT queries are permitted, please enter a query that starts with SELECT and does not contain the words INSERT, UPDATE, DELETE, CREATE, DROP, or ALTER","Restricted query");
+                MessageBox.Show("Only SELECT queries are permitted, please enter a query that starts with SELECT and does not contain the words INSERT, UPDATE, DELETE, CREATE, DROP, or ALTER", "Restricted query");
                 return;
             }
 
@@ -42,7 +37,6 @@ namespace FDAManager
             _queryID = Guid.NewGuid().ToString();
             string topic = "DBQUERY/" + _queryID;
             byte[] serializedQuery = Encoding.UTF8.GetBytes(textBox1.Text);
-
 
             // subscribe to the result
             _mqtt.Subscribe(new string[] { "DBQUERYRESULT/" + _queryID }, new byte[] { 0 });
@@ -75,14 +69,13 @@ namespace FDAManager
             }
             else
             {
-
                 progressBar1.Visible = false;
                 string rawResult = Encoding.UTF8.GetString(result);
                 if (rawResult.StartsWith("Error"))
                 {
                     dataGridView1.DataSource = null;
                     lbl_rowcount.Text = "(" + dataGridView1.Rows.Count + " rows)";
-                    MessageBox.Show("SQL returned an error: " + rawResult, "Query Error", MessageBoxButtons.OK,MessageBoxIcon.Error);
+                    MessageBox.Show("SQL returned an error: " + rawResult, "Query Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     return;
                 }
 
@@ -100,11 +93,8 @@ namespace FDAManager
                     dataGridView1.DataSource = null;
                     lbl_rowcount.Text = "(" + dataGridView1.Rows.Count + " rows)";
                 }
-                
             }
-
         }
-
 
         private void WriteDataTableToCSV(DataTable table)
         {
@@ -150,14 +140,12 @@ namespace FDAManager
             }
             if (saveFileDialog1.ShowDialog() == DialogResult.OK)
             {
-                
                 filename = saveFileDialog1.FileName;
 
                 DataTable tbl = (DataTable)dataGridView1.DataSource;
                 string CSV = DataTableToCSV(tbl);
-                File.WriteAllText(filename,CSV);
+                File.WriteAllText(filename, CSV);
             }
-
         }
 
         private void dataGridView1_DataSourceChanged(object sender, EventArgs e)
@@ -172,7 +160,5 @@ namespace FDAManager
                 btnExport.BackColor = SystemColors.ControlDark;
             }
         }
-
-    
     }
 }

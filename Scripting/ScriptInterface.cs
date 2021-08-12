@@ -1,13 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Text;
 
 namespace Scripting
 {
     public class ScriptInterface
     {
-        Dictionary<string, ScriptableObject> _scriptables = new();
-       
+        private Dictionary<string, ScriptableObject> _scriptables = new();
+
         public dynamic GetTag(string ID)
         {
             return Get(ID);
@@ -28,13 +27,13 @@ namespace Scripting
             else
                 throw new Exception("The requested object '" + ID + "' was not found");
         }
-        
+
         public void AddObject(ScriptableObject obj)
         {
             if (!_scriptables.ContainsKey(obj.ID))
                 _scriptables.Add(obj.ID, obj);
         }
-  
+
         public void AddObjects(IEnumerable<ScriptableObject> objs)
         {
             foreach (ScriptableObject obj in objs)
@@ -43,9 +42,5 @@ namespace Scripting
                     _scriptables.Add(obj.ID, obj);
             }
         }
-
-       
     }
-
-    
 }

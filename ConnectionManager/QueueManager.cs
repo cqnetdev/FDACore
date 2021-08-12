@@ -1,10 +1,6 @@
-﻿using System;
+﻿using Common;
+using System;
 using System.Collections.Generic;
-using System.Linq;
-using Common;
-using System.Text;
-using System.Threading.Tasks;
-using System.Threading;
 
 namespace FDA
 {
@@ -14,39 +10,41 @@ namespace FDA
         {
             private readonly int _queueNumber;
             private readonly int _queueSize;
-            
 
             public int QueueNumber { get => _queueNumber; }
             public int QueueSize { get => _queueSize; }
-  
 
             public QueueEventArgs(int priority, int size)
             {
                 _queueNumber = priority;
                 _queueSize = size;
-        
             }
         }
 
         private readonly int _priorityCount;
         public int PriorityCount { get => _priorityCount; }
 
-        private readonly List<Dictionary<Guid,RequestGroup>> _queuedGroups; 
+        private readonly List<Dictionary<Guid, RequestGroup>> _queuedGroups;
 
         private readonly dynamic _owner;
         private readonly List<Queue<RequestGroup>> _queues;
+
         //private List<CircularBuffer<RequestGroup>> _recentDequeues;
         private RequestGroup superPriorityGroup;
+
         //private int _totalCount;
 
         public int TotalQueueCount { get => GetTotalCount(); }//_totalCount;}
+
         public delegate void QueueActivatedEventHandler(object sender, QueueCountEventArgs e);
+
         public event QueueActivatedEventHandler QueueActivated;
 
         public delegate void QueueEmptyHandler(object sender, QueueCountEventArgs e);
+
         public event QueueEmptyHandler QueueEmpty;
 
-        public QueueManager(dynamic caller,int priorityCount)
+        public QueueManager(dynamic caller, int priorityCount)
         {
             _owner = caller;
             _queues = new List<Queue<RequestGroup>>();
@@ -55,7 +53,7 @@ namespace FDA
             //_queueCountHistory = new List<LinkedList<QueueHistoryPoint>>();
             _priorityCount = priorityCount;
             superPriorityGroup = null;
-            
+
             Queue<RequestGroup> temp;
             int i;
             for (i = 0; i < PriorityCount; i++)
@@ -64,13 +62,12 @@ namespace FDA
                 _queues.Add(temp);
                 //_recentDequeues.Add(new CircularBuffer<RequestGroup>(5));
                 _queuedGroups.Add(new Dictionary<Guid, RequestGroup>());
-               // _queueCountHistory.Add(new LinkedList<QueueHistoryPoint>());
+                // _queueCountHistory.Add(new LinkedList<QueueHistoryPoint>());
 
                 // disable queue history collection
                 //CollectHistoryPoint(i);
             }
 
-            
             // disable queue history collection
             //_historyCleanupTmr = new Timer(HistoryTimerTick, null, _historyCleanupRate*1000,Timeout.Infinite);
 
@@ -101,7 +98,6 @@ namespace FDA
                             }
                         } while (_queueCountHistory[Qn].Count > 0 && age.TotalMinutes > _historyLength);
 
-
                         // if the newest (Last) data point is older than the minimum collection time, collect a data point
                         newestDataPoint = _queueCountHistory[Qn].Last.Value;
                         age = currentTime.Subtract(newestDataPoint.Timestamp);
@@ -128,37 +124,36 @@ namespace FDA
         */
 
         /*
-        private void CollectHistoryPoint(int Qn) 
+        private void CollectHistoryPoint(int Qn)
         {
-
             _queueCountHistory[Qn].AddLast(new QueueHistoryPoint(Globals.FDANow(), _queues[Qn].Count));
         }*/
 
-            /*
-        public QueueHistoryPoint[] GetHistory(int priority)
+        /*
+    public QueueHistoryPoint[] GetHistory(int priority)
+    {
+        return _queueCountHistory[priority].ToArray();
+    }
+    */
+
+        /*
+    public struct QueueHistoryPoint
+    {
+        public readonly DateTime Timestamp;
+        public readonly int Count;
+
+        public QueueHistoryPoint(DateTime timestamp,int count)
         {
-            return _queueCountHistory[priority].ToArray();
+            Timestamp = timestamp;
+            Count = count;
         }
-        */
 
-            /*
-        public struct QueueHistoryPoint
+        public string GetString()
         {
-            public readonly DateTime Timestamp;
-            public readonly int Count;
-
-            public QueueHistoryPoint(DateTime timestamp,int count)
-            {
-                Timestamp = timestamp;
-                Count = count;
-            }
-
-            public string GetString()
-            {
-                return Timestamp.Ticks + ":" + Count;
-            }
+            return Timestamp.Ticks + ":" + Count;
         }
-        */
+    }
+    */
 
         /*
         public TimeSpan GetAverageQueueTime(int priority)
@@ -168,7 +163,7 @@ namespace FDA
                 return TimeSpan.Zero;
 
             List<TimeSpan> recentQueueTimes = new List<TimeSpan>();
-           
+
             if (_recentDequeues[priority].Count == 0)
                 return TimeSpan.Zero;
 
@@ -195,9 +190,9 @@ namespace FDA
             return TimeSpan.FromTicks(avgQueueTime.Ticks * _queues[priority].Count);
         }
         */
+
         public UInt16[] GetQueueCounts()
         {
-
             UInt16[] counts = new UInt16[_queues.Count];
 
             for (int i = 0; i < _queues.Count; i++)
@@ -213,10 +208,10 @@ namespace FDA
             else
                 return 0;
         }
-        
+
         // queue the supplied request group (the group has a priority property that will determine which queue it goes into
         // if superPriority=true, this group will be the next one processed, regardless of priority
-        public bool QueueTransactionGroup(RequestGroup requestGroup,bool superPriority=false)
+        public bool QueueTransactionGroup(RequestGroup requestGroup, bool superPriority = false)
         {
             int priority;
             try
@@ -243,7 +238,6 @@ namespace FDA
                         changeFromZero = (_queues[priority].Count == 0);
                         if (!superPriority)
                         {
-
                             _queues[priority].Enqueue(requestGroup);
 
                             _queuedGroups[priority].Add(requestGroup.ID, requestGroup);
@@ -261,7 +255,6 @@ namespace FDA
                             }
                         }
                     }
-                       
 
                     //Globals.SystemManager.LogApplicationEvent(this, _owner.Description, "Queued request group: " + requestGroup.ID + " at priority " + priority);
                     QueueActivated?.Invoke(this, new QueueCountEventArgs(priority, changeFromZero));
@@ -284,14 +277,13 @@ namespace FDA
                         return true;
                     }
                 }
-              //  }
+                //  }
             }
             catch (Exception ex)
             {
                 Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Error occurred while queuing group " + requestGroup.ID + ", in connection " + _owner.ConnectionID);
                 return false;
             }
- 
         }
 
         private void UpdateCountProperty(int priority)
@@ -304,10 +296,10 @@ namespace FDA
                 case 3: _owner.Priority3Count = _queues[3].Count; break;
             }
         }
-      
+
         public RequestGroup GetNextRequestGroup()
         {
-            RequestGroup selectedRequestGroup=null;
+            RequestGroup selectedRequestGroup = null;
 
             // first, check if there is any group in the superPriority slot
             // if there is, that's the next group to be processed, return it and clear the superpriority slot
@@ -319,7 +311,7 @@ namespace FDA
             }
 
             // no SuperPriority group, so find the highest priority queue that is not empty, and dequeue the first DataRequestGroup from it
-            for (int i=0;i<_queues.Count;i++)
+            for (int i = 0; i < _queues.Count; i++)
             {
                 if (_queues[i].Count > 0)
                 {
@@ -327,7 +319,7 @@ namespace FDA
                     {
                         selectedRequestGroup = _queues[i].Dequeue();
                     }
-                    _queuedGroups[i].Remove(selectedRequestGroup.ID);                       
+                    _queuedGroups[i].Remove(selectedRequestGroup.ID);
 
                     if (_queues[i].Count <= 0)
                     {
@@ -336,8 +328,8 @@ namespace FDA
                             _queues[i].Clear();
                         }
                         QueueEmpty?.Invoke(this, new QueueCountEventArgs(i, false));
-                    }                           
-                    
+                    }
+
                     //_recentDequeues[i].AddItem(selectedRequestGroup);
                     //_totalCount--;
                     //CollectHistoryPoint(i);
@@ -350,7 +342,6 @@ namespace FDA
 
         public void ClearQueues()
         {
-
             foreach (Queue<RequestGroup> queue in _queues)
             {
                 lock (queue)
@@ -363,7 +354,7 @@ namespace FDA
         private int GetTotalCount()
         {
             int count = 0;
-            foreach(Queue<RequestGroup> queue in _queues)
+            foreach (Queue<RequestGroup> queue in _queues)
             {
                 count += queue.Count;
             }
@@ -379,18 +370,13 @@ namespace FDA
             public int QueueNumber;
             public bool ChangeFromZero;
             public DateTime Timestamp;
-  
 
-            public QueueCountEventArgs(int queueNumber,bool changefromZeroCount)
+            public QueueCountEventArgs(int queueNumber, bool changefromZeroCount)
             {
                 Timestamp = Globals.FDANow();
                 QueueNumber = queueNumber;
                 ChangeFromZero = changefromZeroCount;
-
             }
         }
-
-        
     }
-
 }

@@ -1,10 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace Support
 {
-
     public static class IntHelpers
     {
         public static Byte GetHighNibble(Byte value)
@@ -61,7 +58,7 @@ namespace Support
             if (data.Length == 4)
                 return new byte[] { data[1], data[0], data[3], data[2] }; // A,B,C,D -> B,A,D,C
 
-            // invalid data type length (can only swap 2 or 4 bytes) 
+            // invalid data type length (can only swap 2 or 4 bytes)
             return null;
         }
 

@@ -5,9 +5,12 @@ namespace Common
 {
     public class DataRequest
     {
-        public enum RequestStatus { Idle, Queued, Pending, Success, Error, PartialSuccess};
-        public enum RequestType { Read, Write, ReadbackAfterWrite,Backfill,PreWriteRead,AlarmEventPointers,HourHistoryPtr,Alarms,Events};
+        public enum RequestStatus { Idle, Queued, Pending, Success, Error, PartialSuccess };
+
+        public enum RequestType { Read, Write, ReadbackAfterWrite, Backfill, PreWriteRead, AlarmEventPointers, HourHistoryPtr, Alarms, Events };
+
         public enum WriteMode { Insert, Update };
+
         private DateTime _requestTimestamp;
         private DateTime _queuedTimestamp;
         private DateTime _ResponseTimestamp;
@@ -46,13 +49,13 @@ namespace Common
         public RequestStatus Status { get => _status; }
         public string ErrorMessage { get => _errorMessage; set => _errorMessage = value; }
         public List<Tag> TagList { get; set; }
-        public DataTypeBase ReturnDataType { get => _returnDataType; set => _returnDataType = value; }   
+        public DataTypeBase ReturnDataType { get => _returnDataType; set => _returnDataType = value; }
         public string DataTypeName { get { if (_returnDataType != null) return _returnDataType.Name; else return string.Empty; } }
         public int ExpectedResponseSize { get => _expectedResponseSize; set => _expectedResponseSize = value; }
         public int ActualResponseSize { get { if (_responseBytes != null) return _responseBytes.Length; else return 0; } }
         public string Protocol { get => _protocol; set => _protocol = value; }
         public object ProtocolSpecificParams { get => _protocolSpecificParams; set => _protocolSpecificParams = value; }
-        
+
         public string Destination;
         public DataRequest ErrorCorrectionRequest { get; set; }
         public bool ErrorCorrectionAttempted = false;
@@ -79,7 +82,7 @@ namespace Common
         public DateTime BackfillEndTime = DateTime.MinValue;
 
         public Globals.RequesterType RequesterType { get; set; }
-        public Guid RequesterID { get; set;}
+        public Guid RequesterID { get; set; }
 
         //public delegate void StatusChangeHandler(object sender, EventArgs e);
         //public event StatusChangeHandler StatusChange;
@@ -93,15 +96,11 @@ namespace Common
             MessageType = RequestType.Read;
         }
 
-
-    
         public void SetStatus(RequestStatus status)
         {
             _status = status;
-            // raise an event to notify anyone monitoring that the status of this request has changed               
+            // raise an event to notify anyone monitoring that the status of this request has changed
             //StatusChange?.Invoke(this, new EventArgs());
         }
-
-
     }
 }

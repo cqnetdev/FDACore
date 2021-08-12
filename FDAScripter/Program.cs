@@ -1,26 +1,21 @@
+using Microsoft.CodeAnalysis;
+using Scripting;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using System.Windows.Forms;
-using System.Data.SqlClient;
-using System.Data.Common;
-using System.Data;
-using Microsoft.CodeAnalysis.CSharp.Scripting;
-using Microsoft.CodeAnalysis.Scripting;
-using Scripting;
 using System.Collections.Immutable;
-using Microsoft.CodeAnalysis;
+using System.Data;
+using System.Data.SqlClient;
+using System.Windows.Forms;
 
 namespace FDAScripter
 {
-    static class Program
+    internal static class Program
     {
         /// <summary>
         ///  The main entry point for the application.
         /// </summary>
 
-        private enum DB {SQL,PG };
+        private enum DB { SQL, PG };
 
         private static FrmScriptEditor scriptEditor;
         private static frmLogin loginForm;
@@ -30,9 +25,8 @@ namespace FDAScripter
 
         internal static Dictionary<string, RecentConn> RecentConnections;
 
-
         [STAThread]
-        static void Main()
+        private static void Main()
         {
             Application.SetHighDpiMode(HighDpiMode.SystemAware);
             Application.EnableVisualStyles();
@@ -55,7 +49,7 @@ namespace FDAScripter
 
             if (!recentsString.Contains(";")) return;
 
-            string[] recentsArray = recentsString.Split(";",StringSplitOptions.RemoveEmptyEntries);
+            string[] recentsArray = recentsString.Split(";", StringSplitOptions.RemoveEmptyEntries);
             foreach (string recent in recentsArray)
             {
                 RecentConn conn = new(recent);
@@ -63,8 +57,7 @@ namespace FDAScripter
             }
         }
 
-
-        internal static void ConnectSQL(string instance,string dbname,string user,string password,bool savepwd)
+        internal static void ConnectSQL(string instance, string dbname, string user, string password, bool savepwd)
         {
             string connString = "Server=" + instance + "; Database = " + dbname + "; user = " + user + "; password = " + password + ";";
 
@@ -79,11 +72,10 @@ namespace FDAScripter
             else
                 AddToRecent(instance, dbname, user);
 
-
             scriptEditor = new FrmScriptEditor();
             scriptEditor.FormClosed += ScriptEditor_FormClosed;
             scriptEditor.Show();
-            loginForm.Hide();          
+            loginForm.Hide();
         }
 
         private static void ScriptEditor_FormClosed(object sender, FormClosedEventArgs e)
@@ -105,7 +97,7 @@ namespace FDAScripter
             Application.Exit();
         }
 
-        private static void AddToRecent(string instance, string dbname, string user, string password="")
+        private static void AddToRecent(string instance, string dbname, string user, string password = "")
         {
             if (!RecentConnections.ContainsKey(instance))
             {
@@ -146,7 +138,6 @@ namespace FDAScripter
 
         internal static ImmutableArray<Diagnostic> CheckScript(string code)
         {
-            
             ImmutableArray<Diagnostic> result = Scripter.CheckScript(code);
 
             return result;
@@ -156,7 +147,6 @@ namespace FDAScripter
         {
             return unsafeQuery;
         }
-
 
         internal class RecentConn
         {
@@ -175,6 +165,4 @@ namespace FDAScripter
             }
         }
     }
-
-   
 }

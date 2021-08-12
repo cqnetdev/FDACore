@@ -1,10 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-
 
 namespace Support
 {
@@ -20,11 +17,13 @@ namespace Support
             lock (_sb) _sb.Append(value);
             ScheduleFlush();
         }
+
         public static void Write(string format, params object[] args)
         {
             lock (_sb) _sb.AppendFormat(format, args);
             ScheduleFlush();
         }
+
         public static void WriteLine(string value)
             => Write(value + Environment.NewLine);
 

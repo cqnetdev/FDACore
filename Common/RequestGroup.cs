@@ -1,14 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Common
 {
     public class RequestGroup : ICloneable
     {
-        public enum ValidationState {Valid,Invalid,Unvalidated};
+        public enum ValidationState { Valid, Invalid, Unvalidated };
+
         public ValidationState Validation;
 
         public Guid ID;
@@ -29,7 +27,7 @@ namespace Common
         public Guid RequesterID;
         public string Protocol;
         public Dictionary<Guid, Double> writeLookup;
-        public int RequeueCount = 0; 
+        public int RequeueCount = 0;
         public bool containsFailedReq = false;
 
         public DateTime BackfillStartTime = DateTime.MinValue;
@@ -59,12 +57,7 @@ namespace Common
                 Validation = this.Validation,
             };
 
-          
-
-          
-
             return groupCopy;
         }
-
     }
 }

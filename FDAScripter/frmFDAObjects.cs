@@ -1,11 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
 using System.Data;
-using System.Drawing;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace FDAScripter
@@ -35,7 +29,6 @@ namespace FDAScripter
             }
         }
 
-        
         private void DGV_FDAObjects_CellMouseDown(object sender, DataGridViewCellMouseEventArgs e)
         {
             if (e.ColumnIndex != -1 && e.RowIndex != -1 && e.Button == System.Windows.Forms.MouseButtons.Right)
@@ -49,7 +42,6 @@ namespace FDAScripter
                 }
                 // open context menu
                 ctxMenu.Show(Cursor.Position);
-
             }
         }
 
@@ -66,7 +58,6 @@ namespace FDAScripter
             {
                 objectType = "tag";
                 IDColName = "DPDUID";
-               
             }
             else if (rbConn.Checked)
             {

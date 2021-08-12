@@ -1,8 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Common
 {
@@ -13,8 +9,7 @@ namespace Common
         public object OldItem { get; }
         public string ChangeType { get; }
 
-
-        public ConfigEventArgs(string changetype, string table, object itemref,object olditem=null)
+        public ConfigEventArgs(string changetype, string table, object itemref, object olditem = null)
         {
             ChangeType = changetype;
             TableName = table;

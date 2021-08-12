@@ -1,12 +1,9 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace Support
 {
     public static class MiscHelpers
     {
-
         public static int AddCircular(int value, int offset, int min, int max)
         {
             int newValue = value + offset;

@@ -1,33 +1,27 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using Common;
+using System;
 using System.Data;
-using System.Text;
-using TableDependency.SqlClient;
-using TableDependency.SqlClient.Base;
-using TableDependency.SqlClient.Base.Enums;
-using Common;
 using System.Data.SqlClient;
-using System.Diagnostics;
 using System.Threading;
+using TableDependency.SqlClient;
+using TableDependency.SqlClient.Base.Enums;
 
 namespace FDA
 {
     public class DBManagerSQL : DBManager, IDisposable
     {
-        SqlTableDependency<FDARequestGroupScheduler> _schedMonitor;
-        SqlTableDependency<FDARequestGroupDemand> _demandMonitor;
-        SqlTableDependency<FDADataBlockRequestGroup> _requestGroupDefMonitor;
-        SqlTableDependency<FDADataPointDefinitionStructure> _dataPointDefMonitor;
-        SqlTableDependency<FDASourceConnection> _connectionDefMonitor;
-        SqlTableDependency<FDADevice> _deviceDefMonitor;
-        SqlTableDependency<FDATask> _taskDefMonitor;
-        SqlTableDependency<UserScriptDefinition> _scriptMonitor;
-        SqlTableDependency<DataSubscription> _subscriptionMonitor;
-      
+        private SqlTableDependency<FDARequestGroupScheduler> _schedMonitor;
+        private SqlTableDependency<FDARequestGroupDemand> _demandMonitor;
+        private SqlTableDependency<FDADataBlockRequestGroup> _requestGroupDefMonitor;
+        private SqlTableDependency<FDADataPointDefinitionStructure> _dataPointDefMonitor;
+        private SqlTableDependency<FDASourceConnection> _connectionDefMonitor;
+        private SqlTableDependency<FDADevice> _deviceDefMonitor;
+        private SqlTableDependency<FDATask> _taskDefMonitor;
+        private SqlTableDependency<UserScriptDefinition> _scriptMonitor;
+        private SqlTableDependency<DataSubscription> _subscriptionMonitor;
 
         public DBManagerSQL(string connString) : base(connString)
         {
-
         }
 
         public override void Initialize()
@@ -43,7 +37,7 @@ namespace FDA
                 _requestGroupDefMonitor = new SqlTableDependency<FDADataBlockRequestGroup>(ConnectionString, Globals.SystemManager.GetTableName("FDADataBlockRequestGroup"));
                 _dataPointDefMonitor = new SqlTableDependency<FDADataPointDefinitionStructure>(ConnectionString, Globals.SystemManager.GetTableName("DataPointDefinitionStructures"));
                 _connectionDefMonitor = new SqlTableDependency<FDASourceConnection>(ConnectionString, Globals.SystemManager.GetTableName("FDASourceConnections"));
-                
+
                 if (_devicesTableExists)
                     _deviceDefMonitor = new SqlTableDependency<FDADevice>(ConnectionString, Globals.SystemManager.GetTableName("FDADevices"));
 
@@ -74,7 +68,8 @@ namespace FDA
 
                 //_deviceDefMonitor.TraceLevel = System.Diagnostics.TraceLevel.Verbose;
                 //_deviceDefMonitor.TraceListener = new TextWriterTraceListener(Console.Out);
-            } catch (Exception ex)
+            }
+            catch (Exception ex)
             {
                 Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Error occurred while initializing monitoring of table " +
                        Globals.SystemManager.GetTableName("FDARequestGroupScheduler") + ", or " +
@@ -91,7 +86,6 @@ namespace FDA
                     _schedMonitor.Stop();
                     _schedMonitor.Dispose();
                     _schedMonitor = null;
-
                 }
 
                 if (_demandMonitor != null)
@@ -101,13 +95,11 @@ namespace FDA
                     _demandMonitor = null;
                 }
 
-
                 if (_requestGroupDefMonitor != null)
                 {
                     _requestGroupDefMonitor.Stop();
                     _requestGroupDefMonitor.Dispose();
                     _requestGroupDefMonitor = null;
-
                 }
 
                 if (_dataPointDefMonitor != null)
@@ -117,7 +109,6 @@ namespace FDA
                     _dataPointDefMonitor.Dispose();
                     _dataPointDefMonitor = null;
                 }
-
 
                 if (_connectionDefMonitor != null)
                 {
@@ -157,7 +148,6 @@ namespace FDA
                 return;
             }
 
-
             // subscribe to events, so we'll be notified when something changes in the tables, or if something changes in the status of the monitor objects
             _demandMonitor.OnChanged += DemandMonitor_OnChanged;
             _schedMonitor.OnChanged += SchedMonitor_OnChanged;
@@ -167,7 +157,7 @@ namespace FDA
             if (_deviceDefMonitor != null)
                 _deviceDefMonitor.OnChanged += DeviceDefMonitor_OnChanged;
             if (_taskDefMonitor != null)
-                _taskDefMonitor.OnChanged += TaskDefMonitor_OnChanged; 
+                _taskDefMonitor.OnChanged += TaskDefMonitor_OnChanged;
             if (_scriptMonitor != null)
                 _scriptMonitor.OnChanged += ScriptMonitor_OnChanged;
             if (_subscriptionMonitor != null)
@@ -191,15 +181,9 @@ namespace FDA
             if (_deviceDefMonitor != null) _deviceDefMonitor.OnError += DeviceDefMonitor_OnError;
             if (_taskDefMonitor != null) _taskDefMonitor.OnError += TaskDefMonitor_OnError;
             if (_scriptMonitor != null) _scriptMonitor.OnError += ScriptMonitor_OnError;
-            if (_subscriptionMonitor != null) _subscriptionMonitor.OnError += SubscriptionMonitor_OnError; 
+            if (_subscriptionMonitor != null) _subscriptionMonitor.OnError += SubscriptionMonitor_OnError;
             StartChangeMonitoring();
         }
-
-     
-
-      
-
-    
 
         protected new bool PreReqCheck()
         {
@@ -222,7 +206,7 @@ namespace FDA
                 bool enabled = (bool)row["is_broker_enabled"];
                 if (!enabled) Globals.SystemManager.LogApplicationEvent(this, "", "Prequisite fail: Service broker not enabled on database '" + dbname + "'");
 
-                brokerEnabled = brokerEnabled && (bool)row["is_broker_enabled"];               
+                brokerEnabled = brokerEnabled && (bool)row["is_broker_enabled"];
             }
             result.Clear();
 
@@ -311,7 +295,6 @@ namespace FDA
                         Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "ExecuteNonQuery() Failed to execute query after " + (maxRetries + 1) + " attempts. Query = " + sql);
                         return -99;
                     }
-
                 }
 
                 conn.Close();
@@ -382,7 +365,6 @@ namespace FDA
                     return null;
                 }
 
-
                 using (SqlCommand sqlCommand = conn.CreateCommand())
                 {
                     sqlCommand.CommandText = sql;
@@ -406,9 +388,7 @@ namespace FDA
                             return null;
                         }
                     }
-
                 }
-
             }
         }
 
@@ -438,10 +418,11 @@ namespace FDA
             }
         }
 
-        private void HandleTableMonitorError(object sender,TableDependency.SqlClient.Base.EventArgs.ErrorEventArgs e)
+        private void HandleTableMonitorError(object sender, TableDependency.SqlClient.Base.EventArgs.ErrorEventArgs e)
         {
-            Globals.SystemManager.LogApplicationError(Globals.FDANow(),e.Error, "Error reported by SQLTableDependency : " + e.Message);
+            Globals.SystemManager.LogApplicationError(Globals.FDANow(), e.Error, "Error reported by SQLTableDependency : " + e.Message);
         }
+
         private void ScriptMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<UserScriptDefinition> e)
         {
             string changeType = e.ChangeType.ToString().ToUpper();
@@ -484,7 +465,6 @@ namespace FDA
             base.DemandMonitorNotification(changeType, e.Entity);
         }
 
-
         private void ConnectionDefMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<FDASourceConnection> e)
         {
             string changeType = e.ChangeType.ToString().ToUpper();
@@ -521,7 +501,6 @@ namespace FDA
             HandleTableMonitorError("Subscriptions", e);
         }
 
-
         private void DataPointDefMonitor_OnError(object sender, TableDependency.SqlClient.Base.EventArgs.ErrorEventArgs e)
         {
             if (_dataPointDefMonitor != null)
@@ -546,8 +525,6 @@ namespace FDA
             HandleTableMonitorError("ScriptMonitor", e);
         }
 
-      
-
         private void RequestGroupDefMonitor_OnError(object sender, TableDependency.SqlClient.Base.EventArgs.ErrorEventArgs e)
         {
             if (_requestGroupDefMonitor != null)
@@ -558,9 +535,7 @@ namespace FDA
                 _requestGroupDefMonitor = null;
             }
             HandleTableMonitorError("RequestGroupDefMonitor", e);
-
         }
-
 
         private void DemandMonitor_OnError(object sender, TableDependency.SqlClient.Base.EventArgs.ErrorEventArgs e)
         {
@@ -574,7 +549,6 @@ namespace FDA
             HandleTableMonitorError("DemandMonitor", e);
         }
 
-
         private void SchedMonitor_OnError(object sender, TableDependency.SqlClient.Base.EventArgs.ErrorEventArgs e)
         {
             if (_schedMonitor != null)
@@ -586,7 +560,6 @@ namespace FDA
             }
             HandleTableMonitorError("SchedMonitor", e);
         }
-
 
         private void DeviceDefMonitor_OnError(object sender, TableDependency.SqlClient.Base.EventArgs.ErrorEventArgs e)
         {
@@ -612,7 +585,6 @@ namespace FDA
             HandleTableMonitorError("TaskMonitor", e);
         }
 
-        
         private void DemandMonitor_OnStatusChanged(object sender, TableDependency.SqlClient.Base.EventArgs.StatusChangedEventArgs e)
         {
             LogMonitorStatusChangeEvent("DemandMonitor", e);
@@ -625,16 +597,13 @@ namespace FDA
 
         private void ConnectionDefMonitor_OnStatusChanged(object sender, TableDependency.SqlClient.Base.EventArgs.StatusChangedEventArgs e)
         {
-
             LogMonitorStatusChangeEvent("ConnectionDefMonitor", e);
         }
-
 
         private void DataPointDefMonitor_OnStatusChanged(object sender, TableDependency.SqlClient.Base.EventArgs.StatusChangedEventArgs e)
         {
             LogMonitorStatusChangeEvent("DataPointDefMonitor", e);
         }
-
 
         private void RequestGroupDefMonitor_OnStatusChanged(object sender, TableDependency.SqlClient.Base.EventArgs.StatusChangedEventArgs e)
         {
@@ -646,7 +615,6 @@ namespace FDA
             LogMonitorStatusChangeEvent("UserScriptMonitor", e);
         }
 
-     
         private void SchedMonitor_OnStatusChanged(object sender, TableDependency.SqlClient.Base.EventArgs.StatusChangedEventArgs e)
         {
             LogMonitorStatusChangeEvent("ScheduleMonitor", e);
@@ -662,19 +630,15 @@ namespace FDA
             LogMonitorStatusChangeEvent("TaskMonitor", e);
         }
 
-
-
         private static void LogMonitorStatusChangeEvent(string monitorName, TableDependency.SqlClient.Base.EventArgs.StatusChangedEventArgs e)
         {
             if (e.Status != TableDependencyStatus.StopDueToError)
                 Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "SQLTableDependency", monitorName, "Status change: " + e.Status.ToString());
         }
-        
-
 
         private void TriggerCleanup()
         {
-            // get a list of triggers to be cleaned  
+            // get a list of triggers to be cleaned
             string triggerDropSQL = "";
             string triggerQuerySQL = "select TR.name as trigname,U.name as tablename from (select name, parent_obj from sysobjects where type = 'TR') TR inner join (select name, id from sysobjects where name in ('DataPointDefinitionStructures', 'FDADataBlockRequestGroup', 'FDADevices','FDARequestGroupDemand','FDARequestGroupScheduler','FDASourceConnections','FDATasks')) U on TR.parent_obj = U.id;";
             DataTable triggers = ExecuteQuery(triggerQuerySQL);
@@ -685,20 +649,17 @@ namespace FDA
             {
                 triggerName = (string)row["trigname"];
                 tableName = (string)row["tablename"];
-                Globals.SystemManager.LogApplicationEvent(this, "", "Removing old trigger '" + triggerName + "' from table '" + tableName + "'",false,true);
+                Globals.SystemManager.LogApplicationEvent(this, "", "Removing old trigger '" + triggerName + "' from table '" + tableName + "'", false, true);
                 triggerDropSQL += "drop trigger if exists [" + triggerName + "];";
 
                 ExecuteNonQuery(triggerDropSQL);
             }
         }
 
-
         #region IDisposable Support
-
 
         public override void Dispose()
         {
-
             // sql server specific disposal
             _demandMonitor?.Stop();
             _schedMonitor?.Stop();
@@ -722,13 +683,11 @@ namespace FDA
             GC.SuppressFinalize(this);
         }
 
-   
-
-        public static string GenerateConnectionString(string instance, string database,string user, string pass)
+        public static string GenerateConnectionString(string instance, string database, string user, string pass)
         {
             return "Server=" + instance + ";Database=" + database + ";user=" + user + ";password=" + pass;
-
         }
-        #endregion
+
+        #endregion IDisposable Support
     }
 }

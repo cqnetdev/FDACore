@@ -1,36 +1,29 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Data.SqlTypes;
-using System.Linq;
-using System.Net;
-using System.Text;
-using System.Threading.Tasks;
 
 // suppress warnings about properties that don't start with capital letters, these property names must match the column names in the database
 #pragma warning disable IDE1006
 
 namespace Common
 {
-
     public class DataSubscription
-    {        
+    {
         public Guid subscription_id { get; set; }
-        
+
         public Guid source_connection_ref { get; set; }
-        
+
         public string monitored_items { get; set; }
-        
+
         public string destination_table { get; set; }
-        
+
         public bool enabled { get; set; }
-        
+
         public int interval { get; set; }
-        
+
         public string deadband_type { get; set; }
-        
+
         public Double deadband { get; set; }
-        
+
         public bool report_on_timestamp_change { get; set; }
     }
 
@@ -41,6 +34,7 @@ namespace Common
         public bool DRGEnabled { get; set; }
         public string DPSType { get; set; }
         public bool CommsLogEnabled { get; set; }
+
         //public string DataPointBlockRequestListUIds { get; set; }
         public string DataPointBlockRequestListVals { get; set; }
 
@@ -71,7 +65,6 @@ namespace Common
         public int Priority { get; set; }
         public string RequestGroupList { get; set; }
         public bool CommsLogEnabled { get; set; }
-
     }
 
     public class FDARequestGroupScheduler
@@ -97,7 +90,6 @@ namespace Common
             RequestGroups = new List<RequestGroup>();
             Tasks = new List<FDATask>();
         }
-
     }
 
     public class FDADataPointDefinitionStructure : SubscriptionManager.SubscribeableObject
@@ -140,7 +132,6 @@ namespace Common
                     return true;
 
                 return (lhs.Timestamp == rhs.Timestamp);
-
             }
 
             public static bool operator !=(Datapoint lhs, Datapoint rhs)
@@ -172,8 +163,6 @@ namespace Common
             }
         }
 
-       
-
         /* Database table columns */
         public Guid DPDUID { get => _DPDUID; set { if (_DPDUID != value) { _DPDUID = value; base.ID = value.ToString(); NotifyPropertyChanged(); } } }
         public Boolean DPDSEnabled { get => _DPDSEnabled; set { if (_DPDSEnabled != value) { _DPDSEnabled = value; NotifyPropertyChanged(); } } }
@@ -204,8 +193,11 @@ namespace Common
         public String DeviceTagName { get => _deviceTagName; set => _deviceTagName = value; }
         public String DeviceTagAddress { get => _deviceTagAddress; set => _deviceTagAddress = value; }
 
-        public Datapoint LastRead { get => _lastread;
-            set {
+        public Datapoint LastRead
+        {
+            get => _lastread;
+            set
+            {
                 if (_lastread != value) { _lastread = value; NotifyPropertyChanged(nameof(LastRead), 0); }
             }
         }
@@ -241,10 +233,6 @@ namespace Common
             base.ObjectType = "Tag";
             _lastread = Datapoint.Empty;
         }
-
-        
-
-
     }
 
     public class FDASourceConnection
@@ -290,7 +278,6 @@ namespace Common
         public int ConfigType { get; set; }
     }
 
-
     public class RocDataTypes
     {
         public int POINTTYPE { get; set; }
@@ -300,7 +287,6 @@ namespace Common
         public string DescLong { get; set; }
         public string Key { get { return POINTTYPE + ":" + PARM; } }
     }
-
 
     public class RocEventFormats
     {
@@ -318,11 +304,10 @@ namespace Common
         public int load_order { get; set; }
         public string depends_on { get; set; }
         public bool enabled { get; set; }
+
         public int CompareTo(object other)
         {
             return load_order.CompareTo(((UserScriptDefinition)other).load_order);
         }
     }
-
-
 }

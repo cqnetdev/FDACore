@@ -1,9 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using Npgsql;
+using System;
 using System.Data;
-using System.Text;
 using System.Threading;
-using Npgsql;
 
 namespace Common
 {
@@ -30,8 +28,7 @@ namespace Common
             StartListening();
         }
 
-
-        protected override DataTable ExecuteQuery(string sql,string dbConnString)
+        protected override DataTable ExecuteQuery(string sql, string dbConnString)
         {
             int retries = 0;
             int maxRetries = 3;
@@ -75,7 +72,7 @@ namespace Common
             return result;
         }
 
-        protected override int ExecuteNonQuery(string sql,string dbConnString)
+        protected override int ExecuteNonQuery(string sql, string dbConnString)
         {
             int rowsaffected = -99;
             int retries = 0;
@@ -116,7 +113,6 @@ namespace Common
                         Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "ExecuteNonQuery() Failed to execute query after " + (maxRetries + 1) + " attempts. Query = " + sql);
                         return -99;
                     }
-
                 }
 
                 conn.Close();
@@ -125,7 +121,7 @@ namespace Common
             return rowsaffected;
         }
 
-        protected override object ExecuteScalar(string sql,string dbConnString)
+        protected override object ExecuteScalar(string sql, string dbConnString)
         {
             int maxRetries = 3;
             int retries = 0;
@@ -142,7 +138,6 @@ namespace Common
                     Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "ExecuteScalar() Failed to connect to database");
                     return null;
                 }
-
 
                 using (NpgsqlCommand sqlCommand = conn.CreateCommand())
                 {
@@ -167,9 +162,7 @@ namespace Common
                             return null;
                         }
                     }
-
                 }
-
             }
         }
 
@@ -186,9 +179,7 @@ namespace Common
         private void RocEventsFormatsMonitor_Notification(object sender, PostgreSQLListener<RocEventFormats>.PostgreSQLNotification notifyEvent)
         {
             ROCEventsNotification(notifyEvent.Notification.operation, notifyEvent.Notification.row);
-
         }
-
 
         protected override void StartListening()
         {
@@ -197,16 +188,13 @@ namespace Common
             //_RocEventsFormatsMonitor?.StartListening();
         }
 
-        protected override string GetSystemDBConnectionString(string instance,string dbname,string user,string pass)
-        {           
+        protected override string GetSystemDBConnectionString(string instance, string dbname, string user, string pass)
+        {
             return "Server=" + instance + ";Port=5432;User Id=" + user + ";Password=" + pass + ";Database=" + dbname + ";Keepalive=1;";
         }
 
-   
-
-        protected override string GetAppDBConnectionString(string instance,string db,string login,string pass)
+        protected override string GetAppDBConnectionString(string instance, string db, string login, string pass)
         {
-   
             return "Server=" + instance + ";port=5432; Database = " + db + ";User Id = " + login + "; password = " + pass + ";Keepalive=1;";
         }
 

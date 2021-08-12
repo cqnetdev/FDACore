@@ -1,20 +1,19 @@
-﻿using System;
+﻿using Microsoft.Extensions.Logging;
+using System;
 using System.Collections.Generic;
-using System.Text;
-using System.Net.Sockets;
 using System.ComponentModel;
-using System.Threading;
 using System.Diagnostics;
-using Microsoft.Extensions.Logging;
-using System.Text.Json;
+using System.Net.Sockets;
+using System.Text;
+using System.Threading;
 
 namespace ControllerService
 {
-    class BasicServicesClient : IDisposable
+    internal class BasicServicesClient : IDisposable
     {
         private readonly ILogger<Worker> _logger;
         private TcpClient _FDA;
-        NetworkStream FDAstream;
+        private NetworkStream FDAstream;
 
         private readonly int _port;
         private readonly Queue<string> _sendQueue;
@@ -25,11 +24,11 @@ namespace ControllerService
         public string FDAUpTime = "";
         public Common.FDAStatus Status = null;
 
-        public bool FDAConnected { get { if (_FDA == null) return false; else return _FDA.Connected;} }
+        public bool FDAConnected { get { if (_FDA == null) return false; else return _FDA.Connected; } }
 
         private readonly BackgroundWorker _bgWorker;
 
-        public BasicServicesClient(int port,ILogger<Worker> logger)
+        public BasicServicesClient(int port, ILogger<Worker> logger)
         {
             _logger = logger;
             _FDA = new TcpClient();
@@ -61,11 +60,9 @@ namespace ControllerService
 
         private void BGWorker_DoWork(object sender, DoWorkEventArgs e)
         {
-
             Stopwatch stopwatch = new();
             string message;
             string responseStr;
-
 
             stopwatch.Start();
             while (!e.Cancel)
@@ -73,10 +70,10 @@ namespace ControllerService
                 // if not connected, try to connect until successful
                 if (!_FDA.Connected)
                 {
-                    Status = new Common.FDAStatus(); // default FDA status (runtime = 0:00:00, all other fields null)                  
+                    Status = new Common.FDAStatus(); // default FDA status (runtime = 0:00:00, all other fields null)
                     Connect(e);
                 }
-              
+
                 // we're connected now
 
                 // send any pending requests
@@ -97,11 +94,10 @@ namespace ControllerService
                     else
                         Status = new Common.FDAStatus(); // no response from FDA, set the current status to the default status
 
-
                     stopwatch.Reset();
                     stopwatch.Start();
                 }
-                
+
                 Thread.Sleep(100);
             }
         }
@@ -135,8 +131,8 @@ namespace ControllerService
                 }
                 else
                     return ""; // no response
-
-            } catch (Exception ex)
+            }
+            catch (Exception ex)
             {
                 return "error: " + ex.Message;
             }
@@ -144,7 +140,7 @@ namespace ControllerService
             return responseStr;
         }
 
-        private static void WaitForResponse(NetworkStream stream,int limit)
+        private static void WaitForResponse(NetworkStream stream, int limit)
         {
             int wait = 0;
             while (!stream.DataAvailable && wait < limit)
@@ -185,13 +181,11 @@ namespace ControllerService
         public void Start()
         {
             _bgWorker.RunWorkerAsync();
-
         }
 
         public void Dispose()
         {
-            _bgWorker.CancelAsync();      
+            _bgWorker.CancelAsync();
         }
-
     }
 }

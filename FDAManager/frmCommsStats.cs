@@ -1,12 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Data;
 using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 using uPLibrary.Networking.M2Mqtt;
 
@@ -15,13 +13,15 @@ namespace FDAManager
     public partial class frmCommsStats : Form
     {
         private readonly MqttClient _mqtt;
+
         private delegate void DataReceivedHandler(byte[] data);
+
         private string _queryID;
         private readonly string _dbtype;
 
         private delegate void ThreadsafeUpdateText(string text);
 
-        public frmCommsStats(MqttClient mqtt,string DBType)
+        public frmCommsStats(MqttClient mqtt, string DBType)
         {
             InitializeComponent();
 
@@ -29,7 +29,6 @@ namespace FDAManager
             _mqtt = mqtt;
             _mqtt.MqttMsgPublishReceived += MqttMsgPublishReceived;
             _mqtt.Subscribe(new string[] { "FDA/DefaultCommsStatsTable" }, new byte[] { 1 });
-
         }
 
         private void CalcButton_Click(object sender, EventArgs e)
@@ -43,7 +42,7 @@ namespace FDAManager
 
             string startTimeString = calcstarttime.ToString("yyyy-MM-dd H:mm:ss.fff");
             string endTimeString = calcendtime.ToString("yyyy-MM-dd H:mm:ss.fff");
-            
+
             string topic = "DBQUERY/" + _queryID;
             string fulldescription = description.Text.Replace("%timestamp%", DateTime.Now.ToString("yyyy-MM-dd hh:mm:ss tt"));
             ComboBoxConnection conn = (ComboBoxConnection)cb_connection.SelectedItem;
@@ -78,11 +77,12 @@ namespace FDAManager
                         query += ",@saveOutput = 0";
                     }
                     break;
+
                 case "POSTGRESQL":
                     {
                         // start time, end time, return results,description
                         query = "SELECT * from calcstats('" + startTimeString + "','" + endTimeString + "',1::bit,'" + description.Text + "',";
-                        
+
                         // connection filter
                         if (cb_connection.SelectedItem != null && cb_connection.SelectedIndex > 0)
                         {
@@ -116,7 +116,7 @@ namespace FDAManager
                         break;
                     }
             }
-      
+
             byte[] serializedQuery = Encoding.UTF8.GetBytes(query);
 
             // subscribe to the result
@@ -125,7 +125,6 @@ namespace FDAManager
             // publish the query request
             _mqtt.Publish(topic, serializedQuery);
         }
-
 
         private void UpdateTableLabel(string text)
         {
@@ -144,7 +143,7 @@ namespace FDAManager
             }
 
             string[] topic = e.Topic.Split('/');
-            
+
             if (topic.Length < 2)
                 return;
 
@@ -187,15 +186,7 @@ namespace FDAManager
                 {
                     MessageBox.Show(Encoding.UTF8.GetString(result));
                 }
-
-                
-                
-
-
-
-
             }
-
         }
 
         private void Btn_export_Click(object sender, EventArgs e)
@@ -246,16 +237,12 @@ namespace FDAManager
                 filename = saveFileDialog1.FileName;
                 File.WriteAllText(filename, sb.ToString());
             }
-
-
         }
-
-     
 
         private void FrmCommsStats_Load(object sender, EventArgs e)
         {
             string displayString = DateTime.Now.AddDays(-365).ToString("yyyy-MM-dd hh:mm:ss tt");
-            startTime.Text =displayString;
+            startTime.Text = displayString;
         }
 
         private void DataGridView1_DataSourceChanged(object sender, EventArgs e)
@@ -271,30 +258,29 @@ namespace FDAManager
             }
         }
 
-
         private class ComboBoxConnection
         {
             private readonly string Description;
             public string ID;
 
-           
-            public ComboBoxConnection(string id,string description)
+            public ComboBoxConnection(string id, string description)
             {
                 Description = description;
                 ID = id;
             }
+
             public override string ToString()
             {
                 return Description;
             }
         }
-        
-        internal void SetConnectionList(Dictionary<Guid,frmMain2.ConnectionNode> connections)
+
+        internal void SetConnectionList(Dictionary<Guid, frmMain2.ConnectionNode> connections)
         {
             List<frmMain2.ConnectionNode> connList = connections.Values.ToList();
             connList.Sort();
             foreach (frmMain2.ConnectionNode item in connList)
-                cb_connection.Items.Add(new ComboBoxConnection(item.ID.ToString(),item.Description));
+                cb_connection.Items.Add(new ComboBoxConnection(item.ID.ToString(), item.Description));
         }
 
         private void BtnSetStart_Click(object sender, EventArgs e)

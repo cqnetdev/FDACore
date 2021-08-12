@@ -1,4 +1,6 @@
-﻿using System;
+﻿using Common;
+using Support;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -7,8 +9,6 @@ using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading;
-using Common;
-using Support;
 
 namespace FDA
 {
@@ -21,7 +21,7 @@ namespace FDA
         protected Dictionary<Guid, FDADevice> _deviceConfig;
         protected Dictionary<Guid, FDATask> _taskConfig;
         protected Dictionary<string, UserScriptDefinition> _scriptsConfig;
-        protected Dictionary<Guid, DataSubscription> _dataSubscriptionsConfig;  
+        protected Dictionary<Guid, DataSubscription> _dataSubscriptionsConfig;
 
         protected Queue<DataRequest> _writeQueue;
         protected BackgroundWorker _dataWriter;
@@ -38,18 +38,25 @@ namespace FDA
 #pragma warning restore IDE0052 // Remove unread private members
 
         public delegate void ConfigChangeHandler(object sender, ConfigEventArgs e);
+
         public event ConfigChangeHandler ConfigChange;
 
         public delegate void DemandRequestHandler(object sender, DemandEventArgs e);
+
         public event DemandRequestHandler DemandRequest;
 
         public delegate void ForceScheduleHandler(object sender, ForceScheduleEventArgs e);
+
         public event ForceScheduleHandler ForceScheduleExecution;
 
         protected bool _DBStatus = false;
+
         protected bool DBStatus
-        { get { return _DBStatus; }
-            set { _DBStatus = value;
+        {
+            get { return _DBStatus; }
+            set
+            {
+                _DBStatus = value;
                 if (Globals.MQTTEnabled && Globals.MQTT != null)
                 {
                     if (Globals.MQTT.IsConnected)
@@ -64,7 +71,6 @@ namespace FDA
         protected bool _tasksTableExists;
         protected bool _scriptsTableExists = false;
         protected bool _datasubscriptionsTableExists = false;
-
 
         protected Timer _keepAliveTimer;
         protected TimeSpan _DBKeepAliveRate = new(0, 0, 3);
@@ -91,7 +97,6 @@ namespace FDA
 
             //_derivedTagConfig = new Dictionary<Guid, DerivedTag>();
 
-
             _dataWriter = new BackgroundWorker();
             _dataWriter.DoWork += DataWriter_DoWork;
 
@@ -101,7 +106,7 @@ namespace FDA
 
             // load custom batch write settings (if specified)
             if (Globals.SystemManager.GetAppConfig().ContainsKey("BatchInsertMaxRecords"))
-               _ = int.TryParse(Globals.SystemManager.GetAppConfig()["BatchInsertMaxRecords"].OptionValue, out batchLimit);
+                _ = int.TryParse(Globals.SystemManager.GetAppConfig()["BatchInsertMaxRecords"].OptionValue, out batchLimit);
 
             if (Globals.SystemManager.GetAppConfig().ContainsKey("BatchInsertMaxTime"))
                 _ = int.TryParse(Globals.SystemManager.GetAppConfig()["BatchInsertMaxTime"].OptionValue, out batchTimeout);
@@ -121,7 +126,6 @@ namespace FDA
             DateTime timeOfFirstRun = new(tomorrow.Year, tomorrow.Month, tomorrow.Day, 0, 0, 0);
             TimeSpan timeFromNowToFirstRun = timeOfFirstRun.Subtract(currentDateTime);
 
-
             _logTrimTimer = new Timer(LogTrimTimerTick, null, timeFromNowToFirstRun, TimeSpan.FromDays(1));
 
             // check if device table exists
@@ -133,7 +137,6 @@ namespace FDA
             // check if scripts table exists
             _scriptsTableExists = ((int)ExecuteScalar("SELECT cast(count(1) as integer) from information_schema.tables where table_name = '" + Globals.SystemManager.GetTableName("fda_scripts") + "';") > 0);
 
-
             // check if subscriptions table exists
             string sql = "SELECT cast(count(1) as integer) from information_schema.tables where table_name = '" + Globals.SystemManager.GetTableName("fdasubscriptions") + "';";
             _datasubscriptionsTableExists = (int)ExecuteScalar(sql) > 0;
@@ -141,9 +144,7 @@ namespace FDA
             _writeQueue = new Queue<DataRequest>();
 
             _keepAliveTimer = new Timer(DBCheckTimerTick, this, Timeout.Infinite, Timeout.Infinite);
-
         }
-
 
         public virtual void Initialize()
         {
@@ -151,7 +152,6 @@ namespace FDA
 
             // start the remote query manager (handles queries from FDAManagers)
             StartRemoteQueryManager();
-
 
             // get the last DB start time
             _PreviousDBStartTime = GetDBStartTime();
@@ -181,11 +181,10 @@ namespace FDA
             RemoteQueryManager = null;
         }
 
-
         #region abstract functions
 
-
         protected abstract int ExecuteNonQuery(string sql);
+
         protected abstract object ExecuteScalar(string sql);
 
         protected abstract DataTable ExecuteQuery(string sql);
@@ -196,15 +195,13 @@ namespace FDA
 
         public abstract void PauseChangeMonitoring();
 
-
         protected abstract bool TestConnection();
 
         protected abstract bool BuildAppLogTable(string tableName);
 
         protected abstract bool BuildCommsLogTable(string tableName);
 
-
-        #endregion
+        #endregion abstract functions
 
         #region configuration access functions
 
@@ -251,7 +248,6 @@ namespace FDA
 
         public FDADataPointDefinitionStructure GetTagDef(Guid ID)
         {
-
             if (_dataPointConfig.ContainsKey(ID))
                 return _dataPointConfig[ID];
             else
@@ -282,8 +278,6 @@ namespace FDA
             else
                 return null;
         }
-
-
 
         public FDASourceConnection GetConnectionConfig(Guid ID)
         {
@@ -335,7 +329,6 @@ namespace FDA
             if (groupsToDelete.Count == 0)
                 return;
 
-
             foreach (RequestGroup group in groupsToDelete)
             {
                 sb.Append('\'');
@@ -347,9 +340,10 @@ namespace FDA
             ExecuteNonQuery(sb.ToString());
         }
 
-        #endregion
+        #endregion configuration access functions
 
         #region Data Logging
+
         public void WriteDataToDB(DataRequest completedRequest)
         {
             ///Globals.SystemManager.LogApplicationEvent(this, "", "Received completed request");
@@ -365,13 +359,10 @@ namespace FDA
                 _dataWriter.RunWorkerAsync();
         }
 
-
         private void DataWriter_DoWork(object sender, DoWorkEventArgs e)
         {
-
             try
             {
-
                 //int attempt = 0;
                 //using (NpgsqlConnection conn = new NpgsqlConnection(ConnectionString))
                 //{
@@ -405,9 +396,7 @@ namespace FDA
                     object value;
                     int querycount = 0;
 
-
                     string[] destList = transactionToLog.Destination.Split(',');
-                   
 
                     foreach (Tag tag in transactionToLog.TagList)
                     {
@@ -421,7 +410,7 @@ namespace FDA
                             continue;
                         if (!tagDef.DPDSEnabled)
                             continue;
-  
+
                         // replace null values with the text string "null" for use in the query
                         if (tag.Value != null)
                             value = tag.Value.ToString();
@@ -430,12 +419,10 @@ namespace FDA
 
                         if (tag.Timestamp == DateTime.MinValue)
                         {
-                            tag.Timestamp = new DateTime (1900,1,1,0,0,00,0,Calendar.CurrentEra);  /// oldest datetime for database is more recent than the .NET minimum datetime, .NET min date causes SQL error
+                            tag.Timestamp = new DateTime(1900, 1, 1, 0, 0, 00, 0, Calendar.CurrentEra);  /// oldest datetime for database is more recent than the .NET minimum datetime, .NET min date causes SQL error
                         }
-                        
 
                         bool firstDest = true;
-
 
                         foreach (string dest in destList)
                         {
@@ -487,7 +474,6 @@ namespace FDA
                             }
                         }
 
-
                         // if tag quality is good, write the value and timestamp to the FDALastDataValues table (update if it already exists in the table, insert otherwise)
                         if (tag.Quality == 192)
                         {
@@ -523,8 +509,7 @@ namespace FDA
 
                         lock (_writeQueue) { _writeQueue.Dequeue(); }
                     }
-                    Thread.Sleep(20); // slow down the queries a tiny bit to reduce the load on the database while clearing a backlog 
-
+                    Thread.Sleep(20); // slow down the queries a tiny bit to reduce the load on the database while clearing a backlog
                 }
             }
             catch (Exception ex)
@@ -532,7 +517,6 @@ namespace FDA
                 Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "DBManager: General error in data writer thread");
             }
         }
-
 
         private void CacheMananger_CacheFlush(object sender, CacheManager.CacheFlushEventArgs e)
         {
@@ -564,9 +548,6 @@ namespace FDA
             string sql;
             List<AlarmEventRecord> recordsList;
 
-
-
-
             while (_alarmEventQueue.Count > 0)
             {
                 lock (_alarmEventQueue)
@@ -582,7 +563,6 @@ namespace FDA
                     sql = record.GetWriteSQL();
                     int result = ExecuteNonQuery(sql);
 
-
                     if (result > 0) // if the write was successful, update the last read record in the "HistoricReferences" Table
                     {
                         sql = record.GetUpdateLastRecordSQL();
@@ -591,14 +571,12 @@ namespace FDA
                             ExecuteNonQuery(sql);
                         }
                     }
-                    Thread.Sleep(50); // a little breather for the database, this stuff doesn't need to be written as fast as possible       
+                    Thread.Sleep(50); // a little breather for the database, this stuff doesn't need to be written as fast as possible
                 }
-
             }
-
         }
-        #endregion
 
+        #endregion Data Logging
 
         public void GetLastValues(string table, Dictionary<Guid, double> values)
         {
@@ -621,7 +599,6 @@ namespace FDA
             }
             query.Append(")) B on A.DPDUID = B.DPDUID and A.Timestamp = B.LastEntry");
 
-
             try
             {
                 DataTable queryResultTable = ExecuteQuery(query.ToString());
@@ -637,7 +614,6 @@ namespace FDA
                 Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Failed to retrieve values to write to field device: query = " + query);
                 return;
             }
-
 
             // look for any tags that did not get a value, mention them in an event message
             StringBuilder errorList = new();
@@ -655,11 +631,10 @@ namespace FDA
                 Globals.SystemManager.LogApplicationEvent(this, "", "The tag(s) " + errorList + " were not found in the table " + table + " while looking for values to be written to the device. This/these tag(s) will be dropped from the write request ");
             }
             return;
-
         }
+
         public RequestGroup RequestGroupFromConfigString(string RequestingEntity, string groupconfig, int priority, bool forceCommsLogging = false)
         {
-
             string[] groupconfigparts;
             string[] connectionsList;
 
@@ -722,13 +697,10 @@ namespace FDA
             if (connectionsList.Length > 1)
                 newGroup.BackupConnectionID = Guid.Parse(connectionsList[1]);
 
-
-
             newGroup.TagsRef = _dataPointConfig;
 
             return newGroup;
         }
-
 
         protected static string[] FindNulls(object thing, List<string> exceptionList = null)
         {
@@ -795,8 +767,6 @@ namespace FDA
             }
         }
 
-
-
         protected void DBCheckTimerTick(Object o)
         {
             if (TestConnection() == false)
@@ -804,7 +774,7 @@ namespace FDA
                 if (!_DBDownTimer.IsRunning)
                     _DBDownTimer.Start();
 
-                // failed to connect                  
+                // failed to connect
                 Console.WriteLine(Globals.FDANow().ToString() + ": The database connection is down (" + _DBDownTimer.Elapsed.ToString() + ")");
 
                 if (_DBDownTimer.Elapsed >= _databaseDownNotificationLimit)
@@ -829,7 +799,6 @@ namespace FDA
                 StartChangeMonitoring();
                 return;
             }
-
 
             DateTime DB_starttime = GetDBStartTime();
 
@@ -873,13 +842,11 @@ namespace FDA
             DemandRequest?.Invoke(this, new DemandEventArgs(demand, requestGroups));
         }
 
-
-        protected void RaiseConfigChangeEvent(string type, string table, object itemref,object olditemref=null)
+        protected void RaiseConfigChangeEvent(string type, string table, object itemref, object olditemref = null)
         {
             //Globals.SystemManager.LogApplicationEvent(this, "", table + " table changed (" + type + "), ID = " + item.ToString());
-            ConfigChange?.Invoke(this, new ConfigEventArgs(type, table, itemref,olditemref));
+            ConfigChange?.Invoke(this, new ConfigEventArgs(type, table, itemref, olditemref));
         }
-
 
         protected bool PreReqCheck()
         {
@@ -892,7 +859,6 @@ namespace FDA
             object result;
             string query;
 
-
             // check if commslog and applog tables exist
             query = "select count(1) from INFORMATION_SCHEMA.TABLES where TABLE_NAME  = '" + Globals.SystemManager.GetTableName("applog") + "';";
             result = ExecuteScalar(query);
@@ -901,7 +867,6 @@ namespace FDA
                 appLogexists = ((Int32)Convert.ChangeType(result, typeof(Int32)) > 0);
             }
 
-
             query = "select count(1) from INFORMATION_SCHEMA.TABLES where TABLE_NAME  = '" + Globals.SystemManager.GetTableName("commslog") + "';";
             result = ExecuteScalar(query);
             if (result != null)
@@ -909,13 +874,10 @@ namespace FDA
                 commsLogExists = ((Int32)Convert.ChangeType(result, typeof(Int32)) > 0);
             }
 
-
-           
             //if (Globals.SystemManager.GetAppConfig().ContainsKey("FDADBName"))
             //    FDAdbname = Globals.SystemManager.GetAppConfig()["FDADBName"].OptionValue;
             //else
             //    FDAdbname = "FDA";
-
 
             if (!appLogexists)
             {
@@ -966,9 +928,11 @@ namespace FDA
                                     newRequestGroup.Protocol = GetRequestGroup(requestGroupID).DPSType.ToUpper();
                                 }
                                 break;
+
                             case "CALCCOMMSSTATS":
                                 otherTasks.Add(_taskConfig[taskID]);
                                 break;
+
                             default:
                                 Globals.SystemManager.LogApplicationEvent(this, "", "unable to execute task id " + taskID + ", due to invalid entry in task_details[0]");
                                 break;
@@ -981,7 +945,6 @@ namespace FDA
                 }
                 else
                 {
-
                     newRequestGroup = RequestGroupFromConfigString("Schedule " + requestorID, groupconfig, priority);
                     if (newRequestGroup != null)
                     {
@@ -1009,12 +972,10 @@ namespace FDA
             lock (_dataSubscriptionsConfig) { _dataSubscriptionsConfig.Clear(); }
             //lock (_derivedTagConfig) { _derivedTagConfig.Clear(); }
 
-
             string tableName = "";
 
-
             //bool MQTTColumnExists;
-            string ID; // a temporary place to store the ID (as a string) of whatever we're trying to parse, so we can include it in the error message if parsing fails 
+            string ID; // a temporary place to store the ID (as a string) of whatever we're trying to parse, so we can include it in the error message if parsing fails
             string query = "";
 
             // ***********************    load connections ******************************************
@@ -1059,7 +1020,6 @@ namespace FDA
                     lock (_connectionsConfig)
                     {
                         _connectionsConfig.Add(newConnConfig.SCUID, newConnConfig);
-
                     }
                 }
                 catch
@@ -1068,8 +1028,6 @@ namespace FDA
                 }
             }
             table.Clear();
-
-
 
             // load datapoint definitions (both PLC tags and soft tags)
             DateTime currentTime = Globals.FDANow();
@@ -1084,7 +1042,6 @@ namespace FDA
                     "from DataPointDefinitionStructures";
 
             FDADataPointDefinitionStructure newTag;
-
 
             //MQTTColumnExists = HasColumn(sqlDataReader, "MQTTEnabled");
             table = ExecuteQuery(query);
@@ -1108,10 +1065,10 @@ namespace FDA
                         DerivedTag newDerivedTag = DerivedTag.Create(ID, softtagtype, softtagarguments);
                         if (newDerivedTag == null)
                         {
-                            Globals.SystemManager.LogApplicationEvent(this, "", "FDA Start, Config Error - DPDS ID '" + ID + "' rejected. Unrecognized soft tag type '"+ softtagtype + "'", true);
+                            Globals.SystemManager.LogApplicationEvent(this, "", "FDA Start, Config Error - DPDS ID '" + ID + "' rejected. Unrecognized soft tag type '" + softtagtype + "'", true);
                             continue;
                         }
-                       
+
                         newDerivedTag.DPDSEnabled = (bool)row["DPDSEnabled"];
                         newDerivedTag.DPSType = row["DPSType"].ToString();
                         newDerivedTag.read_scaling = (bool)row["read_scaling"];
@@ -1181,12 +1138,10 @@ namespace FDA
             }
             table.Clear();
 
-
             // new Mar 9, 2020  load last values from the FDALastDataValues table and update the DataPointDefinitionStructure objects in memory
             Guid DPDUID;
             tableName = Globals.SystemManager.GetTableName("FDALastDataValues");
             query = "select DPDUID,value,timestamp,quality from " + tableName + ";";
-
 
             //sqlCommand.CommandText = query;
             table = ExecuteQuery(query);
@@ -1202,7 +1157,7 @@ namespace FDA
                         if (_dataPointConfig.ContainsKey(DPDUID))
                         {
                             _dataPointConfig[DPDUID].LastRead = new FDADataPointDefinitionStructure.Datapoint(
-                                (Double)row["value"],                               
+                                (Double)row["value"],
                                 (Int32)row["quality"],
                                 (DateTime)row["timestamp"],
                                 "",
@@ -1240,7 +1195,6 @@ namespace FDA
 
             if (_devicesTableExists)
             {
-
                 tableName = Globals.SystemManager.GetTableName("FDADevices");
                 query = "SELECT * from " + tableName + ";";
 
@@ -1276,7 +1230,6 @@ namespace FDA
 
             if (_tasksTableExists)
             {
-
                 tableName = Globals.SystemManager.GetTableName("FDATasks");
                 query = "SELECT * from " + tableName + ";";
 
@@ -1305,7 +1258,6 @@ namespace FDA
                 }
                 table.Clear();
             }
-
 
             // load Datablock Request Groups (groups of individual requests)
             tableName = Globals.SystemManager.GetTableName("FDADataBlockRequestGroup");
@@ -1343,12 +1295,9 @@ namespace FDA
             }
             table.Clear();
 
-
-
             // load Schedules
             tableName = Globals.SystemManager.GetTableName("FDARequestGroupScheduler");
             query = "SELECT FRGSUID,Description,FRGSEnabled,FRGSType,RealTimeRate,Year,Month,Day,Hour,Minute,Second,Priority,RequestGroupList from " + tableName + ";";
-
 
             table = ExecuteQuery(query);
 
@@ -1387,8 +1336,7 @@ namespace FDA
                 }
             }
 
-
-            // after loading the Schedule configs, turn the requestgroup strings in the schedulers into actual RequestGroup objects, ready to be passed to a connection manager          
+            // after loading the Schedule configs, turn the requestgroup strings in the schedulers into actual RequestGroup objects, ready to be passed to a connection manager
             List<RequestGroup> requestGroups;
             lock (_schedConfig)
             {
@@ -1399,7 +1347,6 @@ namespace FDA
                     sched.Tasks.AddRange(tasks);
                 }
             }
-
 
             // load data subscriptions
             if (_datasubscriptionsTableExists)
@@ -1423,11 +1370,9 @@ namespace FDA
                         deadband = (Double)row["deadband"]
                     };
 
-  
-                    _dataSubscriptionsConfig.Add(sub.subscription_id,sub);
+                    _dataSubscriptionsConfig.Add(sub.subscription_id, sub);
                 }
             }
-
 
             // load user scripts
             if (_scriptsTableExists)
@@ -1450,14 +1395,10 @@ namespace FDA
                         run_spec = row["run_spec"].ToString()
                     };
 
-                    _scriptsConfig.Add(newModule.script_name,newModule);
-
- 
+                    _scriptsConfig.Add(newModule.script_name, newModule);
                 }
                 table.Clear();
             }
-
-
 
             return true;
         }
@@ -1488,8 +1429,8 @@ namespace FDA
             // and insert it into the pipeline to be written to the database
             WriteDataToDB(softTagRequestObject);
 
-            // and log a message about the update 
-            Globals.SystemManager.LogApplicationEvent(this, "", "Soft tag " + updatedSoftpoint.DPDUID.ToString() + " updated",false,true);
+            // and log a message about the update
+            Globals.SystemManager.LogApplicationEvent(this, "", "Soft tag " + updatedSoftpoint.DPDUID.ToString() + " updated", false, true);
         }
 
         public void UpdateAlmEvtCurrentPtrs(DataRequest PtrPositionRequest)
@@ -1503,7 +1444,6 @@ namespace FDA
             int affectedRows;
 
             string ResponseTimestamp = DateTimeHelpers.FormatDateTime(PtrPositionRequest.ResponseTimestamp);
-
 
             // update the alarm or event current ptr and timestamp
             sql = "update " + Globals.SystemManager.GetTableName("FDAHistoricReferences") + " set AlarmsCurPtrPosition = " + almsPtr + ", AlarmsCurPtrTimestamp = '" + DateTimeHelpers.FormatDateTime(almsTimestamp) + "'";
@@ -1520,8 +1460,6 @@ namespace FDA
                 sql += evtsPtr + ",240,'" + ResponseTimestamp + "',0,'" + ResponseTimestamp + "'," + almsPtr + ",240,'" + ResponseTimestamp + "',0);";
                 ExecuteNonQuery(sql);
             }
-
-
         }
 
         public byte[] GetAlmEvtPtrs(Guid connID, string NodeID, string ptrType)
@@ -1529,8 +1467,6 @@ namespace FDA
             string sql;
             int lastRead = 0;
             int currPtr = 0;
-
-
 
             // update the alarm or event current ptr and timestamp
             sql = "select " + ptrType + "CurPtrPosition," + ptrType + "LastPtrReadPosition from " + Globals.SystemManager.GetTableName("FDAHistoricReferences");
@@ -1550,8 +1486,6 @@ namespace FDA
                     return null;
                 }
             }
-
-
 
             lastRead = MiscHelpers.AddCircular(lastRead, -1, 0, 239);
 
@@ -1614,7 +1548,6 @@ namespace FDA
                 statsCalcParams.Add(calcParams[2]);
             }
 
-
             if (calcParams.Length > 3)
             {
                 // device filter
@@ -1676,6 +1609,7 @@ namespace FDA
                             action = "was deleted from the database but not found in the FDA, so no action was taken";
                         }
                         break;
+
                     case "INSERT":
                         _taskConfig.Add(task.TASK_ID, task);
                         action = "added";
@@ -1713,7 +1647,6 @@ namespace FDA
                             action = "not found, adding it as a new FDA Task";
                             changeType = "INSERT";
                             break;
-
                         }
                         break;
                 }
@@ -1754,6 +1687,7 @@ namespace FDA
                         action = "deleted from the database but was not found in the FDA, so no action was taken";
                     }
                     break;
+
                 case "UPDATE":
                     if (_dataSubscriptionsConfig.ContainsKey(subscription.subscription_id))
                     {
@@ -1767,8 +1701,8 @@ namespace FDA
                         action = "not found, adding it as a new subscription";
                     }
 
-
                     break;
+
                 default: action = "<action>"; break;
             }
 
@@ -1779,11 +1713,10 @@ namespace FDA
 
         protected void UserScriptChangeNotification(string changeType, UserScriptDefinition scriptModule)
         {
-
             // check for nulls
             if (changeType == "INSERT" || changeType == "UPDATE")
             {
-                string[] nulls = FindNulls(scriptModule,new List<string> { "depends_on" });
+                string[] nulls = FindNulls(scriptModule, new List<string> { "depends_on" });
                 if (nulls.Length > 0)
                 {
                     Globals.SystemManager.LogApplicationEvent(this, "", "script " + scriptModule.script_name + " " + changeType.ToString().ToLower() + " rejected, null values in field(s) " + string.Join(",", nulls));
@@ -1795,8 +1728,8 @@ namespace FDA
             switch (changeType)
             {
                 case "INSERT":
-                        _scriptsConfig.Add(scriptModule.script_name, scriptModule);
-                        action = "inserted";
+                    _scriptsConfig.Add(scriptModule.script_name, scriptModule);
+                    action = "inserted";
                     break;
 
                 case "DELETE":
@@ -1810,6 +1743,7 @@ namespace FDA
                         action = "deleted from the database but was not found in the FDA, so no action was taken";
                     }
                     break;
+
                 case "UPDATE":
                     if (_scriptsConfig.ContainsKey(scriptModule.script_name))
                     {
@@ -1824,14 +1758,13 @@ namespace FDA
                         UserScriptChangeNotification(changeType, scriptModule);
                     }
                     break;
+
                 default: action = "<action>"; break;
             }
 
             Globals.SystemManager.LogApplicationEvent(this, "", "User script module '" + scriptModule.script_name + "' was " + action);
 
             RaiseConfigChangeEvent(changeType, "fda_scripts", scriptModule.script_name);
-   
-  
         }
 
         protected void DeviceMonitorNotification(string changeType, FDADevice device)
@@ -1865,6 +1798,7 @@ namespace FDA
                         }
 
                         break;
+
                     case "INSERT":
                         _deviceConfig.Add(device.DEVICE_ID, device);
                         action = "added";
@@ -1879,7 +1813,7 @@ namespace FDA
                         }
                         else
                         {
-                            /* OLD VALUES NOT YET SUPPORTED 
+                            /* OLD VALUES NOT YET SUPPORTED
                             if (e.EntityOldValues != null)
                             {
                                 if (e.EntityOldValues.device_id != e.Entity.device_id)
@@ -1900,7 +1834,6 @@ namespace FDA
                             _deviceConfig.Add(device.DEVICE_ID, device);
                             action = "not found, adding it as a new FDADevice";
                             changeType = "INSERT";
-
                         }
                         break;
                 }
@@ -1911,14 +1844,12 @@ namespace FDA
             RaiseConfigChangeEvent(changeType.ToString(), Globals.SystemManager.GetTableName("FDADevices"), device.DEVICE_ID);
         }
 
-
         protected void DataPointMonitorNotification(string changeType, FDADataPointDefinitionStructure datapoint)
         {
-
             // check for nulls
             if (changeType == "INSERT" || changeType == "UPDATE")
             {
-                List<string> exceptionList = new(new string[] { "backfill_enabled", "backfill_dataID", "backfill_data_structure_type", "backfill_data_lapse_limit", "backfill_data_interval","LastReadDataType"});
+                List<string> exceptionList = new(new string[] { "backfill_enabled", "backfill_dataID", "backfill_data_structure_type", "backfill_data_lapse_limit", "backfill_data_interval", "LastReadDataType" });
                 string[] nulls = FindNulls(datapoint, exceptionList);
                 if (nulls.Length > 0)
                 {
@@ -1932,8 +1863,7 @@ namespace FDA
             {
                 switch (changeType)
                 {
-
-                    case "INSERT":                    
+                    case "INSERT":
                         if (datapoint.DPSType.ToUpper() == "SOFTTAG")
                         {
                             // create a soft tag
@@ -1943,9 +1873,9 @@ namespace FDA
                             if (newTag == null)
                             {
                                 Globals.SystemManager.LogApplicationEvent(this, "", "Config Error: DPDS ID '" + datapoint.DPDUID + "' insert rejected. Unrecognized soft tag type '" + datapoint.read_detail_01 + "'", true);
-                                return;    
+                                return;
                             }
-                            
+
                             newTag.DPDSEnabled = datapoint.DPDSEnabled;
                             newTag.DPSType = datapoint.DPSType;
                             newTag.read_scaling = datapoint.read_scaling;
@@ -1969,12 +1899,11 @@ namespace FDA
                             newTag.backfill_data_structure_type = 0;
                             newTag.backfill_data_lapse_limit = 0;
                             newTag.backfill_data_interval = 0;
-                            
-                            
+
                             newTag.Initialize();
                             if (!newTag.IsValid)
                             {
-                                Globals.SystemManager.LogApplicationEvent(this, "", "Config Error: DPDS ID '" + datapoint.DPDUID + "' insert rejected. " + newTag.ErrorMessage, true);                               
+                                Globals.SystemManager.LogApplicationEvent(this, "", "Config Error: DPDS ID '" + datapoint.DPDUID + "' insert rejected. " + newTag.ErrorMessage, true);
                             }
                             newTag.OnUpdate += SoftPoint_OnUpdate;
                             _dataPointConfig.Add(newTag.DPDUID, newTag);
@@ -1984,9 +1913,9 @@ namespace FDA
                             _dataPointConfig.Add(datapoint.DPDUID, datapoint);
                         }
 
-                        
                         action = "added";
                         break;
+
                     case "DELETE":
                         if (_dataPointConfig.ContainsKey(datapoint.DPDUID))
                         {
@@ -2005,6 +1934,7 @@ namespace FDA
                         }
 
                         break;
+
                     case "UPDATE":
                         if (_dataPointConfig.ContainsKey(datapoint.DPDUID))
                         {
@@ -2021,7 +1951,6 @@ namespace FDA
                             oldTag.write_scale_raw_high = datapoint.write_scale_raw_high;
                             oldTag.write_scale_eu_low = datapoint.write_scale_eu_low;
                             oldTag.write_scale_eu_high = datapoint.write_scale_eu_high;
-                       
 
                             if (_dataPointConfig[datapoint.DPDUID].DPSType.ToLower() == "softtag")
                             {
@@ -2046,7 +1975,6 @@ namespace FDA
                             }
                             else
                             {
-
                                 oldTag.backfill_enabled = datapoint.backfill_enabled;
                                 oldTag.backfill_data_ID = datapoint.backfill_data_ID;
                                 oldTag.backfill_data_structure_type = datapoint.backfill_data_structure_type;
@@ -2081,22 +2009,17 @@ namespace FDA
                             return;
                         }
 
-
                         break;
-
                 }
-
             }
 
             Globals.SystemManager.LogApplicationEvent(this, "", "DPDUID " + datapoint.DPDUID + " " + action);
 
             RaiseConfigChangeEvent(changeType.ToString(), Globals.SystemManager.GetTableName("DataPointDefinitionStructures"), datapoint.DPDUID);
-
         }
 
         protected void SourceConnectionMonitorNotification(string changeType, FDASourceConnection connection)
         {
-
             // check for nulls
             if (changeType == "INSERT" || changeType == "UPDATE")
             {
@@ -2118,6 +2041,7 @@ namespace FDA
                         _connectionsConfig.Add(connection.SCUID, connection);
                         action = "added";
                         break;
+
                     case "UPDATE":
                         if (_connectionsConfig.ContainsKey(connection.SCUID))
                         {
@@ -2147,10 +2071,10 @@ namespace FDA
                             _connectionsConfig.Add(connection.SCUID, connection);
                             action = "not found, adding it as a new connection";
                             changeType = "INSERT";
-
                         }
                         action = "updated";
                         break;
+
                     case "DELETE":
                         _connectionsConfig.Remove(connection.SCUID);
                         action = "deleted";
@@ -2164,7 +2088,6 @@ namespace FDA
 
         protected void RequestGroupMonitorNotification(string changeType, FDADataBlockRequestGroup requestGroup)
         {
-
             if (changeType == "INSERT" || changeType == "UPDATE")
             {
                 // check for nulls
@@ -2211,7 +2134,6 @@ namespace FDA
                                 action = "not found, adding it as a new FDADataBlockRequestGroup";
                                 changeType = ChangeType.Insert;
                                 break;
-
                             }
                             */
                             _requestgroupConfig.Add(requestGroup.DRGUID, requestGroup);
@@ -2219,8 +2141,8 @@ namespace FDA
                             changeType = "INSERT";
                         }
 
-
                         break;
+
                     case "DELETE":
                         if (_requestgroupConfig.ContainsKey(requestGroup.DRGUID))
                         {
@@ -2237,14 +2159,11 @@ namespace FDA
             Globals.SystemManager.LogApplicationEvent(this, "", "DRGUID " + requestGroup.DRGUID + " " + action);
 
             RaiseConfigChangeEvent(changeType.ToString(), Globals.SystemManager.GetTableName("FDADataBlockRequestGroup"), requestGroup.DRGUID);
-
         }
 
         protected void SchedulerMonitorNotification(string changeType, FDARequestGroupScheduler sched)
         {
-
             string action = "";
-
 
             // check for nulls
             if (changeType == "INSERT" || changeType == "UPDATE")
@@ -2254,10 +2173,8 @@ namespace FDA
                 {
                     Globals.SystemManager.LogApplicationEvent(this, "", "FRGSUID " + sched.FRGSUID + " " + changeType.ToString().ToLower() + " rejected, null values in field(s) " + string.Join(",", nulls));
                     return;
-
                 }
             }
-
 
             lock (_schedConfig)
             {
@@ -2267,6 +2184,7 @@ namespace FDA
                         _schedConfig.Remove(sched.FRGSUID);
                         action = " deleted";
                         break;
+
                     case "INSERT":
                         List<FDATask> taskList;
                         sched.RequestGroups = RequestGroupListToRequestGroups(sched.FRGSUID, sched.Priority, sched.RequestGroupList, out taskList);
@@ -2308,7 +2226,6 @@ namespace FDA
                             _schedConfig.Add(sched.FRGSUID, sched);
                             action = "not found, adding it as a new FDARequestGroupScheduler";
                             changeType = "INSERT";
-
                         }
                         break;
                 }
@@ -2317,12 +2234,10 @@ namespace FDA
             Globals.SystemManager.LogApplicationEvent(this, "", "FRGSUID " + sched.FRGSUID + " " + action);
 
             RaiseConfigChangeEvent(changeType.ToString(), Globals.SystemManager.GetTableName("FDARequestGroupScheduler"), sched.FRGSUID);
-
         }
 
-        protected void DemandMonitorNotification(string changeType,FDARequestGroupDemand demand)
+        protected void DemandMonitorNotification(string changeType, FDARequestGroupDemand demand)
         {
-
             try
             {
                 if (changeType == "INSERT" || changeType == "UPDATE")
@@ -2371,6 +2286,7 @@ namespace FDA
                                                 newRequestGroup.Protocol = GetRequestGroup(requestGroupID).DPSType;
                                             }
                                             break;
+
                                         case "CALCCOMMSSTATS":
                                             string error;
                                             List<object> calcParams = ParseStatsCalcParams(task.task_details, out error);
@@ -2384,6 +2300,7 @@ namespace FDA
                                                 Globals.SystemManager.LogApplicationEvent(this, "", "invalid task_details in task " + task.TASK_ID + ": " + error + ". The task will not be executed");
                                             }
                                             break;
+
                                         default:
                                             Globals.SystemManager.LogApplicationEvent(this, "", "FDA Task id " + taskID + ", requested by demand " + demand.FRGDUID + " has an unrecognized task type '" + task.task_type + "'. The task will not be executed");
                                             continue;
@@ -2396,7 +2313,7 @@ namespace FDA
                                     if (scheduler != null)
                                     {
                                         ForceScheduleExecution?.Invoke(this, new ForceScheduleEventArgs(scheduler.FRGSUID));
-                                        return; 
+                                        return;
                                     }
                                     Globals.SystemManager.LogApplicationEvent(this, "", "Task " + taskID + " was not found. Task was requested by demand " + demand.FRGDUID, true);
                                 }
@@ -2417,7 +2334,7 @@ namespace FDA
                         if (demandedGroupList.Count > 0)
                         {
                             RaiseDemandRequestEvent(demand, demandedGroupList);
-                            
+
                             if (demand.DestroyDRG)
                                 DeleteRequestGroup(demandedGroupList);
 
@@ -2433,14 +2350,13 @@ namespace FDA
             }
         }
 
-
         public bool TestDatabaseConnection()
         {
             Globals.SystemManager.LogApplicationEvent(this, "", "Testing Database connection");
 
             if (!TestConnection())
             {
-                Globals.SystemManager.LogApplicationEvent(this,"", "Unable to connect to the database");
+                Globals.SystemManager.LogApplicationEvent(this, "", "Unable to connect to the database");
                 DBStatus = false;
                 return false;
             }
@@ -2448,7 +2364,6 @@ namespace FDA
             DBStatus = true;
 
             _PreviousDBStartTime = GetDBStartTime();
-
 
             return PreReqCheck();
         }
@@ -2496,7 +2411,6 @@ namespace FDA
                 _alarmsEventsWriter.Dispose();
             }
 
-
             lock (_schedConfig) { _schedConfig.Clear(); }
             lock (_requestgroupConfig) { _requestgroupConfig.Clear(); }
             lock (_dataPointConfig) { _dataPointConfig.Clear(); }
@@ -2505,7 +2419,6 @@ namespace FDA
 
             GC.SuppressFinalize(this);
         }
-    
 
         //protected virtual void Dispose(bool disposing)
         //{
@@ -2513,7 +2426,6 @@ namespace FDA
         //    {
         //        if (disposing)
         //        {
-
         //            // log any data that's sitting in the caches before shutting down
         //            Globals.SystemManager.LogApplicationEvent(this, "", "Flushing all cached data");
 
@@ -2557,7 +2469,6 @@ namespace FDA
 
         //            stopwatch = null;
 
-
         //            lock (_schedConfig) { _schedConfig.Clear(); }
         //            lock (_requestgroupConfig) { _requestgroupConfig.Clear(); }
         //            lock (_dataPointConfig) { _dataPointConfig.Clear(); }
@@ -2583,6 +2494,5 @@ namespace FDA
         //    Dispose(disposing: true);
         //    GC.SuppressFinalize(this);
         //}
-
     }
 }

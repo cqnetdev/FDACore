@@ -1,19 +1,11 @@
-﻿
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Data;
-using System.Drawing;
-using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
-using System.Windows.Forms;
+
 //using FDA;
 using System.Threading;
-using System.Runtime.Serialization.Formatters.Binary;
-using System.IO;
-using System.Collections.Specialized;
-using System.Runtime.CompilerServices;
+using System.Windows.Forms;
 using uPLibrary.Networking.M2Mqtt;
 using static FDAManager.Program;
 
@@ -21,7 +13,6 @@ namespace FDAManager
 {
     public partial class frmMain2 : Form, IDisposable
     {
-
         public class FDAConnection : INotifyPropertyChanged
         {
             private string _FDAName;
@@ -44,9 +35,6 @@ namespace FDAManager
                     Host = "";
                 }
             }
-
-
-
 
             public event PropertyChangedEventHandler PropertyChanged;
 
@@ -87,6 +75,7 @@ namespace FDAManager
                 return base.GetHashCode();
             }
         }
+
         private string _FDADBConnstring;
         private bool closing = false;
         private string SelectedConnID = "";
@@ -97,17 +86,25 @@ namespace FDAManager
         private readonly Dictionary<Guid, ConnectionNode> _connOverviewDict;
 
         private delegate void DataReceivedHandler(byte[] data, byte dataType);
+
         private delegate void SafeCallStatusUpdate(object sender, FDAManagerContext.StatusUpdateArgs e);
+
         private delegate void SafeCallFDANameUpdate(object sender, string FDAName);
+
         private delegate void SafeCallNoParams();
+
         private delegate void SafeCall1StringParam(string param);
+
         private delegate void SafeCall2StringParams(string param1, string param2);
+
         private delegate void SafeCall1BoolParam(bool param1);
+
         private delegate void SafeMQQTEventHandler(object sender, uPLibrary.Networking.M2Mqtt.Messages.MqttMsgPublishEventArgs e);
 
         private readonly System.Threading.Timer elevationWaitTimer;
 
         private enum DetailsType { Queue, Connection, None };
+
         internal MqttClient MQTT
         {
             get => _mqtt; set
@@ -120,12 +117,12 @@ namespace FDAManager
             }
         }
 
-
-
         //private List<FDAConnection> _recent;
 
         /******************************************** CONSTRUCTOR / initialization ***************************************/
+
         #region initialization
+
         public frmMain2()
         {
             InitializeComponent();
@@ -222,11 +219,11 @@ namespace FDAManager
         {
             tree.Nodes[0].Expand();
         }
-        #endregion
 
-
+        #endregion initialization
 
         /************************************* MQTT subscriptions and publication received handling **************************************************/
+
         #region MQTT
 
         internal void SetMQTT(uPLibrary.Networking.M2Mqtt.MqttClient mqtt)
@@ -271,7 +268,6 @@ namespace FDAManager
             }
         }
 
-
         private void _mqtt_ConnectionClosed(object sender, EventArgs e)
         {
             MQTTDisconnected();
@@ -288,20 +284,18 @@ namespace FDAManager
             }
             else
             {
-
                 //imgBrokerStatus.Image = imageList1.Images[2];
                 mqttStatus.Text = "MQTT Status: Disconnected";
                 //btn_Connect.Enabled = true;
             }
         }
 
-
         /*************************************   handle MQTT 'publication received' events  ****************************************************/
+
         private void MQTT_MqttMsgPublishReceived(object sender, uPLibrary.Networking.M2Mqtt.Messages.MqttMsgPublishEventArgs e)
         {
             if (closing || Disposing || IsDisposed)
                 return;
-
 
             if (InvokeRequired)
             {
@@ -325,14 +319,17 @@ namespace FDAManager
                             case "connectionstatus":
                                 _connOverviewDict[connectionID].Status = Encoding.UTF8.GetString(e.Message);
                                 break;
+
                             case "connectionenabled":
                                 bool enb = BitConverter.ToBoolean(e.Message, 0);
                                 _connOverviewDict[connectionID].ConnectionEnabled = enb;
                                 break;
+
                             case "communicationsenabled":
                                 enb = BitConverter.ToBoolean(e.Message, 0);
                                 _connOverviewDict[connectionID].CommunicationsEnabled = enb;
                                 break;
+
                             case "description":
                                 _connOverviewDict[connectionID].Description = Encoding.UTF8.GetString(e.Message);
                                 break;
@@ -343,8 +340,6 @@ namespace FDAManager
                             case "priority3count": HandleQueueCountUpdate(connectionID, 3, e.Message); break;
                         }
 
-
-
                         if (connDetails.ConnDetailsObj != null)
                         {
                             if (connDetails.ConnDetailsObj.ID == connectionID.ToString())
@@ -353,6 +348,7 @@ namespace FDAManager
                             }
                         }
                         break;
+
                     case "FDA":
                         switch (topic[1])
                         {
@@ -383,9 +379,11 @@ namespace FDAManager
                                 _FDADBConnstring = Encoding.UTF8.GetString(e.Message);
                                 connDetails.DbConnStr = _FDADBConnstring;
                                 break;
+
                             case "executionid":
                                 connDetails.FDAExecutionID = Encoding.UTF8.GetString(e.Message);
                                 break;
+
                             case "connectionlist":
                                 string connList = Encoding.UTF8.GetString(e.Message);
                                 string[] connectionStrings = connList.Split('|');
@@ -393,8 +391,6 @@ namespace FDAManager
                                 string[] connparts;
                                 ConnectionNode newConnNode;
                                 List<Guid> updatedConnList = new();
-
-
 
                                 // look for new connections
                                 foreach (string connStr in connectionStrings)
@@ -438,13 +434,10 @@ namespace FDAManager
                                         _connOverviewDict.Remove(IDtoRemove);
                                     }
 
-
                                 // make sure the root node is expanded
                                 tree.Nodes[0].Expand();
 
                                 break;
-
-                               
                         }
                         break;
                 }
@@ -473,9 +466,9 @@ namespace FDAManager
         {
             MQTT?.Unsubscribe(new string[] { "FDA/version", "FDA/uptime", "FDA/connectionlist" });
         }
+
         private void SubscribeToConnectionStatus(string ID, byte QOS)
         {
-
             string[] topics = new string[4];
             topics[0] = "connection/" + ID + "/connectionstatus";
             topics[1] = "connection/" + ID + "/connectionenabled";
@@ -507,8 +500,6 @@ namespace FDAManager
             MQTT.Subscribe(topics, QOSList);
         }
 
-
-
         private void UnsubscribeQueueCounts(string ID)
         {
             string[] topics = new string[4];
@@ -519,8 +510,6 @@ namespace FDAManager
 
             MQTT.Unsubscribe(topics);
         }
-
-
 
         private void SubscribeToConnectionDetails(string ID, byte QOS)
         {
@@ -577,9 +566,11 @@ namespace FDAManager
             string[] topics = new string[] { "connection/" + ID + "/log" };
             MQTT.Unsubscribe(topics);
         }
-        #endregion
+
+        #endregion MQTT
 
         /*************************************  form appearance (control visibility, enabled/disabled status etc ********************************/
+
         #region FormControlManagement
 
         internal void SetConnectionMenuItems(bool enabled)
@@ -633,6 +624,7 @@ namespace FDAManager
                         mQTTQueryTestToolStripMenuItem.Enabled = false;
                         communicationsStatsToolStripMenuItem.Enabled = false;
                         break;
+
                     case "Normal":
                         startToolStripMenuItem.Enabled = false;
                         startwithConsoleToolStripMenuItem.Enabled = false;
@@ -644,6 +636,7 @@ namespace FDAManager
                             communicationsStatsToolStripMenuItem.Enabled = true;
                         }
                         break;
+
                     case "ShuttingDown":
                         startToolStripMenuItem.Enabled = false;
                         startwithConsoleToolStripMenuItem.Enabled = false;
@@ -652,6 +645,7 @@ namespace FDAManager
                         mQTTQueryTestToolStripMenuItem.Enabled = false;
                         communicationsStatsToolStripMenuItem.Enabled = false;
                         break;
+
                     case "Stopped":
                         startToolStripMenuItem.Enabled = true;
                         startwithConsoleToolStripMenuItem.Enabled = true;
@@ -660,6 +654,7 @@ namespace FDAManager
                         mQTTQueryTestToolStripMenuItem.Enabled = false;
                         communicationsStatsToolStripMenuItem.Enabled = false;
                         break;
+
                     case "":
                         startToolStripMenuItem.Enabled = true;
                         startwithConsoleToolStripMenuItem.Enabled = true;
@@ -668,6 +663,7 @@ namespace FDAManager
                         mQTTQueryTestToolStripMenuItem.Enabled = false;
                         communicationsStatsToolStripMenuItem.Enabled = false;
                         break;
+
                     default:
                         startToolStripMenuItem.Enabled = false;
                         startwithConsoleToolStripMenuItem.Enabled = false;
@@ -679,10 +675,6 @@ namespace FDAManager
                 }
             }
         }
-
-
-
-
 
         internal void ResetForm(bool FDAOnly = false)
         {
@@ -699,7 +691,6 @@ namespace FDAManager
                 dbtypeDisplay.Text = "Database Type: unknown";
                 startToolStripMenuItem.Enabled = false;
                 stopToolStripMenuItem.Enabled = false;
-
 
                 foreach (ConnectionNode connection in _connOverviewDict.Values)
                 {
@@ -721,19 +712,18 @@ namespace FDAManager
                 }
             }
         }
-        #endregion
+
+        #endregion FormControlManagement
 
         /*************************************** user action handling (handle clicks)************************************************************/
+
         #region UserInteraction
-
-
 
         //FDA Menu
         private void startToolStripMenuItem_Click(object sender, EventArgs e)
         {
             FDAManagerContext.SendCommandToFDAController("START");
         }
-
 
         private void startwithConsoleToolStripMenuItem_Click(object sender, EventArgs e)
         {
@@ -748,9 +738,6 @@ namespace FDAManager
             FDAManagerContext.SendCommandToFDAController("SHUTDOWN");
         }
 
-
-
-
         // item selected in the tree
         private void tree_AfterSelect(object sender, TreeViewEventArgs e)
         {
@@ -758,10 +745,9 @@ namespace FDAManager
             {
                 string newlySelectedID = ((Guid)e.Node.Tag).ToString();
 
-                // if a connection was previously selected, unsubscribe from the previously selected connection 
+                // if a connection was previously selected, unsubscribe from the previously selected connection
                 if (SelectedConnID != "" && SelectedConnID != newlySelectedID)
                 {
-
                     if (newlySelectedID != SelectedConnID)
                     {
                         UnsubscribeConnectionDetails(connDetails.ConnDetailsObj.ID);
@@ -782,8 +768,6 @@ namespace FDAManager
                 // enable MQTT for the selected connection
                 SetConnectionMQTTEnabledStatus(SelectedConnID, true);
 
-
-
                 // default to the connection details view mode
                 //tabControl1.SelectedIndex = 0;
 
@@ -796,11 +780,8 @@ namespace FDAManager
 
                 qHist.ConnectionID = Guid.Parse(SelectedConnID);
                 qHist.Clear();
-
             }
         }
-
-
 
         private void SetConnectionMQTTEnabledStatus(string id, bool enabled)
         {
@@ -815,12 +796,7 @@ namespace FDAManager
                 }
         }
 
-
-
-        #endregion
-
-
-
+        #endregion UserInteraction
 
         private void frmMain2_FormClosing(object sender, FormClosingEventArgs e)
         {
@@ -843,15 +819,13 @@ namespace FDAManager
             MQTT = null;
         }
 
-
-
         /*********************************** ConnectionNode Class ***********************************/
         /**** contains all the details about a given connection                                  ****/
         /**** automatically updates the tree when connection status changes                      ****/
         /********************************************************************************************/
+
         internal class ConnectionNode : IComparable
         {
-
             private string _status;
             private bool _connectionEnabled;
             private bool _communicationsEnabled;
@@ -886,19 +860,16 @@ namespace FDAManager
                 }
                 _qCounts = qCountList.ToArray();
 
-
                 _node.Tag = ID;
 
                 // don't create queue nodes anymore
                 //CreateQueueSubNodes(_qCounts);
-
             }
 
             private void UpdateIcon()
             {
                 if (_node == null)
                     return;
-
 
                 int imageIdx = 3;
 
@@ -932,8 +903,6 @@ namespace FDAManager
                 _node.Text = Description;
             }
 
-
-
             public TreeNode GetNode()
             {
                 return _node;
@@ -944,7 +913,6 @@ namespace FDAManager
                 ConnectionNode node = (ConnectionNode)obj;
                 return Description.CompareTo(node.Description);
             }
-
         }
 
         //==========================================
@@ -1017,7 +985,6 @@ namespace FDAManager
             }
             //Properties.Settings.Default.RecentConnections.Add(connection.FDAName + "|" + connection.Host);
             //Properties.Settings.Default.Save();
-
         }
 
         internal void SetFDAStatus(FDAManagerContext.FDAStatus status)
@@ -1030,21 +997,27 @@ namespace FDAManager
                 case "Normal":
                     imgFDARunStatus.Image = imageList1.Images[0];
                     break;
+
                 case "ShuttingDown":
                     imgFDARunStatus.Image = imageList1.Images[10];
                     break;
+
                 case "Starting":
                     imgFDARunStatus.Image = imageList1.Images[1];
                     break;
+
                 case "Stopped":
                     imgFDARunStatus.Image = imageList1.Images[2];
                     break;
+
                 case "unknown":
                     imgFDARunStatus.Image = imageList1.Images[3];
                     break;
+
                 case "":
                     imgFDARunStatus.Image = imageList1.Images[3];
                     break;
+
                 default:
                     return;
             }
@@ -1053,7 +1026,7 @@ namespace FDAManager
             SetMenuItemEnabledStates();
 
             Version.Text = "FDA Version: " + status.Version;
-            
+
             DBType = status.DB;
             dbtypeDisplay.Text = "Database Type: " + status.DB;
 
@@ -1113,9 +1086,5 @@ namespace FDAManager
             FDAManagerContext.Disconnect();
             ResetForm();
         }
-
-    
     }
-
-
 }

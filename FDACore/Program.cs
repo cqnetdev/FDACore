@@ -1,43 +1,40 @@
 ﻿using Common;
 using FDA;
 using Microsoft.Extensions.Configuration;
+using Support;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
-using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
-using System.Security.Principal;
-using System.ServiceProcess;
 using System.Text;
 using System.Threading;
 using uPLibrary.Networking.M2Mqtt;
-using Support;
-using System.Text.Json.Serialization;
-using System.Text.Json;
-using System.ComponentModel;
 
 namespace FDAApp
 {
-    static class Program
+    internal static class Program
     {
-        static DataAcqManager _dataAquisitionManager;
-        static TCPServer _FDAControlServer;
-
+        private static DataAcqManager _dataAquisitionManager;
+        private static TCPServer _FDAControlServer;
 
         static public bool InitSuccess { get; }
 
         static private Guid ExecutionID;
         static private string DBType;
         static private System.Threading.Timer MqttRetryTimer;
+
         //static private bool FDAIsElevated = false;
         static private bool FDAElevationMessagePosted = false;
+
         static private bool ShutdownComplete = false;
-        static IConfiguration configuration;
+        private static IConfiguration configuration;
+
         //private string FDAidentifier = "";
-        static BackgroundWorker shutdownWorker;
-        
+        private static BackgroundWorker shutdownWorker;
+
         static private class NativeMethods
         {
             public const int SW_HIDE = 0;
@@ -47,28 +44,31 @@ namespace FDAApp
             public const int QuickEditMode = 64;
             public const int ExtendedFlags = 128;
             public const int STD_INPUT_HANDLE = -10;
+
             [DllImport("kernel32.dll")] public static extern IntPtr GetConsoleWindow();
+
             [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
             [DllImport("user32.dll")] public static extern int DeleteMenu(IntPtr hMenu, int nPosition, int wFlags);
+
             [DllImport("user32.dll")] public static extern IntPtr GetSystemMenu(IntPtr hWnd, bool bRevert);
+
             //[DllImport("kernel32.dll", SetLastError = true)] public static extern bool SetConsoleCtrlHandler(ConsoleEventDelegate callback, bool add);
             [DllImport("kernel32.dll", SetLastError = true)] public static extern bool GetConsoleMode(IntPtr hConsoleHandle, out int lpMode);
+
             [DllImport("kernel32.dll", SetLastError = true)] public static extern bool SetConsoleMode(IntPtr hConsoleHandle, int ioMode);
+
             [DllImport("Kernel32.dll", SetLastError = true)] public static extern IntPtr GetStdHandle(int nStdHandle);
         }
 
-
-
-
         //static ConsoleEventDelegate handler;   // Keeps it from getting garbage collected
         // private delegate bool ConsoleEventDelegate(int eventType);
-    
 
         /// <summary>
         /// The main entry point for the application.
         /// </summary>
         [STAThread]
-        static void Main(string[] args)
+        private static void Main(string[] args)
         {
             // check if an instance is already running
             Process[] proc = Process.GetProcessesByName("FDACore");
@@ -106,10 +106,10 @@ namespace FDAApp
             {
                 configuration = new ConfigurationBuilder().AddJsonFile("appsettings.json", false, true).Build();
                 appConfig = configuration.GetSection("AppSettings");
-                
+
                 FDAID = appConfig["FDAID"];
                 DBInstance = appConfig["DatabaseInstance"];
-                
+
                 DBType = appConfig["DatabaseType"];
                 DBName = appConfig["SystemDBName"];
                 userName = appConfig["SystemLogin"];
@@ -139,7 +139,6 @@ namespace FDAApp
                     LogEvent("SystemLogin setting not found, using the default value ");
                 }
 
-
                 if (FDAID.Contains("(default"))
                 {
                     FDAID = FDAID.Replace("(default)", "");
@@ -157,7 +156,7 @@ namespace FDAApp
 
             // start basic services server
             Console.WriteLine("Starting the basic services control server");
-            _FDAControlServer = TCPServer.NewTCPServer(9572,"Basic Services Control Server");
+            _FDAControlServer = TCPServer.NewTCPServer(9572, "Basic Services Control Server");
             if (_FDAControlServer != null)
             {
                 _FDAControlServer.DataAvailable += TCPServer_DataAvailable;
@@ -195,8 +194,8 @@ namespace FDAApp
 
                     //disable the window close button(X)
                     _ = NativeMethods.DeleteMenu(NativeMethods.GetSystemMenu(conHandle, false), NativeMethods.SC_CLOSE, NativeMethods.MF_BYCOMMAND);
-      
-                    // disable quick edit mode (this causes the app to pause when the user clicks in the console window)             
+
+                    // disable quick edit mode (this causes the app to pause when the user clicks in the console window)
                     IntPtr stdHandle = NativeMethods.GetStdHandle(NativeMethods.STD_INPUT_HANDLE);
                     if (!NativeMethods.GetConsoleMode(stdHandle, out int mode))
                     {
@@ -213,30 +212,23 @@ namespace FDAApp
                     }
                 }
             }
- 
 
             // initialize and start data acquisition
             try // general error catching
             {
-               
-
                 Globals.FDAIsElevated = false;
                 Globals.FDAIsElevated = MQTTUtils.ThisProcessIsAdmin();
 
-
- 
                 // start the FDASystemManager
                 FDASystemManager systemManager;
                 switch (DBType.ToUpper())
                 {
-                    case "POSTGRESQL": systemManager = new FDASystemManagerPG(DBInstance, DBName, userName, userPass,Globals.FDAVersion, ExecutionID); break;
-                    case "SQLSERVER": systemManager = new FDASystemManagerSQL(DBInstance, DBName, userName, userPass,Globals.FDAVersion, ExecutionID); break;
+                    case "POSTGRESQL": systemManager = new FDASystemManagerPG(DBInstance, DBName, userName, userPass, Globals.FDAVersion, ExecutionID); break;
+                    case "SQLSERVER": systemManager = new FDASystemManagerSQL(DBInstance, DBName, userName, userPass, Globals.FDAVersion, ExecutionID); break;
                     default:
                         LogEvent("Unrecognized database server type '" + DBType + "'. Should be 'POSTGRESQL' or 'SQLSERVER'");
                         return;
                 }
-
-
 
                 Dictionary<string, FDAConfig> options = systemManager.GetAppConfig();
 
@@ -252,9 +244,9 @@ namespace FDAApp
                 {
                     Globals.MQTTEnabled = (options["MQTTEnabled"].OptionValue == "1");
                 }
-                
+
                 if (Globals.MQTTEnabled)
-                { 
+                {
                     MQTTConnect("localhost");
                     Globals.MQTT?.Publish("FDA/DBType", Encoding.UTF8.GetBytes(DBType.ToUpper()), 0, true);
                 }
@@ -279,7 +271,7 @@ namespace FDAApp
                 }
 
                 Console.WriteLine("Starting the Data Acquisition Manager");
-                // start the DataAcqManager             
+                // start the DataAcqManager
                 _dataAquisitionManager = new DataAcqManager(dbManager, ExecutionID);
 
                 // watch for changes to the MQTTEnabled option
@@ -298,7 +290,6 @@ namespace FDAApp
             }
             catch (Exception ex)
             {
-
                 if (Globals.SystemManager != null)
                 {
                     Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "FDA: error in application initilization");
@@ -315,37 +306,30 @@ namespace FDAApp
             }
         }
 
-
-    
-
         private static void DataAquisitionManager_MQTTEnableStatusChanged(object sender, BoolEventArgs e)
         {
             bool mqttEnabled = e.Value;
 
             if (mqttEnabled == Globals.MQTTEnabled) return;
 
-
-
             Globals.MQTTEnabled = mqttEnabled;
 
             if (mqttEnabled)
             {
-                Globals.SystemManager.LogApplicationEvent(null,"","Enabling MQTT");
+                Globals.SystemManager.LogApplicationEvent(null, "", "Enabling MQTT");
                 MQTTConnect("localhost");
                 Globals.SystemManager.LogApplicationEvent(null, "", "Starting Remote Query Manager");
 
                 ((DBManager)Globals.DBManager).StartRemoteQueryManager();
-                
             }
             else
             {
                 Globals.SystemManager.LogApplicationEvent(null, "", "Disabling Remote Query Manager");
                 ((DBManager)Globals.DBManager).StopRemoteQueryManager();
 
- 
                 if (Globals.MQTT != null)
                     if (Globals.MQTT.IsConnected)
-                        Globals.MQTT.Disconnect(); 
+                        Globals.MQTT.Disconnect();
                 Globals.MQTT = null;
             }
         }
@@ -353,13 +337,13 @@ namespace FDAApp
         private static void BSCP_ClientDisconnected(object sender, TCPServer.ClientEventArgs e)
         {
             string serverName = ((TCPServer)sender).ServerName;
-            LogEvent("TCP Client (" + e.ClientAddress + ") disconnected","TCPServer",serverName);
+            LogEvent("TCP Client (" + e.ClientAddress + ") disconnected", "TCPServer", serverName);
         }
 
         private static void BSCP_ClientConnected(object sender, TCPServer.ClientEventArgs e)
         {
-            string serverName = ((TCPServer)sender).ServerName; 
-            LogEvent("TCP client (" + e.ClientAddress + ") connected on port " + _FDAControlServer.Port,"TCPServer",serverName);
+            string serverName = ((TCPServer)sender).ServerName;
+            LogEvent("TCP client (" + e.ClientAddress + ") connected on port " + _FDAControlServer.Port, "TCPServer", serverName);
         }
 
         static private void MQTTConnect(object o)
@@ -371,7 +355,7 @@ namespace FDAApp
                 {
                     Globals.MQTT = new MqttClient(o.ToString());
                 }
-  
+
                 IConfigurationSection appConfig = configuration.GetSection("AppSettings");
                 string pass = Common.Encrypt.DecryptString(appConfig["MQTT"], "KrdXI6HhS3B8C0CulLtB");
 
@@ -391,7 +375,7 @@ namespace FDAApp
 
             if (success)
             {
-                HandleMQTTConnected();  
+                HandleMQTTConnected();
             }
             else
             {
@@ -401,7 +385,7 @@ namespace FDAApp
                 Globals.SystemManager.LogApplicationEvent(null, "", "Attempting to connect to MQTT broker");
                 // start a 5 second timer for re-attempting the connection
                 if (MqttRetryTimer == null)
-                    MqttRetryTimer = new System.Threading.Timer(MQTTConnect, o, 0, 30000);              
+                    MqttRetryTimer = new System.Threading.Timer(MQTTConnect, o, 0, 30000);
             }
         }
 
@@ -425,11 +409,8 @@ namespace FDAApp
             // subscribe to changes to MQTTenabled status of connections and tags
             Globals.MQTT.Subscribe(new string[] { "connection/+/setmqttenabled", "tag/+/setmqttenabled" }, new byte[] { 0, 0 });
 
-        
-
             // publish the current connection list
             DataAcqManager.PublishUpdatedConnectionsList();
-
 
             PublishSubscribables();
         }
@@ -439,7 +420,7 @@ namespace FDAApp
         /// </summary>
         private static void PublishSubscribables()
         {
-             if (_dataAquisitionManager != null)
+            if (_dataAquisitionManager != null)
             {
                 Dictionary<Guid, RRConnectionManager> rrConnections = DataAcqManager.GetRRConnections();
                 if (rrConnections != null)
@@ -476,39 +457,37 @@ namespace FDAApp
             }
         }
 
-  
         static internal void MQTT_MqttMsgPublishReceived(object sender, uPLibrary.Networking.M2Mqtt.Messages.MqttMsgPublishEventArgs e)
         {
             string[] topic = e.Topic.Split('/');
             if (topic.Length < 2)
                 return;
 
-             /* these commands don't come through MQTT anymore
-            if (topic[0].ToUpper() == "FDAMANAGER")
-            {
-
-                if (topic[1].ToUpper() == "COMMAND")
-                {
-                    string command = Encoding.UTF8.GetString(e.Message).ToUpper();
-                    switch (command)
-                    {
-                        // these commands will come over TCP from the FDAController service now
-                        //case "SHUTDOWN":
-                        //    DoShutdown();
-                        //    break;
-                        //case "PAUSE":
-                        //    Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "FDA Application", "", "Pause command received from FDA Manager", false, true);
-                        //    Console2.Flush();
-                        //    Globals.FDAStatus = Globals.AppState.Pausing;
-                        //    break;
-                        //case "RESUME":
-                        //    Globals.FDAStatus = Globals.AppState.Normal;
-                        //    Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "FDA Application", "", "Resume command received from FDA Manager", false, true);
-                        //    break;
-                    }
-                }
-            }
-            */
+            /* these commands don't come through MQTT anymore
+           if (topic[0].ToUpper() == "FDAMANAGER")
+           {
+               if (topic[1].ToUpper() == "COMMAND")
+               {
+                   string command = Encoding.UTF8.GetString(e.Message).ToUpper();
+                   switch (command)
+                   {
+                       // these commands will come over TCP from the FDAController service now
+                       //case "SHUTDOWN":
+                       //    DoShutdown();
+                       //    break;
+                       //case "PAUSE":
+                       //    Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "FDA Application", "", "Pause command received from FDA Manager", false, true);
+                       //    Console2.Flush();
+                       //    Globals.FDAStatus = Globals.AppState.Pausing;
+                       //    break;
+                       //case "RESUME":
+                       //    Globals.FDAStatus = Globals.AppState.Normal;
+                       //    Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "FDA Application", "", "Resume command received from FDA Manager", false, true);
+                       //    break;
+                   }
+               }
+           }
+           */
 
             if (topic.Length < 3)
                 return;
@@ -526,27 +505,27 @@ namespace FDAApp
                         if (conn != null)
                             conn.MQTTEnabled = enabled;
                         break;
+
                     case "TAG":
                         FDADataPointDefinitionStructure tag = ((DBManager)(Globals.DBManager)).GetTagDef(objectID);
                         if (tag != null)
                             tag.MQTTEnabled = enabled;
                         break;
-
                 }
             }
         }
 
         private static void TCPServer_DataAvailable(object sender, TCPServer.TCPCommandEventArgs e)
         {
-            string receivedStr = Encoding.UTF8.GetString(e.Data);      
+            string receivedStr = Encoding.UTF8.GetString(e.Data);
 
-            string[] commands = receivedStr.Split("\0",StringSplitOptions.RemoveEmptyEntries); // break up multiple commands that came in together
+            string[] commands = receivedStr.Split("\0", StringSplitOptions.RemoveEmptyEntries); // break up multiple commands that came in together
 
             //string trimmedCommand;
             foreach (string command in commands)
             {
                 // if the command is null terminated, remove the null so that the command is recognized in the switch statement below
-                
+
                 //if (command.EndsWith("\0"))
                 //{
                 //    trimmedCommand = command.Substring(0, command.Length - 1); // Encoding.UTF8.GetString(e.Data, 0, e.Data.Length - 1);
@@ -557,6 +536,7 @@ namespace FDAApp
                     case "PING":
                         _FDAControlServer.Send(e.ClientID, "OK");
                         break;
+
                     case "SHUTDOWN":
                         Globals.SystemManager?.LogApplicationEvent(Globals.FDANow(), "FDA Application", "", "Shutdown command received");
                         _FDAControlServer.Send(e.ClientID, "OK");
@@ -569,6 +549,7 @@ namespace FDAApp
                         shutdownWorker.RunWorkerAsync();
                         //DoShutdown();
                         break;
+
                     case "TOTALQUEUECOUNT":
                         //LogEvent("Getting queue counts");
                         int count = -1;
@@ -577,23 +558,28 @@ namespace FDAApp
                         //LogEvent("Replying with the count (" + count.ToString() + ")");
                         _FDAControlServer.Send(e.ClientID, count.ToString());
                         break;
+
                     case "STATUS":
-                        string jsonStatus = GetFDAStatus().JSON();                      
+                        string jsonStatus = GetFDAStatus().JSON();
                         _FDAControlServer.Send(e.ClientID, jsonStatus);
                         break;
+
                     case "VERSION":
                         // return the FDA version number and the database type
                         _FDAControlServer.Send(e.ClientID, Globals.FDAVersion);
                         break;
+
                     case "DBTYPE":
                         _FDAControlServer.Send(e.ClientID, DBType);
                         break;
+
                     case "RUNMODE":
                         if (Globals.ConsoleMode)
                             _FDAControlServer.Send(e.ClientID, "debug (console)");
                         else
                             _FDAControlServer.Send(e.ClientID, "background");
                         break;
+
                     case "UPTIME":
                         string sendString = "";
                         TimeSpan uptime;
@@ -604,15 +590,18 @@ namespace FDAApp
                         }
                         _FDAControlServer.Send(e.ClientID, sendString);
                         break;
+
                     case "PAUSE":
                         Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "FDA Application", "", "Pause command received", false, true);
                         AsyncConsole.Flush();
                         Globals.FDAStatus = Globals.AppState.Pausing;
                         break;
+
                     case "RESUME":
                         Globals.FDAStatus = Globals.AppState.Normal;
                         Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "FDA Application", "", "Resume command received", false, true);
                         break;
+
                     default:
                         Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "FDA Application", "", "Unrecognized command received over TCP '" + receivedStr + "'");
                         _FDAControlServer.Send(e.ClientID, "Unrecognized command '" + receivedStr + "'");
@@ -644,13 +633,12 @@ namespace FDAApp
                 Version = Globals.FDAVersion,
                 UpTime = uptime,
                 RunMode = mode,
-                TotalQueueCount = count    
+                TotalQueueCount = count
             };
 
             //string json = status.JSON();
             return status;
         }
-
 
         private static void DoShutdown(object sender, DoWorkEventArgs e)
         {
@@ -664,14 +652,13 @@ namespace FDAApp
             }
 
             // stop listening for changes to the DB while shutting down
-            //((DBManager)Globals.DBManager).PauseChangeMonitoring();           
+            //((DBManager)Globals.DBManager).PauseChangeMonitoring();
 
             Globals.SystemManager?.LogApplicationEvent(Globals.FDANow(), "FDA Application", "", "Shutting down the Data Acquisition Manager");
             _dataAquisitionManager?.Dispose();
 
             Globals.SystemManager?.LogApplicationEvent(Globals.FDANow(), "FDA Application", "", "Shutting down System Manager");
             Globals.SystemManager?.Dispose();
-
 
             var autoResetEvent = new AutoResetEvent(false);
 
@@ -686,7 +673,7 @@ namespace FDAApp
                     Globals.MQTT = null;
                 }
             }
-            
+
             // set the status to stopped and wait 4 seconds to allow the controller to request and receive the stopped state
             Globals.FDAStatus = Globals.AppState.Stopped;
             Thread.Sleep(4000);
@@ -708,7 +695,6 @@ namespace FDAApp
             {
                 Globals.SystemManager.LogApplicationEvent(null, "", "Disconnected from MQTT broker. Will attempt to reconnect every 5 seconds until connection is re-established");
 
-
                 if (MqttRetryTimer == null)
                     MqttRetryTimer = new System.Threading.Timer(MQTTConnect, null, 5000, 5000);
                 else
@@ -728,14 +714,13 @@ namespace FDAApp
             }
         }
 
-
         private static void RepairMosquittoService()
         {
             try
-            { 
+            {
                 // check if FDA process was run with elevated permissions
                 if (Globals.FDAIsElevated)
-                { 
+                {
                     Globals.SystemManager.LogApplicationEvent(null, "", "Unable to connect to the MQTT broker, attempting to repair the service");
                     string result = MQTTUtils.RepairMQTT();
                     if (result == "")
@@ -743,7 +728,7 @@ namespace FDAApp
                         Globals.SystemManager.LogApplicationEvent(null, "", "MQTT repair process complete");
                     }
                     else
-                        Globals.SystemManager.LogApplicationEvent(null, "", "Unable to repair MQTT broker: " + result);           
+                        Globals.SystemManager.LogApplicationEvent(null, "", "Unable to repair MQTT broker: " + result);
                 }
                 else
                 {
@@ -752,24 +737,20 @@ namespace FDAApp
                         Globals.SystemManager.LogApplicationEvent(null, "", "Warning: Unable to connect to the MQTT Broker, and the FDA cannot repair the issue because it does not have administrator privileges, please run the FDA as Administrator/SuperUser");
                         FDAElevationMessagePosted = true;
                     }
-                }                
+                }
             }
             catch (Exception ex)
             {
                 Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Error while attempting to repair the Mosquitto Broker service");
             }
         }
-        
 
-        static private void LogEvent(string message,string sourcetype="FDA",string sourcename="")
+        static private void LogEvent(string message, string sourcetype = "FDA", string sourcename = "")
         {
             if (Globals.SystemManager != null)
                 Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), sourcetype, sourcename, message);
             else
                 Console.WriteLine(Globals.FDANow().ToString() + ": " + message);
-
         }
-
     }
-
 }

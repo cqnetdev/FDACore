@@ -1,8 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
-using System.Text.Json.Serialization;
 using System.Text.Json;
+
 namespace Common
 {
     public class FDAStatus
@@ -37,15 +35,13 @@ namespace Common
             try
             {
                 status = JsonSerializer.Deserialize<FDAStatus>(json);
-            } catch
+            }
+            catch
             {
                 return new FDAStatus();
             }
 
             return status;
         }
-
-        
-       
     }
 }

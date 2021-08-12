@@ -1,10 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Collections;
-using Common;
+﻿using Common;
 using FDA;
 using Support;
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace ROC
 {
@@ -16,15 +16,16 @@ namespace ROC
         private readonly static List<string> supportedOpcodes = new(new string[] { "180", "181", "+181", "17", "120", "121", "+121", "122", "+122" });
         private readonly static List<string> OpcodesRequiringTagList = new(new string[] { "180", "181", "+181" });
         private static List<string> validationErrors;
+
         private class TLP
         {
-            readonly byte _type;
-            readonly byte _logical;
-            readonly byte _param;
+            private readonly byte _type;
+            private readonly byte _logical;
+            private readonly byte _param;
 
-            readonly DataType _datatype;
+            private readonly DataType _datatype;
 
-            byte[] _bytes;
+            private byte[] _bytes;
 
             public byte[] Bytes { get => _bytes; set => _bytes = value; }
             public DataType Datatype { get => _datatype; }
@@ -49,7 +50,6 @@ namespace ROC
                 return new TLP(_type, _logical, _param, newDataType);
             }
         }
-
 
         public static List<RequestGroup> BackfillTag(FDADataPointDefinitionStructure tagInfo, DataRequest request)
         {
@@ -76,7 +76,6 @@ namespace ROC
                 fillTo = fillTo.AddSeconds(-1 * fillFrom.Second).AddMilliseconds(-1 * fillFrom.Millisecond);
             }
 
-
             // create a new group with an HDR config string
             RequestGroup backfillGroup = (RequestGroup)request.ParentTemplateGroup.Clone();
             backfillGroup.RequesterType = Globals.RequesterType.System;
@@ -88,8 +87,6 @@ namespace ROC
             backfillGroup.BackfillStep = step;
             backfillGroup.RequeueCount = 5;
 
-
-
             string[] originalReqHeader = backfillGroup.DBGroupRequestConfig.DataPointBlockRequestListVals.Split('|')[0].Split(':');
             originalReqHeader[2] = "HDR";
             string newReqHeader = string.Join(":", originalReqHeader);
@@ -100,11 +97,9 @@ namespace ROC
             return RequestGroups;
         }
 
-      
-
         // obj is a reference to the DataAcqManager if the requestor is the FDA
         // obj is a reference to the string[] error list if the requestor is the Database Validator tool
-        private static void RecordValidationError(object obj,string groupID,string requestor,string error,bool isWarning=false)
+        private static void RecordValidationError(object obj, string groupID, string requestor, string error, bool isWarning = false)
         {
             if (requestor != "DBValidator" && !isWarning)
             {
@@ -121,29 +116,27 @@ namespace ROC
         }
 
         // for calling from the Database Validator tool
-        public static string[] ValidateRequestString(string request, Dictionary<Guid, FDADataPointDefinitionStructure> tags, Dictionary<Guid, FDADevice> devices,ref HashSet<Guid> referencedTags)
+        public static string[] ValidateRequestString(string request, Dictionary<Guid, FDADataPointDefinitionStructure> tags, Dictionary<Guid, FDADevice> devices, ref HashSet<Guid> referencedTags)
         {
             validationErrors = new List<string>();
-            ValidateRequestString(validationErrors, "", "DBValidator", request, tags, devices,referencedTags);
+            ValidateRequestString(validationErrors, "", "DBValidator", request, tags, devices, referencedTags);
             return validationErrors.ToArray();
         }
 
         // obj is a reference to the DataAcqManager if the requestor is the FDA
         // obj is a reference to the string[] error list if the requestor is the Database Validator tool
-        public static bool ValidateRequestString(object obj, string groupID, string requestor, string request, Dictionary<Guid, FDADataPointDefinitionStructure> pointDefs, Dictionary<Guid, FDADevice> deviceParams,HashSet<Guid> referencedTags = null)
+        public static bool ValidateRequestString(object obj, string groupID, string requestor, string request, Dictionary<Guid, FDADataPointDefinitionStructure> pointDefs, Dictionary<Guid, FDADevice> deviceParams, HashSet<Guid> referencedTags = null)
         {
-      
             bool valid = true;
 
             string[] headerAndTagList = request.Split('|');
             string[] header = headerAndTagList[0].Split(':');
 
-
             // the header has the correct number of elements
             if (header.Length < 5) // header can be 5 or 6 (with the optional max data size paramenter). less than 5 is invalid, elements 7+ will just be ignored
             {
                 //Globals.SystemManager.LogApplicationEvent(obj, "", " "contains an request with an invalid header (should be 'group:device:OpCode:Login:Pass:MaxDataSize(optional)'.", true);
-                RecordValidationError(obj,groupID,requestor,"contains a request with an invalid header(should be 'group:device:OpCode:Login:Pass:MaxDataSize(optional)'");
+                RecordValidationError(obj, groupID, requestor, "contains a request with an invalid header(should be 'group:device:OpCode:Login:Pass:MaxDataSize(optional)'");
                 valid = false;
             }
             else
@@ -174,18 +167,16 @@ namespace ROC
                         if (!deviceParams.ContainsKey(deviceRefID))
                         {
                             // Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with an invalid device reference (the device ID '" + deviceRefString + "' is not found).", true);
-                           RecordValidationError(obj,groupID,requestor,"contains a request with an invalid device reference (the device ID '" + deviceRefString + "' is not found).");
-                           valid = false;
+                            RecordValidationError(obj, groupID, requestor, "contains a request with an invalid device reference (the device ID '" + deviceRefString + "' is not found).");
+                            valid = false;
                         }
                     }
                 }
 
-
-
                 if (!int.TryParse(groupString, out _))
                 {
                     //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with an invalid element in the header (Device Group '" + header[0] + "' is not a number).", true);
-                    RecordValidationError(obj,groupID,requestor,"contains a request with an invalid element in the header (Device Group '" + header[0] + "' is not a number).");
+                    RecordValidationError(obj, groupID, requestor, "contains a request with an invalid element in the header (Device Group '" + header[0] + "' is not a number).");
                     valid = false;
                 }
 
@@ -193,7 +184,7 @@ namespace ROC
                 if (!int.TryParse(header[1], out _))
                 {
                     //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with an invalid element in the header (device '" + header[1] + "' is not a number).", true);
-                    RecordValidationError(obj,groupID,requestor, "contains a request with an invalid element in the header (device '" + header[1] + "' is not a number).");
+                    RecordValidationError(obj, groupID, requestor, "contains a request with an invalid element in the header (device '" + header[1] + "' is not a number).");
                     valid = false;
                 }
 
@@ -207,7 +198,7 @@ namespace ROC
                     if (opCodewithNoPlus != "HDR")
                     {
                         //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with an invalid element in the header (opcode '" + header[2] + "' is not a number. A plus (+) is allowed but no other non-numeric characters).", true);
-                        RecordValidationError(obj,groupID,requestor, "contains a request with an invalid element in the header (opcode '" + header[2] + "' is not a number. A plus (+) is allowed but no other non-numeric characters).");
+                        RecordValidationError(obj, groupID, requestor, "contains a request with an invalid element in the header (opcode '" + header[2] + "' is not a number. A plus (+) is allowed but no other non-numeric characters).");
                         valid = false;
                     }
                 }
@@ -217,8 +208,8 @@ namespace ROC
                 {
                     if (header[3].Length != 3)
                     {
-                      //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with an invalid element in the header (The ROC username '" + header[3] + "' is invalid, must be three characters).", true);
-                        RecordValidationError(obj,groupID,requestor, "contains a request with an invalid element in the header (The ROC username '" + header[3] + "' is invalid, must be three characters).");
+                        //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with an invalid element in the header (The ROC username '" + header[3] + "' is invalid, must be three characters).", true);
+                        RecordValidationError(obj, groupID, requestor, "contains a request with an invalid element in the header (The ROC username '" + header[3] + "' is invalid, must be three characters).");
                         valid = false;
                     }
                 }
@@ -231,8 +222,8 @@ namespace ROC
                         // it's a number?
                         if (!int.TryParse(header[4], out int n))
                         {
-                           //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with an invalid element in the header (The ROC password '" + header[4] + "' is not a number).", true);
-                           RecordValidationError(obj,groupID,requestor, "contains a request with an invalid element in the header (The ROC password '" + header[4] + "' is not a number).");
+                            //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with an invalid element in the header (The ROC password '" + header[4] + "' is not a number).", true);
+                            RecordValidationError(obj, groupID, requestor, "contains a request with an invalid element in the header (The ROC password '" + header[4] + "' is not a number).");
                             valid = false;
                         }
                         else
@@ -241,7 +232,7 @@ namespace ROC
                             if (n < 0 || n > ushort.MaxValue)
                             {
                                 //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with an invalid element in the header (The ROC password '" + header[4] + "' must be an integer between 0 and 65,535).", true);
-                                RecordValidationError(obj,groupID,requestor, "contains a request with an invalid element in the header (The ROC password '" + header[4] + "' must be an integer between 0 and 65,535).");
+                                RecordValidationError(obj, groupID, requestor, "contains a request with an invalid element in the header (The ROC password '" + header[4] + "' must be an integer between 0 and 65,535).");
                                 valid = false;
                             }
                         }
@@ -253,7 +244,7 @@ namespace ROC
                     if (!int.TryParse(header[5], out _))
                     {
                         //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with an invalid element in the header (MaxDataSize '" + header[5] + "' is not a number).", true);
-                        RecordValidationError(obj,groupID,requestor,"contains a request with an invalid element in the header (MaxDataSize '" + header[5] + "' is not a number).");
+                        RecordValidationError(obj, groupID, requestor, "contains a request with an invalid element in the header (MaxDataSize '" + header[5] + "' is not a number).");
                         valid = false;
                     }
                 }
@@ -264,13 +255,11 @@ namespace ROC
                     if (!supportedOpcodes.Contains(header[2]))
                     {
                         //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with an invalid element in the header (Opcode '" + header[2] + "' is not supported).", true);
-                        RecordValidationError(obj,groupID,requestor,"contains a request with an invalid element in the header (Opcode '" + header[2] + "' is not supported).");
+                        RecordValidationError(obj, groupID, requestor, "contains a request with an invalid element in the header (Opcode '" + header[2] + "' is not supported).");
                         valid = false;
                     }
                 }
             }
-
-
 
             // for those opcodes that require a TagList (information after the |)
             // string contains at least 1 header / tagList (separated by '|')
@@ -279,7 +268,7 @@ namespace ROC
                 if (headerAndTagList.Length < 2)
                 {
                     //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an invalid request (requires at least 1 | character)'.", true);
-                    RecordValidationError(obj,groupID,requestor, "contains an invalid request (requires at least 1 | character)'.");
+                    RecordValidationError(obj, groupID, requestor, "contains an invalid request (requires at least 1 | character)'.");
                     valid = false;
                     return valid;
                 }
@@ -293,9 +282,8 @@ namespace ROC
                     if (tagInfo.Length < 5)
                     {
                         //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with invalid tag information, should be 'Type:Logical:Parameter:DataType:DataPointID'.", true);
-                        RecordValidationError(obj,groupID,requestor, "contains a request with invalid tag information, should be 'Type:Logical:Parameter:DataType:DataPointID'.");
+                        RecordValidationError(obj, groupID, requestor, "contains a request with invalid tag information, should be 'Type:Logical:Parameter:DataType:DataPointID'.");
                         valid = false;
-
                     }
                     else
                     {
@@ -303,21 +291,21 @@ namespace ROC
                         if (!int.TryParse(tagInfo[0], out _))
                         {
                             //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with  invalid tag information (point type '" + tagInfo[0] + "' is not a number).", true);
-                            RecordValidationError(obj,groupID,requestor, "contains a request with  invalid tag information (point type '" + tagInfo[0] + "' is not a number).");
+                            RecordValidationError(obj, groupID, requestor, "contains a request with  invalid tag information (point type '" + tagInfo[0] + "' is not a number).");
                             valid = false;
                         }
 
                         if (!int.TryParse(tagInfo[1], out _))
                         {
                             //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with  invalid tag information (logical number '" + tagInfo[1] + "' is not a number).", true);
-                           RecordValidationError(obj,groupID,requestor, "contains a request with  invalid tag information (logical number '" + tagInfo[1] + "' is not a number).");
-                           valid = false;
+                            RecordValidationError(obj, groupID, requestor, "contains a request with  invalid tag information (logical number '" + tagInfo[1] + "' is not a number).");
+                            valid = false;
                         }
 
                         if (!int.TryParse(tagInfo[2], out _))
                         {
                             //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with  invalid tag information (parameter '" + tagInfo[2] + "' is not a number).", true);
-                            RecordValidationError(obj,groupID,requestor, "contains a request with  invalid tag information (parameter '" + tagInfo[2] + "' is not a number).");
+                            RecordValidationError(obj, groupID, requestor, "contains a request with  invalid tag information (parameter '" + tagInfo[2] + "' is not a number).");
                             valid = false;
                         }
 
@@ -326,7 +314,7 @@ namespace ROC
                         if (!DataType.IsValidType(dataType))
                         {
                             //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with invalid tag information (the data type '" + tagInfo[3] + "' is not recognized).", true);
-                            RecordValidationError(obj,groupID,requestor,"contains a request with invalid tag information (the data type '" + tagInfo[3] + "' is not recognized).");
+                            RecordValidationError(obj, groupID, requestor, "contains a request with invalid tag information (the data type '" + tagInfo[3] + "' is not recognized).");
                             valid = false;
                         }
 
@@ -338,7 +326,7 @@ namespace ROC
                                 if (!(dataType == "BIN" && tagInfo[counter] == "0")) // exception for guid = 0 in the case of BIN data type
                                 {
                                     //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with invalid tag information (the tag ID '" + tagInfo[counter] + "' is not a valid UID, should be in the format xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx).", true);
-                                    RecordValidationError(obj,groupID,requestor,"contains a request with invalid tag information (the tag ID '" + tagInfo[counter] + "' is not a valid UID, should be in the format xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx).");
+                                    RecordValidationError(obj, groupID, requestor, "contains a request with invalid tag information (the tag ID '" + tagInfo[counter] + "' is not a valid UID, should be in the format xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx).");
                                     valid = false;
                                 }
                             }
@@ -365,7 +353,6 @@ namespace ROC
                                     if (!tag.DPDSEnabled)
                                     {
                                         RecordValidationError(obj, groupID, requestor, "contains a reference to a tag'" + tagInfo[counter] + "' that is disabled", true);
-
                                     }
                                 }
                             }
@@ -374,43 +361,41 @@ namespace ROC
                 }
             }
 
-            // special handling for backfill requests 
-            if (valid && header[2]=="HDR")
+            // special handling for backfill requests
+            if (valid && header[2] == "HDR")
             {
                 string[] tagInfo;
                 string[] fromTimeStr;
                 string[] toTimeStr;
                 for (int i = 1; i < headerAndTagList.Length; i++)
                 {
-                    
                     tagInfo = headerAndTagList[i].Split(':');
 
                     // ********************* minumum number of fields are present ********************
                     if (tagInfo.Length < 5)
-                    { 
+                    {
                         //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with invalid information. Historical Data Requests (HDR) format is 'HPN:DataType:DPDUID:FromTime:ToTime:step(optional)'.", true);
-                        RecordValidationError(obj,groupID,requestor, "contains a request with invalid information. Historical Data Requests (HDR) format is 'HPN:DataType:DPDUID:FromTime:ToTime:step(optional)'.");
+                        RecordValidationError(obj, groupID, requestor, "contains a request with invalid information. Historical Data Requests (HDR) format is 'HPN:DataType:DPDUID:FromTime:ToTime:step(optional)'.");
                         valid = false;
                     }
 
-
                     //********************* numeric elements are numeric *********************************
 
-                    // Element 0 (HPN) 
+                    // Element 0 (HPN)
                     if (!int.TryParse(tagInfo[0], out _))
                     {
                         //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with  invalid information (The value for HPN of '" + tagInfo[0] + "' is not a number).", true);
-                       RecordValidationError(obj,groupID,requestor, "contains a request with  invalid information (The value for HPN of '" + tagInfo[0] + "' is not a number).");
+                        RecordValidationError(obj, groupID, requestor, "contains a request with  invalid information (The value for HPN of '" + tagInfo[0] + "' is not a number).");
                         valid = false;
                     }
 
                     // Element 5 (step) if present, is numeric
                     if (tagInfo.Length > 5)
                     {
-                        if (!int.TryParse(tagInfo[5],out _))
+                        if (!int.TryParse(tagInfo[5], out _))
                         {
                             //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with  invalid information (The Step value of '" + tagInfo[5] + "' is not a number).", true);
-                            RecordValidationError(obj,groupID,requestor,"contains a request with  invalid information (The Step value of '" + tagInfo[5] + "' is not a number).");
+                            RecordValidationError(obj, groupID, requestor, "contains a request with  invalid information (The Step value of '" + tagInfo[5] + "' is not a number).");
                             valid = false;
                         }
                     }
@@ -420,7 +405,7 @@ namespace ROC
                     if (n < 1 || n > 255)
                     {
                         //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with  invalid information (The HPN value of '" + tagInfo[5] + "' is out of range, valid values are 0 - 254).", true);
-                        RecordValidationError(obj,groupID,requestor, "contains a request with  invalid information (The HPN value of '" + tagInfo[5] + "' is out of range, valid values are 0 - 254).");
+                        RecordValidationError(obj, groupID, requestor, "contains a request with  invalid information (The HPN value of '" + tagInfo[5] + "' is out of range, valid values are 0 - 254).");
                         valid = false;
                     }
 
@@ -428,13 +413,12 @@ namespace ROC
                     fromTimeStr = tagInfo[3].Split('-');
                     toTimeStr = tagInfo[4].Split('-');
 
-
                     // Element 3 (fromTime)
                     // fromTime has the right number of elements
                     if (fromTimeStr.Length != 5)
                     {
                         //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with  invalid information ('" + tagInfo[3] + "' is not a valid Date/Time).", true);
-                        RecordValidationError(obj,groupID,requestor, "contains a request with  invalid information ('" + tagInfo[3] + "' is not a valid Date/Time).");
+                        RecordValidationError(obj, groupID, requestor, "contains a request with  invalid information ('" + tagInfo[3] + "' is not a valid Date/Time).");
                         valid = false;
                     }
 
@@ -444,7 +428,7 @@ namespace ROC
                         if (!int.TryParse(element, out _))
                         {
                             //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with  invalid information ('" + tagInfo[3] + "' is not a valid Date/Time).", true);
-                            RecordValidationError(obj,groupID,requestor,"contains a request with  invalid information ('" + tagInfo[3] + "' is not a valid Date/Time).");
+                            RecordValidationError(obj, groupID, requestor, "contains a request with  invalid information ('" + tagInfo[3] + "' is not a valid Date/Time).");
                             valid = false;
                         }
                     }
@@ -457,7 +441,7 @@ namespace ROC
                         if (n < 0 || n > 99)
                         {
                             //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with  invalid information ('" + tagInfo[3] + "' has a invalid year).", true);
-                            RecordValidationError(obj,groupID,requestor, "contains a request with  invalid information ('" + tagInfo[3] + "' has a invalid year).");
+                            RecordValidationError(obj, groupID, requestor, "contains a request with  invalid information ('" + tagInfo[3] + "' has a invalid year).");
                             valid = false;
                         }
 
@@ -466,16 +450,16 @@ namespace ROC
                         if (month < 1 || month > 12)
                         {
                             //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with  invalid information ('" + tagInfo[3] + "' has an invalid month).", true);
-                            RecordValidationError(obj,groupID,requestor, "contains a request with  invalid information ('" + tagInfo[3] + "' has an invalid month).");
+                            RecordValidationError(obj, groupID, requestor, "contains a request with  invalid information ('" + tagInfo[3] + "' has an invalid month).");
                             valid = false;
                         }
 
                         //day
                         int day = int.Parse(fromTimeStr[2]);
-                        if (!DateTimeHelpers.IsValidDayOfMonth(day,month))
+                        if (!DateTimeHelpers.IsValidDayOfMonth(day, month))
                         {
                             //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with  invalid information ('" + tagInfo[3] + "' has an invalid day).", true);
-                            RecordValidationError(obj,groupID,requestor,"contains a request with  invalid information ('" + tagInfo[3] + "' has an invalid day).");
+                            RecordValidationError(obj, groupID, requestor, "contains a request with  invalid information ('" + tagInfo[3] + "' has an invalid day).");
                             valid = false;
                         }
 
@@ -484,27 +468,25 @@ namespace ROC
                         if (n < 0 || n > 23)
                         {
                             //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with  invalid information ('" + tagInfo[3] + "' has an invalid hour).", true);
-                            RecordValidationError(obj,groupID,requestor, "contains a request with  invalid information ('" + tagInfo[3] + "' has an invalid hour).");
+                            RecordValidationError(obj, groupID, requestor, "contains a request with  invalid information ('" + tagInfo[3] + "' has an invalid hour).");
                             valid = false;
                         }
 
                         // minute
                         n = int.Parse(fromTimeStr[4]);
-                        if (n<0 || n > 59)
+                        if (n < 0 || n > 59)
                         {
                             //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with  invalid information ('" + tagInfo[3] + "' has an invalid minute).", true);
-                            RecordValidationError(obj,groupID,requestor, "contains a request with  invalid information ('" + tagInfo[3] + "' has an invalid minute).");
+                            RecordValidationError(obj, groupID, requestor, "contains a request with  invalid information ('" + tagInfo[3] + "' has an invalid minute).");
                             valid = false;
                         }
-
-
 
                         // Element 4 (toTime)
                         // toTime has the right number of elements
                         if (toTimeStr.Length != 5)
                         {
                             //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with  invalid information ('" + tagInfo[4] + "' is not a valid Date/Time).", true);
-                           RecordValidationError(obj,groupID,requestor, "contains a request with  invalid information ('" + tagInfo[4] + "' is not a valid Date/Time).");
+                            RecordValidationError(obj, groupID, requestor, "contains a request with  invalid information ('" + tagInfo[4] + "' is not a valid Date/Time).");
                             valid = false;
                         }
 
@@ -514,7 +496,7 @@ namespace ROC
                             if (!int.TryParse(element, out n))
                             {
                                 //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with  invalid information ('" + tagInfo[4] + "' is not a valid Date/Time).", true);
-                                RecordValidationError(obj,groupID,requestor, "contains a request with  invalid information ('" + tagInfo[4] + "' is not a valid Date/Time).");
+                                RecordValidationError(obj, groupID, requestor, "contains a request with  invalid information ('" + tagInfo[4] + "' is not a valid Date/Time).");
                                 valid = false;
                             }
                         }
@@ -526,16 +508,16 @@ namespace ROC
                         if (n < 0 || n > 99)
                         {
                             //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with  invalid information ('" + tagInfo[4] + "' has an invalid year).", true);
-                            RecordValidationError(obj,groupID,requestor, "contains a request with  invalid information ('" + tagInfo[4] + "' has an invalid year).");
+                            RecordValidationError(obj, groupID, requestor, "contains a request with  invalid information ('" + tagInfo[4] + "' has an invalid year).");
                             valid = false;
                         }
 
                         // month
                         month = int.Parse(toTimeStr[1]);
-                        if (month < 1 ||month > 12)
+                        if (month < 1 || month > 12)
                         {
                             //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with  invalid information ('" + tagInfo[4] + "' has an invalid month).", true);
-                            RecordValidationError(obj,groupID,requestor,"contains a request with  invalid information ('" + tagInfo[4] + "' has an invalid month).");
+                            RecordValidationError(obj, groupID, requestor, "contains a request with  invalid information ('" + tagInfo[4] + "' has an invalid month).");
                             valid = false;
                         }
 
@@ -543,8 +525,8 @@ namespace ROC
                         day = int.Parse(toTimeStr[2]);
                         if (!DateTimeHelpers.IsValidDayOfMonth(day, month))
                         {
-//                            Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with  invalid information ('" + tagInfo[4] + "' has an invalid day).", true);
-                            RecordValidationError(obj,groupID,requestor,"contains a request with  invalid information ('" + tagInfo[4] + "' has an invalid day).");
+                            //                            Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with  invalid information ('" + tagInfo[4] + "' has an invalid day).", true);
+                            RecordValidationError(obj, groupID, requestor, "contains a request with  invalid information ('" + tagInfo[4] + "' has an invalid day).");
                             valid = false;
                         }
 
@@ -553,7 +535,7 @@ namespace ROC
                         if (n < 0 || n > 23)
                         {
                             //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with  invalid information ('" + tagInfo[4] + "' has an invalid hour).", true);
-                            RecordValidationError(obj,groupID,requestor,"contains a request with  invalid information ('" + tagInfo[4] + "' has an invalid hour).");
+                            RecordValidationError(obj, groupID, requestor, "contains a request with  invalid information ('" + tagInfo[4] + "' has an invalid hour).");
                             valid = false;
                         }
 
@@ -562,7 +544,7 @@ namespace ROC
                         if (n < 0 || n > 59)
                         {
                             //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with  invalid information ('" + tagInfo[4] + "' has an invalid minute).", true);
-                            RecordValidationError(obj,groupID,requestor, "contains a request with  invalid information ('" + tagInfo[4] + "' has an invalid minute).");
+                            RecordValidationError(obj, groupID, requestor, "contains a request with  invalid information ('" + tagInfo[4] + "' has an invalid minute).");
                             valid = false;
                         }
                     }
@@ -576,12 +558,10 @@ namespace ROC
                         if (toTime < fromTime)
                         {
                             //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with  invalid information (the 'to' time " + tagInfo[4] + " is before the 'from' time" + tagInfo[3] + ").", true);
-                            RecordValidationError(obj,groupID,requestor,"contains a request with  invalid information (the 'to' time " + tagInfo[4] + " is before the 'from' time" + tagInfo[3] + ").");
+                            RecordValidationError(obj, groupID, requestor, "contains a request with  invalid information (the 'to' time " + tagInfo[4] + " is before the 'from' time" + tagInfo[3] + ").");
                             valid = false;
                         }
-
                     }
-
 
                     //element 5 (step)
                     if (tagInfo.Length > 5)
@@ -589,18 +569,17 @@ namespace ROC
                         if (!int.TryParse(tagInfo[5], out _))
                         {
                             //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with  invalid information (the inteval value '" + tagInfo[5] + "' is not a number).", true);
-                           RecordValidationError(obj,groupID,requestor, "contains a request with  invalid information (the inteval value '" + tagInfo[5] + "' is not a number).");
+                            RecordValidationError(obj, groupID, requestor, "contains a request with  invalid information (the inteval value '" + tagInfo[5] + "' is not a number).");
                             valid = false;
-                        }                      
+                        }
                     }
 
-                  
                     // element 1 is a valid roc data type
                     string dataType = tagInfo[1].ToUpper();
                     if (!DataType.IsValidType(dataType))
                     {
                         //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with invalid tag information (the data type '" + tagInfo[1] + "' is not recognized).", true);
-                        RecordValidationError(obj,groupID,requestor, "contains a request with invalid tag information (the data type '" + tagInfo[1] + "' is not recognized).");
+                        RecordValidationError(obj, groupID, requestor, "contains a request with invalid tag information (the data type '" + tagInfo[1] + "' is not recognized).");
                         valid = false;
                     }
 
@@ -610,7 +589,7 @@ namespace ROC
                         if (!(dataType == "BIN" && tagInfo[2] == "0")) // exception for guid = 0 in the case of BIN data type
                         {
                             //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with invalid tag information (the tag ID '" + tagInfo[2] + "' is not a valid UID, should be in the format xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx).", true);
-                           RecordValidationError(obj,groupID,requestor, "contains a request with invalid tag information (the tag ID '" + tagInfo[2] + "' is not a valid UID, should be in the format xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx).");
+                            RecordValidationError(obj, groupID, requestor, "contains a request with invalid tag information (the tag ID '" + tagInfo[2] + "' is not a valid UID, should be in the format xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx).");
                             valid = false;
                         }
                     }
@@ -619,7 +598,7 @@ namespace ROC
                         if (!pointDefs.ContainsKey(Guid.Parse(tagInfo[2])))
                         {
                             //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an request with  invalid tag information (the tag ID '" + tagInfo[2] + "' is not found.", true);
-                            RecordValidationError(obj,groupID,requestor,"contains a request with  invalid tag information (the tag ID '" + tagInfo[2] + "' is not found.");
+                            RecordValidationError(obj, groupID, requestor, "contains a request with  invalid tag information (the tag ID '" + tagInfo[2] + "' is not found.");
                             valid = false;
                         }
                     }
@@ -633,30 +612,29 @@ namespace ROC
                 if (pointerInfo.Length < 2)
                 {
                     //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an Alarms/Events request with invalid pointers specified.", true);
-                   RecordValidationError(obj,groupID,requestor, "contains an Alarms/Events request with invalid pointers specified.");
-                   valid = false;
+                    RecordValidationError(obj, groupID, requestor, "contains an Alarms/Events request with invalid pointers specified.");
+                    valid = false;
                 }
                 else
                 {
-
                     if (!int.TryParse(pointerInfo[0], out int start))
                     {
                         //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an Alarms/Events request with invalid pointers specified.", true);
-                        RecordValidationError(obj,groupID,requestor,"contains an Alarms/Events request with invalid pointers specified.");
+                        RecordValidationError(obj, groupID, requestor, "contains an Alarms/Events request with invalid pointers specified.");
                         valid = false;
                     }
 
                     if (!int.TryParse(pointerInfo[1], out int end))
                     {
                         //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an Alarms/Events request with invalid pointers specified.", true);
-                        RecordValidationError(obj,groupID,requestor, "contains an Alarms/Events request with invalid pointers specified.");
+                        RecordValidationError(obj, groupID, requestor, "contains an Alarms/Events request with invalid pointers specified.");
                         valid = false;
                     }
 
                     if (start < 0 || start > 239 || end < 0 || end > 239)
                     {
                         //Globals.SystemManager.LogApplicationEvent(obj, "", "contains an Alarms/Events request with invalid pointers specified.", true);
-                        RecordValidationError(obj,groupID,requestor,"contains an Alarms/Events request with invalid pointers specified.");
+                        RecordValidationError(obj, groupID, requestor, "contains an Alarms/Events request with invalid pointers specified.");
                         valid = false;
                     }
                 }
@@ -710,12 +688,10 @@ namespace ROC
                     }
                 }
             }
- 
         }
 
         public static void CreateRequests(RequestGroup requestGroup, object protocolOptions = null)
         {
-
             //  dbRequest definition example  (two requests to two different devices, each with two tags)
             // 2:1:180:LOI:|
             //    10:1:3:FL:77048344-0506-49E0-A032-6E6591C2E4FD|  (T:L:P:type:ID)
@@ -747,14 +723,13 @@ namespace ROC
                 Tag newTag;
                 TLP newTLP;
                 Guid TagID;
-                
+
                 string login;
                 short pwd;
                 string opCode;
                 byte groupNum;
                 byte devNum;
                 FDADevice deviceSettings = null;
-
 
                 // check for null or empty group definition, exit if found
                 if (requestString == null || requestString == string.Empty)
@@ -788,12 +763,10 @@ namespace ROC
                         {
                             if (headerElement0.Length > 1)
                             {
-
                                 Guid deviceRef = Guid.Parse(headerElement0[1]);
                                 deviceSettings = ((DBManager)Globals.DBManager).GetDevice(deviceRef);
                             }
                         }
-
 
                         groupNum = Byte.Parse(headerElement0[0]);   // device group number
                         devNum = Byte.Parse(Header[1]);     // device unit number
@@ -809,11 +782,9 @@ namespace ROC
 
                         if (maxDataSize > 240 || maxDataSize < 20)
                         {
-
                             Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "Protocol", "ROC", "Request group " + requestGroup.ID + " maximum message size " + maxDataSize + " is invalid. using max data block size of 240 bytes");
                             maxDataSize = 240;
                         }
-
                     }
                     catch (Exception ex)
                     {
@@ -821,7 +792,6 @@ namespace ROC
                         Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "FDA.ROCProtocol: Error while parsing the header of request group ID " + requestGroup.ID);
                         continue;
                     }
-
 
                     // historical data requests
                     if (opCode == "HDR")
@@ -833,8 +803,6 @@ namespace ROC
                         string requestStr = requestGroup.DBGroupRequestConfig.DataPointBlockRequestListVals;
                         string[] parsed = requestStr.Split('|');
                         string[] body = parsed[1].Split(':');
-
-
 
                         int interval = 1;
                         if (HDRparams.Length > 5)
@@ -849,9 +817,7 @@ namespace ROC
                         DateTime toTime = BackfillToDateTime(toTimeStr);
                         DateTime currentTime = Globals.FDANow();
 
-
                         TimeSpan gap = toTime.Subtract(fromTime);
-
 
                         if (currentTime.Subtract(toTime).TotalHours > 840)
                         {
@@ -865,13 +831,11 @@ namespace ROC
                             return;
                         }
 
-
                         if (currentTime.Subtract(fromTime).TotalHours > 840)
                         {
                             // the requested starting point is too old, adjust it to the oldest available data
                             fromTime = currentTime.AddHours(-840);
                         }
-
 
                         if (currentTime.Subtract(toTime).TotalHours < 0)
                         {
@@ -899,13 +863,7 @@ namespace ROC
 
                             int startIdx = (int)currentTime.Subtract(minuteDataTo).TotalMinutes;
 
-
-
-
                             // update the request string with these values
-
-
-
 
                             // update the body of the request with the startIdx and Count values
                             body[3] = startIdx.ToString();
@@ -919,7 +877,7 @@ namespace ROC
                             foreach (DataRequest req in requestGroup.ProtocolRequestList)
                                 req.ParentTemplateGroup = requestGroup;
 
-                             return;
+                            return;
                         }
 
                         // minute data not required, request hourly data
@@ -944,14 +902,10 @@ namespace ROC
                             }
                         }
 
-
-
-
                         requestGroup.ProtocolRequestList = BackfillHourData(requestGroup);
 
-                         return;
-                    }   
-
+                        return;
+                    }
 
                     if (opCode == "128")
                     {
@@ -972,11 +926,8 @@ namespace ROC
                             historyRequestList = GenerateOpcode130Request(requestGroup.ID, requestGroup.ConnectionID, groupNum, devNum, 1, 1, login, pwd, requestBody);
 
                         requestGroup.ProtocolRequestList.AddRange(historyRequestList);
-                         return;
+                        return;
                     }
-                    
- 
-                                      
 
                     tlpList = new List<TLP>();
                     tagList = new List<Tag>();
@@ -1006,13 +957,11 @@ namespace ROC
                             parameter = Byte.Parse(TagData[2]);
                             type = DataType.GetType(TagData[3]);
 
-
                             if (!Guid.TryParse(TagData[4], out TagID))  // check for bad ID
                             {
                                 if (type == DataType.BIN && TagData[4] == "0")  // an ID of 0 gets recognized as a bad ID, but it's ok if the data type is BIN
                                     TagID = Guid.Empty;                         // insert a placeholder in this case
                             }
-
 
                             tagidx++;
                         }
@@ -1028,7 +977,6 @@ namespace ROC
                         if (type == DataType.AC10 || type == DataType.AC20 || type == DataType.AC30)
                             continue;
 
-                        
                         try
                         {
                             if (type == DataType.BIN)    // BIN data type requires special handling
@@ -1088,7 +1036,6 @@ namespace ROC
                         {
                             Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "FDA.ROCPRotocol: Error while processing group " + requestGroup.ID.ToString() + " : Data point definition ID not found (" + TagID.ToString() + ")");
                         }
-                        
                     }
 
                     // check if a OpcodePlus (readback or pre-read, depending on the opcode) is indicated, and strip the + from the opcode field if it is present
@@ -1097,8 +1044,8 @@ namespace ROC
                     if (OpcodePlus)
                         opCode = opCode.Substring(1, opCode.Length - 1);
 
-                    // GenerateReadRequest now returns a list of DataRequests, 
-                    //in the event that the definition would result in an oversized response message and needs to be broken up into multiple requests 
+                    // GenerateReadRequest now returns a list of DataRequests,
+                    //in the event that the definition would result in an oversized response message and needs to be broken up into multiple requests
                     List<DataRequest> subRequestList = new();
                     byte[] ptrs;
                     ushort lastRead;
@@ -1108,14 +1055,14 @@ namespace ROC
                     {
                         // current pointers request
                         case "120":
-                            subRequestList = GenerateOpcode120Request("", groupNum, devNum, 1, 1, requestIdx + 1,false,DataRequest.RequestType.AlarmEventPointers);
+                            subRequestList = GenerateOpcode120Request("", groupNum, devNum, 1, 1, requestIdx + 1, false, DataRequest.RequestType.AlarmEventPointers);
                             break;
                         // alarms request
                         case "121":
                             if (OpcodePlus)
                             {
                                 // Generate an Opcode 120 request, the Opcode 121 will be run when the 120 request is complete
-                                subRequestList = GenerateOpcode120Request("", groupNum, devNum, 1, 1, requestIdx + 1, true,DataRequest.RequestType.AlarmEventPointers);                                
+                                subRequestList = GenerateOpcode120Request("", groupNum, devNum, 1, 1, requestIdx + 1, true, DataRequest.RequestType.AlarmEventPointers);
                                 break;
                             }
 
@@ -1127,7 +1074,7 @@ namespace ROC
                                     lastRead = ptrs[0];
                                     current = ptrs[1];
 
-                                    subRequestList = GenerateAlarmEventsRequests(requestGroup.ID, "", groupNum, devNum, 1, 1, 121, lastRead, current,false, (requestIdx + 1).ToString());
+                                    subRequestList = GenerateAlarmEventsRequests(requestGroup.ID, "", groupNum, devNum, 1, 1, 121, lastRead, current, false, (requestIdx + 1).ToString());
                                 }
                                 else
                                 {
@@ -1148,22 +1095,22 @@ namespace ROC
                                 end = MiscHelpers.AddCircular(end, -1, 0, 239);
 
                                 // when specifying pointers, we need to include the first and last record in the results (the last read and current records are normally excluded), so we set "inclusive" to true
-                                subRequestList = GenerateAlarmEventsRequests(requestGroup.ID, "", groupNum, devNum, 1, 1, 121,Convert.ToUInt16(start),Convert.ToUInt16(end),true,(requestIdx + 1).ToString());
+                                subRequestList = GenerateAlarmEventsRequests(requestGroup.ID, "", groupNum, devNum, 1, 1, 121, Convert.ToUInt16(start), Convert.ToUInt16(end), true, (requestIdx + 1).ToString());
                             }
                             else
                             {
                                 Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "ROC Protocol", "Opcode 121 request with specified pointers requires two values (First Pointer:Last Pointer)");
                                 return;
                             }
-                            
-                            break; 
+
+                            break;
 
                         //events request
                         case "122":
                             if (OpcodePlus)
                             {
                                 // Generate an Opcode 120 request, the Opcode 121 will be run when the 120 request is complete
-                                subRequestList = GenerateOpcode120Request("", groupNum, devNum, 1, 1, requestIdx + 1, true,DataRequest.RequestType.AlarmEventPointers);
+                                subRequestList = GenerateOpcode120Request("", groupNum, devNum, 1, 1, requestIdx + 1, true, DataRequest.RequestType.AlarmEventPointers);
                                 break;
                             }
 
@@ -1174,12 +1121,12 @@ namespace ROC
                                 {
                                     lastRead = ptrs[0];
                                     current = ptrs[1];
-                                    if (MiscHelpers.AddCircular(lastRead,1,1,240)==current)
+                                    if (MiscHelpers.AddCircular(lastRead, 1, 1, 240) == current)
                                     {
                                         Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "ROCProtocol", "", "Alarms request for device " + groupNum + ":" + devNum + " on connection " + requestGroup.ConnectionID + " cancelled, because there are no new records");
                                         break;
                                     }
-                                    subRequestList = GenerateAlarmEventsRequests(requestGroup.ID, "", groupNum, devNum, 1, 1, 122, lastRead, current,false, (requestIdx + 1).ToString());
+                                    subRequestList = GenerateAlarmEventsRequests(requestGroup.ID, "", groupNum, devNum, 1, 1, 122, lastRead, current, false, (requestIdx + 1).ToString());
                                 }
                                 else
                                 {
@@ -1192,14 +1139,14 @@ namespace ROC
                             // use the pointers that were specified in the request string
                             if (TagData.Length >= 2)
                             {
-                                int start  = int.Parse(TagData[0]);
+                                int start = int.Parse(TagData[0]);
                                 int end = int.Parse(TagData[1]);
 
                                 // convert to zero based
                                 start = MiscHelpers.AddCircular(start, -1, 0, 239);
                                 end = MiscHelpers.AddCircular(end, -1, 0, 239);
 
-                                subRequestList = GenerateAlarmEventsRequests(requestGroup.ID, "", groupNum, devNum, 1, 1, 122, Convert.ToUInt16(start),Convert.ToUInt16(end), true, (requestIdx + 1).ToString());
+                                subRequestList = GenerateAlarmEventsRequests(requestGroup.ID, "", groupNum, devNum, 1, 1, 122, Convert.ToUInt16(start), Convert.ToUInt16(end), true, (requestIdx + 1).ToString());
                             }
                             else
                             {
@@ -1211,7 +1158,7 @@ namespace ROC
                         case "180": subRequestList = GenerateReadRequest(requestGroup.ID, "", groupNum, devNum, 1, 1, tlpList.ToArray(), tagConfigsList, tagList, requestIdx + 1, maxDataSize, DataRequest.RequestType.Read); break;
 
                         // Write Param(s)
-                        // opcode 181, write data request. Generate a new DataRequest object for it, identify it as a write, and include the list of tags. 
+                        // opcode 181, write data request. Generate a new DataRequest object for it, identify it as a write, and include the list of tags.
                         // DataAcqManager will update it with the values to be written and send it back to the protocol to be completed using CompleteWriteRequests functions
                         case "181":
                             if (containsBIN && requestGroup.RequesterType != Globals.RequesterType.System)  // do a read of the current value of binary tag(s) before writing, if any binary tags are found in the list
@@ -1221,14 +1168,13 @@ namespace ROC
 
                                 foreach (DataRequest req in subRequestList)
                                     req.ValuesToWrite = requestGroup.writeLookup;
-                                
+
                                 // cancel the readback if it was requested
                                 OpcodePlus = false;
-
                             }
                             else
-                            { 
-                                subRequestList = GenerateWriteRequest("", groupNum, devNum, 1, 1, tlpList.ToArray(), tagConfigsList, requestGroup.writeLookup,PreReadValues,requestIdx + 1);
+                            {
+                                subRequestList = GenerateWriteRequest("", groupNum, devNum, 1, 1, tlpList.ToArray(), tagConfigsList, requestGroup.writeLookup, PreReadValues, requestIdx + 1);
                             }
                             break;
 
@@ -1271,7 +1217,6 @@ namespace ROC
                             readbackSubRequest.DeviceSettings = deviceSettings;
                         }
                         requestGroup.ProtocolRequestList.AddRange(readbackSubRequestList);
-                      
                     }
                 }
 
@@ -1282,7 +1227,6 @@ namespace ROC
             {
                 Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Roc Protocol CreateRequests() general error");
             }
-
         }
 
         public static void CancelDeviceRequests(DataRequest failedReq)
@@ -1308,7 +1252,7 @@ namespace ROC
             }
         }
 
-        private static List<DataRequest> BackfillHourData(RequestGroup requestGroup,int currentPtr=-1)
+        private static List<DataRequest> BackfillHourData(RequestGroup requestGroup, int currentPtr = -1)
         {
             string requestStr = requestGroup.DBGroupRequestConfig.DataPointBlockRequestListVals;
             string[] parsed = requestStr.Split('|');
@@ -1318,7 +1262,6 @@ namespace ROC
             byte deviceGroup = byte.Parse(header[0]);
             byte deviceNum = byte.Parse(header[1]);
             string login = header[3];
-
 
             if (!short.TryParse(header[4], out short pwd))
                 pwd = -1;
@@ -1347,7 +1290,7 @@ namespace ROC
                 DateTime fillFrom = requestGroup.BackfillStartTime;
                 DateTime fillTo = requestGroup.BackfillEndTime;
                 int step = requestGroup.BackfillStep;
- 
+
                 // we don't need hourly data that is within 1 hour from the current time, that will be covered by minute data
                 if (fillTo > currentTime.Subtract(new TimeSpan(1, 0, 0)))
                     fillTo = currentTime.Subtract(new TimeSpan(1, 0, 0));
@@ -1361,9 +1304,8 @@ namespace ROC
 
                 // how many hour values to we need to request to fill in the gap, at the specified interval?
                 // we've already limited the maximum gap for a single request to 60 hours, so the gapSize won't be more than 60 -- note! this not true anymore
-                int fullGapSize = (int)(fillTo.Subtract(fillFrom).TotalHours)+1;
+                int fullGapSize = (int)(fillTo.Subtract(fillFrom).TotalHours) + 1;
 
-                
                 int thisReqCount = fullGapSize;
 
                 if (thisReqCount > 60)
@@ -1377,14 +1319,13 @@ namespace ROC
                 // how many hours between the current time and the backfill end time?
                 // our start index is the current pointer minus that number
                 int startIdx = currentPtr - (int)currentTime.Subtract(fillTo).TotalHours; // + 1?
-    
+
                 // index to start at is (end of the gap - size of the gap)
                 startIdx -= (int)fullGapSize;
 
                 // if the startIdx is less than 0 after all the adjustments, we need to wrap it around
                 if (startIdx < 0)
                     startIdx = 839 + startIdx + 1;
-
 
                 // generate an Opcode 130 request
                 string[] opCode130Body;
@@ -1396,7 +1337,6 @@ namespace ROC
                 else
                     opCode130Body = new string[6];
 
-
                 // update the body of the request with startIdx and Count values
                 opCode130Body[0] = body[0];
                 opCode130Body[1] = body[1];
@@ -1406,7 +1346,7 @@ namespace ROC
                 opCode130Body[5] = thisReqCount.ToString();
                 // now we can go to GenerateOpcode130Request() to get the actual request(s) built
                 List<DataRequest> requests;
-                requests = GenerateOpcode130Request(requestGroup.ID, requestGroup.ConnectionID, deviceGroup, deviceNum, 1, 1, login, pwd, opCode130Body,step);
+                requests = GenerateOpcode130Request(requestGroup.ID, requestGroup.ConnectionID, deviceGroup, deviceNum, 1, 1, login, pwd, opCode130Body, step);
 
                 foreach (DataRequest req in requests)
                 {
@@ -1435,18 +1375,15 @@ namespace ROC
                 int hour = int.Parse(DTStr[3]);
                 int minute = int.Parse(DTStr[4]);
 
-                DateTime dt = new(year, month, day, hour, minute,0);
+                DateTime dt = new(year, month, day, hour, minute, 0);
                 return dt;
-
-            } catch(Exception ex)
+            }
+            catch (Exception ex)
             {
                 Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Error while converting backfill datetime string '" + bfDateTime + "' to a DateTime object");
                 return DateTime.MinValue;
             }
-
-
         }
-
 
         /// <summary>
         /// Generates a Datarequest object, which requests the current alarm and event pointers from the specified device
@@ -1460,11 +1397,9 @@ namespace ROC
         /// <param name="groupIdx">The index number of this request within the group</param>
         /// <param name="systemRequest">mark the request as system generated (not directly triggered by a schedule or demand)</param>
         /// <returns></returns>
-        private static List<DataRequest> GenerateOpcode120Request(string reqID, byte group, byte unit, byte hostGroup, byte hostUnit, int groupIdx,bool systemRequest,DataRequest.RequestType reqType)
+        private static List<DataRequest> GenerateOpcode120Request(string reqID, byte group, byte unit, byte hostGroup, byte hostUnit, int groupIdx, bool systemRequest, DataRequest.RequestType reqType)
         {
-           
-
-            List<byte> requestBytes = new() { unit, group, hostUnit, hostGroup, 120,0};
+            List<byte> requestBytes = new() { unit, group, hostUnit, hostGroup, 120, 0 };
 
             // calculate the checksum
             ushort CRC16 = CRCHelpers.CalcCRC16(requestBytes.ToArray(), CRCInitial, CRCPoly, CRCSwapOutputBytes);
@@ -1472,7 +1407,6 @@ namespace ROC
             // add the checksum bytes to the end of the request
             requestBytes.Add(IntHelpers.GetLowByte(CRC16));         // CRC Low Byte
             requestBytes.Add(IntHelpers.GetHighByte(CRC16));        // CRC High Byte
-
 
             DataRequest request = new()
             {
@@ -1490,7 +1424,6 @@ namespace ROC
                 request.RequesterID = Guid.Empty;
             }
 
-
             List<DataRequest> requestList = new()
             {
                 request
@@ -1498,8 +1431,7 @@ namespace ROC
             return requestList;
         }
 
-
-        public static List<DataRequest> GenerateAlarmEventsRequests(Guid requestGroupID,string requestID,byte groupNum,byte devNum,byte hostGroupNum, byte HostDevNum,byte opCode, ushort lastReadRecord,ushort currentPointer,bool inclusive,string requestIdx)
+        public static List<DataRequest> GenerateAlarmEventsRequests(Guid requestGroupID, string requestID, byte groupNum, byte devNum, byte hostGroupNum, byte HostDevNum, byte opCode, ushort lastReadRecord, ushort currentPointer, bool inclusive, string requestIdx)
         {
             List<DataRequest> requestList = new();
 
@@ -1508,9 +1440,6 @@ namespace ROC
                 Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "ROC Protocol", "GenerateAlarmsEventsRequests()", "Request group " + requestGroupID + ", request " + requestIdx + " received invalid pointer value(s) (" + lastReadRecord + "," + currentPointer + "). Canceling the request", true);
                 return requestList;
             }
-
-
-            
 
             // the requests for alarms or events are identical except for the opcode, so we'll just generate the request(s) and plug in the approriate opcode
             ushort firstRecordToRead = lastReadRecord;
@@ -1534,7 +1463,7 @@ namespace ROC
             {
                 numRecordsToRead += 1;
             }
-         
+
             byte recordCount = 0;
             byte thisRequestRecordCount;
             DataRequest thisRequest;
@@ -1568,7 +1497,7 @@ namespace ROC
                 else
                     thisRequest.TagList.Add(new Tag(Guid.NewGuid()) { Value = currentPointer });
                 requestBytes = new List<byte>();
-                requestBytes.AddRange(new byte[] { devNum, groupNum, 1, 1 }); 
+                requestBytes.AddRange(new byte[] { devNum, groupNum, 1, 1 });
                 requestBytes.Add(opCode);
                 requestBytes.Add(3); // 3 bytes of data
                 requestBytes.Add(thisRequestRecordCount); // number of records requested
@@ -1633,14 +1562,13 @@ namespace ROC
                 requestType = DataRequest.RequestType.Events;
             }
 
-            if (MiscHelpers.AddCircular(currentPointer,-1,1,240) == lastReadRecord)
+            if (MiscHelpers.AddCircular(currentPointer, -1, 1, 240) == lastReadRecord)
             {
                 Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "ROCProtocol", "", requestType.ToString() + " request for device " + nodeID + " on connection " + OpCode120Request.ConnectionID + " cancelled, because there are no new records");
                 return AlarmEventsRequestGroup;
             }
 
-
-            AlarmEventsRequestGroup.ProtocolRequestList = GenerateAlarmEventsRequests(AlarmEventsRequestGroup.ID, "", OpCode120Request.RequestBytes[1], OpCode120Request.RequestBytes[0], 1, 1,opCode, lastReadRecord, currentPointer,false, OpCode120Request.GroupIdxNumber);
+            AlarmEventsRequestGroup.ProtocolRequestList = GenerateAlarmEventsRequests(AlarmEventsRequestGroup.ID, "", OpCode120Request.RequestBytes[1], OpCode120Request.RequestBytes[0], 1, 1, opCode, lastReadRecord, currentPointer, false, OpCode120Request.GroupIdxNumber);
             AlarmEventsRequestGroup.ConnectionID = OpCode120Request.ConnectionID;
             foreach (DataRequest request in AlarmEventsRequestGroup.ProtocolRequestList)
             {
@@ -1648,7 +1576,6 @@ namespace ROC
             }
             return AlarmEventsRequestGroup;
         }
- 
 
         private static List<DataRequest> GeneratePreWriteRead(Guid RequestGroupID, string reqID, byte group, byte unit, byte hostGroup, byte hostUnit, TLP[] TLPs, List<FDADataPointDefinitionStructure> tagsconfigList, List<Tag> tagList, int groupIdx, int maxDataSize)
         {
@@ -1661,7 +1588,6 @@ namespace ROC
             List<TLP> BinaryTLPs = new();
             List<Tag> BinaryTags = new();
             List<FDADataPointDefinitionStructure> BinaryTagConfigs = new();
-
 
             // go through the original TLP list, pull out unique binary TLPs, convert them to UINT8's and generate new lists for the pre-write read
             for (int i = 0; i < TLPs.Length; i++)
@@ -1689,7 +1615,6 @@ namespace ROC
             return subRequestList;
         }
 
-  
         public static RequestGroup GenerateWriteRequestAfterPreWriteRead(DataRequest completedPreWriteRead)
         {
             RequestGroup writeGroup = (RequestGroup)completedPreWriteRead.ParentTemplateGroup.Clone();
@@ -1757,7 +1682,6 @@ namespace ROC
                         hoursStep = byte.Parse(historyRequestData[7]);
                 }
 
-
                 List<byte> requestByteList = new()
                 {
                     devNum,
@@ -1770,7 +1694,6 @@ namespace ROC
                     requestedDay,
                     requestedMonth,
                 };
-
 
                 ushort CRC = CRCHelpers.CalcCRC16(requestByteList.ToArray(), CRCInitial, CRCPoly, CRCSwapOutputBytes);
 
@@ -1789,7 +1712,7 @@ namespace ROC
                     ProtocolSpecificParams = startHour << 16 | hoursRequested << 8 | hoursStep
                 };
 
-                // add the required # of tags to the tag list 
+                // add the required # of tags to the tag list
                 int tagCount = 24;
 
                 for (int idx = 0; idx < tagCount; idx++)
@@ -1808,11 +1731,10 @@ namespace ROC
                 request.GroupSize = subRequestList.Count;
             }
 
-
             return subRequestList;
         }
 
-        private static List<DataRequest> GenerateOpcode130Request(Guid requestGroup, Guid connectionID, byte groupNum, byte devNum, byte hostGroup, byte hostDev, string login, short pwd, string[] historyPointRequest,double recordStep = 60)
+        private static List<DataRequest> GenerateOpcode130Request(Guid requestGroup, Guid connectionID, byte groupNum, byte devNum, byte hostGroup, byte hostDev, string login, short pwd, string[] historyPointRequest, double recordStep = 60)
         {
             List<DataRequest> subRequestList = new();
             byte historyPointNumber;
@@ -1821,7 +1743,7 @@ namespace ROC
             byte recordCount;
 
             recordStep /= 60; // step is in minutes and we're working with hours here
-        
+
             Guid tagID;
 
             byte opCodeByte = 130;
@@ -1843,7 +1765,7 @@ namespace ROC
             historyType = byte.Parse(historyPointRequest[3]);
             startIdx = ushort.Parse(historyPointRequest[4]);
             recordCount = byte.Parse(historyPointRequest[5]);
-    
+
             List<byte> requestByteList = new()
             {
                 devNum,
@@ -1855,11 +1777,9 @@ namespace ROC
                 historyType,
                 historyPointNumber,
                 recordCount,
-                IntHelpers.GetLowByte(startIdx),   
+                IntHelpers.GetLowByte(startIdx),
                 IntHelpers.GetHighByte(startIdx)
-                    
             };
-
 
             ushort CRC = CRCHelpers.CalcCRC16(requestByteList.ToArray(), CRCInitial, CRCPoly, CRCSwapOutputBytes);
 
@@ -1879,23 +1799,21 @@ namespace ROC
                 ProtocolSpecificParams = OC130Params
             };
 
-            // add the required # of tags to the tag list 
+            // add the required # of tags to the tag list
             for (int idx = 0; idx < recordCount; idx += 1)
             {
                 Tag tag = new(tagID) { ProtocolDataType = ROCDataType };
                 thisRequest.TagList.Add(tag);
             }
             thisRequest.RequestBytes = requestByteList.ToArray();
-            thisRequest.ExpectedResponseSize = 9 + (recordCount*4) + 2;
+            thisRequest.ExpectedResponseSize = 9 + (recordCount * 4) + 2;
             thisRequest.MessageType = DataRequest.RequestType.Backfill;
             subRequestList.Add(thisRequest);
-            
 
             foreach (DataRequest request in subRequestList)
             {
                 request.GroupSize = subRequestList.Count;
             }
-
 
             return subRequestList;
         }
@@ -1907,8 +1825,7 @@ namespace ROC
             public double Interval;
         }
 
-
-        private static List<DataRequest> GenerateOpcode126Request(Guid requestGroup, Guid connectionID, byte groupNum, byte devNum, byte hostGroup, byte hostDev,string login, short pwd, string[] historyPointRequests)
+        private static List<DataRequest> GenerateOpcode126Request(Guid requestGroup, Guid connectionID, byte groupNum, byte devNum, byte hostGroup, byte hostDev, string login, short pwd, string[] historyPointRequests)
         {
             // the history for each point results in a max length response, so each history point requested gets it's own request
             List<DataRequest> subRequestList = new();
@@ -1918,7 +1835,6 @@ namespace ROC
             byte startIdx = 1;
             byte minutesStep = 1;
             Guid tagID;
-
 
             for (int i = 0; i < historyPointRequests.Length; i++)
             {
@@ -1968,17 +1884,13 @@ namespace ROC
                     historyPointNumber
                 };
 
-
                 ushort CRC = CRCHelpers.CalcCRC16(requestByteList.ToArray(), CRCInitial, CRCPoly, CRCSwapOutputBytes);
 
                 requestByteList.Add(IntHelpers.GetLowByte(CRC));
                 requestByteList.Add(IntHelpers.GetHighByte(CRC));
 
-
                 DataType ROCDataType = DataType.GetType(historyRequestData[1]);
                 tagID = Guid.Parse(historyRequestData[2]);
-
-
 
                 DataRequest thisRequest = new()
                 {
@@ -2009,11 +1921,10 @@ namespace ROC
                 request.GroupSize = subRequestList.Count;
             }
 
-
             return subRequestList;
         }
 
-        private static List<DataRequest> GenerateWriteRequest(string reqID, byte group, byte unit, byte hostGroup, byte hostUnit, object protocolParams, List<FDADataPointDefinitionStructure> tagsconfigList,Dictionary<Guid,double> writeValues,List<Tag> preReadValues, int groupIdx)
+        private static List<DataRequest> GenerateWriteRequest(string reqID, byte group, byte unit, byte hostGroup, byte hostUnit, object protocolParams, List<FDADataPointDefinitionStructure> tagsconfigList, Dictionary<Guid, double> writeValues, List<Tag> preReadValues, int groupIdx)
         {
             List<DataRequest> requestList = new();
 
@@ -2101,7 +2012,7 @@ namespace ROC
                 }
 
                 // put the whole message together
-                
+
                 List<byte> message = new()
                 {
                     unit,                        // Device Unit    (1 byte)
@@ -2109,8 +2020,8 @@ namespace ROC
                     hostUnit,                    // Host unit  (1 byte)
                     hostGroup,                   // Host group (1 byte)
                     0xB5,                        // Operation Code - 181  (1 byte)
-                    dataSize,                     
-                    parameterCount                     
+                    dataSize,
+                    parameterCount
                 };
 
                 message.AddRange(dataBlock);
@@ -2122,7 +2033,7 @@ namespace ROC
                 message.Add(IntHelpers.GetLowByte(CRC16));         // CRC Low Byte
                 message.Add(IntHelpers.GetHighByte(CRC16));        // CRC High Byte
 
-                // convert from an ArrayList to a simple array of bytes 
+                // convert from an ArrayList to a simple array of bytes
                 byte[] requestBytes = (Byte[])message.ToArray();
 
                 // create a request object
@@ -2137,7 +2048,7 @@ namespace ROC
                     GroupIdxNumber = groupIdx.ToString(),
                     MessageType = DataRequest.RequestType.Write
                 };
-               
+
                 requestList.Add(request);
 
                 return requestList;
@@ -2149,12 +2060,10 @@ namespace ROC
             }
         }
 
-
         // Standard read request (OpCode 180)
         private static List<DataRequest> GenerateReadRequest(Guid RequestGroup, string reqID, byte group, byte unit, byte hostGroup, byte hostUnit, TLP[] TLPs, List<FDADataPointDefinitionStructure> tagsconfigList, List<Tag> tagList, int groupIdx, int maxDataSize, DataRequest.RequestType requestType)
         {
             List<DataRequest> subRequestList = new();
-
 
             try
             {
@@ -2162,7 +2071,6 @@ namespace ROC
                 List<TLP> subRequestTLPList;
                 List<Tag> subRequestTags;
                 List<FDADataPointDefinitionStructure> subRequestTagConfigs;
-
 
                 while (tagIdx < tagList.Count)
                 {
@@ -2178,8 +2086,6 @@ namespace ROC
                     subRequestTags = new List<Tag>();
                     subRequestTagConfigs = new List<FDADataPointDefinitionStructure>();
 
-
-
                     // build message header (minus the data block size, we don't know that yet)
                     List<byte> message = new()
                     {
@@ -2192,7 +2098,6 @@ namespace ROC
 
                     List<byte> datablock = new();
 
-
                     // ---------------------------------- add each parameter (until we reach the max response size)
                     while (responseDataSize + TLPs[tagIdx].Datatype.Size < maxDataSize)
                     {
@@ -2203,25 +2108,21 @@ namespace ROC
                         subRequestTags.Add(tagList[tagIdx]);
                         subRequestTagConfigs.Add(tagsconfigList[tagIdx]);
 
-
                         // for the binary data type, there will always be 8 tags defined (some many be placeholders, but there will laways be 8 elements)
-                        // we only need to read the byte once because the bit values for the next 7 tags are contained in the byte 
-                        // so add 7 more tags to the list without adding the TLPs to the data request  
+                        // we only need to read the byte once because the bit values for the next 7 tags are contained in the byte
+                        // so add 7 more tags to the list without adding the TLPs to the data request
                         if (TLPs[tagIdx].Datatype == DataType.BIN)
                         {
-                            for (int i=0; i<7; i++)
+                            for (int i = 0; i < 7; i++)
                             {
-                                tagIdx++;                               
+                                tagIdx++;
                                 subRequestTags.Add(tagList[tagIdx]);
                             }
-                            
-                            
                         }
 
                         tagIdx++;
                         if (tagIdx >= TLPs.Length)
                             break;
-
                     }
 
                     message.Add((byte)(1 + 3 * subRequestParamCount));   // length of data block (1 byte for data size, 1 byte for # params + 3 bytes per param)
@@ -2235,7 +2136,7 @@ namespace ROC
                     message.Add(IntHelpers.GetLowByte(CRC16));         // CRC Low Byte
                     message.Add(IntHelpers.GetHighByte(CRC16));        // CRC High Byte
 
-                    // convert from an List to a simple array of bytes 
+                    // convert from an List to a simple array of bytes
                     byte[] requestBytes = message.ToArray();
 
                     // find the total Expected Response Size (header + data + CRC)
@@ -2289,7 +2190,6 @@ namespace ROC
             }
         }
 
-
         private static DataRequest GenerateLoginRequest(byte group, byte unit, string user, short pass)
         {
             try
@@ -2310,12 +2210,11 @@ namespace ROC
                 // if the user name is too long, truncate it
                 if (user.Length > 3)
                 {
-                    Globals.SystemManager.LogApplicationEvent(Globals.FDANow(),"ROCProtocol", "The ROC Login name '" + user + "' is too long, expected three characters. Truncating to '" + user.Substring(0, 3) + "'",true);
-                    user = user.Substring(0, 3);               
+                    Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "ROCProtocol", "The ROC Login name '" + user + "' is too long, expected three characters. Truncating to '" + user.Substring(0, 3) + "'", true);
+                    user = user.Substring(0, 3);
                 }
 
                 byte[] ID = System.Text.Encoding.ASCII.GetBytes(user);
-
 
                 ArrayList message;
 
@@ -2374,7 +2273,6 @@ namespace ROC
                 Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Roc Protocol GenerateLoginRequest() general error");
                 return null;
             }
-
         }
 
         // for use by opcode 126 (history collection - minute data)
@@ -2429,20 +2327,21 @@ namespace ROC
                             request.SuperPriorityRequestGroup = request.ParentTemplateGroup;
                         }
                         break;
+
                     case 121: // alarm records
                         manualMode = (bool)request.ProtocolSpecificParams;
 
-                        // break out the 22 bytes for each alarm record and generate a AlarmRecord objects                       
+                        // break out the 22 bytes for each alarm record and generate a AlarmRecord objects
                         numRecords = request.ResponseBytes[6];
                         firstRecord = request.ResponseBytes[7];
                         List<RocAlarmRecord> almRecordList = new();
- 
-                        for(int recordIdx = 0; recordIdx < numRecords; recordIdx++)
+
+                        for (int recordIdx = 0; recordIdx < numRecords; recordIdx++)
                         {
                             recordBytes = request.ResponseBytes.Skip(11 + recordIdx * 22).Take(22).ToArray();
                             recordPos = firstRecord + recordIdx;
                             if (recordPos > 239) recordPos -= 240;
-                            RocAlarmRecord record = new(request.ResponseTimestamp, request.ConnectionID, NodeID,recordPos, Convert.ToInt16(request.TagList[1].Value), recordBytes,request.Destination, manualMode);
+                            RocAlarmRecord record = new(request.ResponseTimestamp, request.ConnectionID, NodeID, recordPos, Convert.ToInt16(request.TagList[1].Value), recordBytes, request.Destination, manualMode);
                             //if (record.Valid)
                             almRecordList.Add(record);
                         }
@@ -2452,10 +2351,11 @@ namespace ROC
 
                         request.TagList.Add(new Tag(Guid.NewGuid()) { Value = genericAlmEvtList });
                         break;
+
                     case 122: // event records
                         manualMode = (bool)request.ProtocolSpecificParams;
 
-                        // break out the 22 bytes for each event record and generate a AlarmRecord objects 
+                        // break out the 22 bytes for each event record and generate a AlarmRecord objects
                         numRecords = request.ResponseBytes[6];
                         firstRecord = request.ResponseBytes[7];
                         List<RocEventRecord> evtRecordList = new();
@@ -2464,7 +2364,7 @@ namespace ROC
                             recordBytes = request.ResponseBytes.Skip(11 + recordIdx * 22).Take(22).ToArray();
                             recordPos = firstRecord + recordIdx;
                             if (recordPos > 239) recordPos -= 240;
-                            RocEventRecord record = new(request.ResponseTimestamp, request.ConnectionID, NodeID, recordPos, Convert.ToInt16(request.TagList[1].Value), recordBytes,request.Destination,manualMode);
+                            RocEventRecord record = new(request.ResponseTimestamp, request.ConnectionID, NodeID, recordPos, Convert.ToInt16(request.TagList[1].Value), recordBytes, request.Destination, manualMode);
                             //if (record.Valid)
                             evtRecordList.Add(record);
                         }
@@ -2491,7 +2391,6 @@ namespace ROC
                         // pointer to the current value in the array returned by the device
                         byte ptr = (byte)(request.ResponseBytes[7] + 1);
 
-
                         // byteIdx is the first byte of the next value (increments by 4)
                         int byteIdx;
                         byte[] valueBytes = new byte[4];
@@ -2502,7 +2401,7 @@ namespace ROC
                             Array.Copy(request.ResponseBytes, byteIdx, valueBytes, 0, 4);
 
                             request.TagList[minutesCounter].Value = DataType.FL.FromBytes(valueBytes);
-                            
+
                             request.TagList[minutesCounter].Quality = 196;
                             request.TagList[minutesCounter].Timestamp = historyTime;
 
@@ -2520,8 +2419,6 @@ namespace ROC
 
                         // filter the full response from the device for only those values needed
                         List<Tag> filtered = new();
-
-
 
                         // from the startIdx (offset from the *end* of the array, going backwards), add each tag to the filtered list (applying the skip parameter)
                         // wrap around the array if necessary
@@ -2541,7 +2438,7 @@ namespace ROC
                             //wrap around the array
                             if (idx < 0)
                             {
-                                idx = request.TagList.Count + idx; 
+                                idx = request.TagList.Count + idx;
                                 wrapped = true;
                             }
                             if (idx <= startIdx && wrapped)
@@ -2552,12 +2449,11 @@ namespace ROC
 
                         request.TagList = filtered;
 
-                        
                         // minute data is complete, do we need some hourly data too?
                         DateTime earliestMinuteData = filtered[filtered.Count - 1].Timestamp;
                         if (earliestMinuteData.Subtract(request.ParentTemplateGroup.BackfillStartTime).TotalMinutes >= request.ParentTemplateGroup.BackfillStep)
                         {
-                            DateTime HourDataTo = earliestMinuteData.AddMinutes(-1*request.ParentTemplateGroup.BackfillStep);
+                            DateTime HourDataTo = earliestMinuteData.AddMinutes(-1 * request.ParentTemplateGroup.BackfillStep);
                             DateTime HourDataFrom = request.ParentTemplateGroup.BackfillStartTime;
 
                             RequestGroup nextGroup = (RequestGroup)request.ParentTemplateGroup.Clone();
@@ -2577,17 +2473,17 @@ namespace ROC
                         }
 
                         break;
+
                     case 128:
                         // get the timestamp of the first hour (month, day, hour minute, starting at byte 7)
                         int month = request.ResponseBytes[7];
                         int day = request.ResponseBytes[8];
                         int hour = request.ResponseBytes[9];
                         int minute = request.ResponseBytes[10];
-                        int year = Globals.FDANow().Year; // assume the current year                       
+                        int year = Globals.FDANow().Year; // assume the current year
                         if (month > Globals.FDANow().Month) // unless the month is higher than the current month, then assume the previous year
                             year -= 1;
                         historyTime = new DateTime(year, month, day, hour, minute, 0);
-
 
                         protocolParams = (int)request.ProtocolSpecificParams;
                         byte startHour = (byte)((protocolParams & 0xFF0000) >> 16);
@@ -2599,16 +2495,13 @@ namespace ROC
                         {
                             bytePointer = 13 + hourIdx * 4;
                             request.TagList[hourIdx].Value = DataType.FL.FromBytes(request.ResponseBytes.Skip(bytePointer).Take(4).ToArray());
-                            request.TagList[hourIdx].Quality = 196; 
+                            request.TagList[hourIdx].Quality = 196;
                             request.TagList[hourIdx].Timestamp = historyTime;
                             historyTime = historyTime.AddHours(1);
                         }
 
-                        
-
                         // filter the full response from the device for only those values needed to fill the hole in the recorded data
                         List<Tag> filteredList = new();
-
 
                         // go through the tags, find the index that corresponds with the start hour
                         idx = 0;
@@ -2661,12 +2554,10 @@ namespace ROC
 
                         // offset according to the startIdx
                         //historyTime = historyTime.AddHours(-1 * startIndex);
-   
 
-                        
                         int tagPtr = 0;
                         byte[] recordValue = new byte[4];
-                        for (int recordPtr=0; recordPtr < recordsReturned; recordPtr += 1)
+                        for (int recordPtr = 0; recordPtr < recordsReturned; recordPtr += 1)
                         {
                             DataType dataType = (DataType)request.TagList[tagPtr].ProtocolDataType;
                             Array.Copy(request.ResponseBytes, bytePtr, recordValue, 0, 4);
@@ -2685,16 +2576,15 @@ namespace ROC
                         }
                         // filter the list according to the interval
                         filtered = new List<Tag>();
-                        int intIdx = request.TagList.Count-1;
+                        int intIdx = request.TagList.Count - 1;
                         double dblIdx = intIdx;
                         while (dblIdx >= 0)
                         {
                             filtered.Add(request.TagList[intIdx]);
                             dblIdx -= recordStep;
-                            intIdx = (int)(dblIdx+0.5);
+                            intIdx = (int)(dblIdx + 0.5);
                         }
                         request.TagList = filtered;
-
 
                         //historyTime = historyTime.AddMinutes(-59);
 
@@ -2718,7 +2608,7 @@ namespace ROC
                             request.NextGroup = nextGroup;
                         }
                         break;
-                        
+
                     case 255: // handle ROC error responses (opCode 255)
 
                         Byte errorCode = request.ResponseBytes[6];
@@ -2750,7 +2640,6 @@ namespace ROC
                         byte[] dataBytes = new byte[datasize];
                         Array.Copy(request.ResponseBytes, 6, dataBytes, 0, datasize);
 
-
                         //temporary structures to hold the values as they're converted from bytes
                         List<object> values = new();
                         object value = null;
@@ -2781,7 +2670,7 @@ namespace ROC
                             //value = ROCDataType.FromBytes(dataBytes.Skip(byteIndex + 3).Take(ROCDataType.Size).ToArray());
 
                             valuebytes = new byte[dataSize];
-                            Array.Copy(dataBytes, byteIndex + 3, valuebytes,0,dataSize);
+                            Array.Copy(dataBytes, byteIndex + 3, valuebytes, 0, dataSize);
                             value = ROCDataType.FromBytes(valuebytes);
 
                             // if the bytes could be converted into the required type, do it, and add the resulting value to the values list
@@ -2801,8 +2690,7 @@ namespace ROC
 
                                     if (float.IsNaN((float)value))
                                         floatCheck = "NaN";
-                                    
-                                   
+
                                     if (floatCheck != "good")
                                     {
                                         // oops, it's NaN or +/- infinity. Look up the last value and use that instead and set the quality to indicate stale value
@@ -2812,23 +2700,22 @@ namespace ROC
                                         else
                                             quality = 122;
 
-                                        Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "ROCProtocol", "","The tag " + request.DataPointConfig[paramIdx].DPDUID + " received an invalid value (" + floatCheck + ")");
+                                        Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "ROCProtocol", "", "The tag " + request.DataPointConfig[paramIdx].DPDUID + " received an invalid value (" + floatCheck + ")");
                                     }
                                 }
 
                                 // scaling now handled by DataAcqManager in TransactionCompleteHandler()
- /*                               // if the tag has scaling configured, apply it
-                                // check for RawHigh = Raw low (causes divide by zero)
-                                // check for numeric value
-                                FDADataPointDefinitionStructure config = request.DataPointConfig[paramIdx];
+                                /*                               // if the tag has scaling configured, apply it
+                                                               // check for RawHigh = Raw low (causes divide by zero)
+                                                               // check for numeric value
+                                                               FDADataPointDefinitionStructure config = request.DataPointConfig[paramIdx];
 
-                                if (config.read_scaling && config.read_scale_raw_high != config.read_scale_raw_low)
-                                {
-
-                                    if (Double.TryParse(Convert.ToString(value), out double numericValue))
-                                        value = (object)(((numericValue - config.read_scale_raw_low) * (config.read_scale_eu_high - config.read_scale_eu_low) / (config.read_scale_raw_high - config.read_scale_raw_low)) + config.read_scale_eu_low);
-                                }
-*/
+                                                               if (config.read_scaling && config.read_scale_raw_high != config.read_scale_raw_low)
+                                                               {
+                                                                   if (Double.TryParse(Convert.ToString(value), out double numericValue))
+                                                                       value = (object)(((numericValue - config.read_scale_raw_low) * (config.read_scale_eu_high - config.read_scale_eu_low) / (config.read_scale_raw_high - config.read_scale_raw_low)) + config.read_scale_eu_low);
+                                                               }
+                               */
                                 if (ROCDataType == DataType.BIN)
                                 {
                                     Tag thisTag;
@@ -2837,8 +2724,8 @@ namespace ROC
                                     int i;
                                     for (i = 0; i < 8; i++)
                                     {
-                                       if (tagIdx + i < request.TagList.Count)
-                                       {
+                                        if (tagIdx + i < request.TagList.Count)
+                                        {
                                             thisTag = (Tag)request.TagList[tagIdx + i];
                                             if (thisTag.TagID != Guid.Empty)
                                             {
@@ -2857,7 +2744,7 @@ namespace ROC
                                                 if (nextTag.DeviceAddress != thisTag.DeviceAddress)
                                                     break;
                                             }
-                                            
+
                                             if (paramIndex + i >= request.TagList.Count)
                                                 break;
                                             */
@@ -2882,14 +2769,11 @@ namespace ROC
                                 }
                             }
 
-
-
                             // increment the tag index
                             paramIdx++;
                         }
 
                         request.SetStatus(DataRequest.RequestStatus.Success);
-
 
                         // special case, this reponse is for a pre-write read
                         // put the original requestgroup at the top of the highest priority queue for processing immediatly after the current request group is complete
@@ -2901,11 +2785,9 @@ namespace ROC
                         }
                         break;
 
-
                     default:
                         Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "ROCProtocol", "InterpretResponse()", "Unsupport opcode " + opCode + " found in device response");
                         break;
-
                 }
             }
             catch (Exception ex)
@@ -2913,13 +2795,12 @@ namespace ROC
                 Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Roc Protocol InterpretResponse() general error while processing response to group " + request.GroupID + ", index " + request.GroupIdxNumber);
                 request.SetStatus(DataRequest.RequestStatus.Error);
             }
-
         }
 
         private static class ROCError
         {
-            static readonly Dictionary<string, string> opCodeSpecificErrors;
-            static readonly Dictionary<byte,string> generalErrors;
+            private static readonly Dictionary<string, string> opCodeSpecificErrors;
+            private static readonly Dictionary<byte, string> generalErrors;
 
             public static string GetErrorMessage(byte opCode, byte errorCode)
             {
@@ -2965,7 +2846,7 @@ namespace ROC
                     {22, "Invalid store and forward path" },
                     {23, "Flash programming Error"},
                     {24, "History configuration in progress"},
-                    {63, "Requested security level too high" }                    
+                    {63, "Requested security level too high" }
                 };
 
                 opCodeSpecificErrors = new Dictionary<string, string>
@@ -2979,15 +2860,13 @@ namespace ROC
                     { "128:63", "Invalid history point number"}
                 };
 
-
                 // opcode 180 errors
-      //          for (int i = 0; i < 100; i++)
-      //              opCodeSpecificErrors.Add("180:" + i, "ROC error. Possible causes: The device requires a login (FDA will attempt a login automatically), an unconfigured point was requested, or the response would be too long");
+                //          for (int i = 0; i < 100; i++)
+                //              opCodeSpecificErrors.Add("180:" + i, "ROC error. Possible causes: The device requires a login (FDA will attempt a login automatically), an unconfigured point was requested, or the response would be too long");
             }
         }
 
-                
-        public static void ValidateResponse(DataRequest request,bool FinalAttempt)
+        public static void ValidateResponse(DataRequest request, bool FinalAttempt)
         {
             try
             {
@@ -3000,7 +2879,6 @@ namespace ROC
                     goto BadResponse;
                 }
 
-
                 // check for minimum response length
                 if (response.Length > 0 && response.Length < 8)
                 {
@@ -3009,10 +2887,9 @@ namespace ROC
                     goto BadResponse;
                 }
 
-
                 byte retOpCode = request.ResponseBytes[4];
 
-                // check for unexpected return response size (with exception for ROC error response opcode 255, and security error opcode 17)         
+                // check for unexpected return response size (with exception for ROC error response opcode 255, and security error opcode 17)
                 if (request.ActualResponseSize != request.ExpectedResponseSize && retOpCode != 255)
                 {
                     bool valid = false;
@@ -3052,7 +2929,7 @@ namespace ROC
                     goto BadResponse;
                 }
 
-                // check the CRC       
+                // check the CRC
                 if (!CRCCheck(response))
                 {
                     request.SetStatus(DataRequest.RequestStatus.Error);
@@ -3094,7 +2971,7 @@ namespace ROC
 
                     string errorMsg = ROCError.GetErrorMessage(errorOpCode, errorCode);
 
-                    request.ErrorMessage = "The device returned an error message: " + errorMsg;   
+                    request.ErrorMessage = "The device returned an error message: " + errorMsg;
 
                     if (errorCode == 20 && request.DeviceLogin != string.Empty)
                     {
@@ -3115,13 +2992,12 @@ namespace ROC
                     request.ErrorMessage = "";
                 }
 
-
                 // do interpretation of the returned data
                 InterpretResponse(ref request);
                 return;
 
-                // handle any additional operations required after a bad response, which depend on the message type
-                BadResponse:
+            // handle any additional operations required after a bad response, which depend on the message type
+            BadResponse:
                 if ((request.MessageType == DataRequest.RequestType.Alarms || request.MessageType == DataRequest.RequestType.Events) && FinalAttempt)
                 {
                     int firstRecord = request.RequestBytes[7];
@@ -3132,7 +3008,7 @@ namespace ROC
                     if (request.MessageType == DataRequest.RequestType.Alarms) transCode = 31;
                     if (request.MessageType == DataRequest.RequestType.Events) transCode = 32;
 
-                    Globals.SystemManager.LogCommsEvent(request.ConnectionID, request.ResponseTimestamp.AddMilliseconds(1), "Unable to retrieve " + request.MessageType.ToString() + " for device " + request.RequestBytes[1] + ":" + request.RequestBytes[0] + " from index " + firstRecord + " to " + lastRecord,transCode);
+                    Globals.SystemManager.LogCommsEvent(request.ConnectionID, request.ResponseTimestamp.AddMilliseconds(1), "Unable to retrieve " + request.MessageType.ToString() + " for device " + request.RequestBytes[1] + ":" + request.RequestBytes[0] + " from index " + firstRecord + " to " + lastRecord, transCode);
                 }
                 return;
             }
@@ -3162,7 +3038,6 @@ namespace ROC
             byte[] data_noCRC = new byte[data.Length - 2];
             Array.Copy(data, data_noCRC, data.Length - 2);
 
-
             ushort calcdCRC = CRCHelpers.CalcCRC16(data_noCRC, CRCInitial, CRCPoly, CRCSwapOutputBytes);
             calcdCRC = IntHelpers.SwapBytes(calcdCRC);
 
@@ -3184,12 +3059,11 @@ namespace ROC
             public static readonly DataType FL = new("FL", 4, typeof(float));
             public static readonly DataType TLP = new("TLP", 3, typeof(byte[]));
             public static readonly DataType DT = new("DT", 4, typeof(float));
-            private static readonly List<string> TypeList = new(new string[] { "AC10","AC20","AC30","BIN","INT8","INT32","UINT8","UINT16","UINT32","FL","TLP","DT"});
+            private static readonly List<string> TypeList = new(new string[] { "AC10", "AC20", "AC30", "BIN", "INT8", "INT32", "UINT8", "UINT16", "UINT32", "FL", "TLP", "DT" });
 
             private DataType(string name, byte size, Type hostDataType) : base(name, size, hostDataType)
             {
-   
-             }
+            }
 
             public static bool IsValidType(string type)
             {
@@ -3271,13 +3145,11 @@ namespace ROC
                     bytes = new byte[1] { Convert.ToByte(value) };
                 }
 
-
                 return bytes;
             }
 
             public object FromBytes(byte[] bytes)
             {
-
                 // wrong number of bytes returned for the data type, return null
                 if (bytes.Length != this.Size && this.Size != 0)
                     return null;
@@ -3308,10 +3180,9 @@ namespace ROC
                     return value;
                 }
 
-
                 if (this == INT32 || this == UINT32)
                 {
-                    // ROC byte Order LSB,LSB+1,MSB-1,MSB                   
+                    // ROC byte Order LSB,LSB+1,MSB-1,MSB
                     Byte A = bytes[0];
                     Byte B = bytes[1];
                     Byte C = bytes[2];
@@ -3323,12 +3194,11 @@ namespace ROC
                     else
                         return value;
                 }
- 
+
                 if (this == UINT8)
                 {
                     return bytes[0];
                 }
-
 
                 if (this == UINT16)
                 {
@@ -3365,7 +3235,6 @@ namespace ROC
                     byte month = bytes[3];
 
                     return month * 1000000 + day * 10000 + hour * 100 + minute;
-
                 }
 
                 // shouldn't be possible to get here, but all paths must return a value so...return null
@@ -3374,7 +3243,6 @@ namespace ROC
 
             public static DataType GetType(string typeName)
             {
-
                 switch (typeName.ToUpper())
                 {
                     case "AC10": return AC10;
@@ -3410,10 +3278,10 @@ namespace ROC
             public readonly DateTime FDATimestamp; // set by constructor
             public DateTime EventTimestamp1 = DateTime.MinValue;  // from record bytes
             public DateTime EventTimestamp2 = DateTime.MinValue;  // from record bytes
-            public byte PtNum=0;                // from record bytes
-            public string Operator="";           // from record bytes
+            public byte PtNum = 0;                // from record bytes
+            public string Operator = "";           // from record bytes
 
-            public string EventText="";          // from record bytes   
+            public string EventText = "";          // from record bytes
             public bool ValuesConverted = false;      // set by FormatReader function, depending on whether it was able to convert the values
             public float EventValue1;             // set by the FormatReader function, if it was able to convert Device value1
             public float EventValue2;              // set by the FormatReader function, if it was able to convert Device value1
@@ -3424,17 +3292,21 @@ namespace ROC
 
             // private properties
             private byte CalibrationType;
+
             //private string CalibrationTypeString;
             private byte CalibrationPointType;
+
             private string CalibrationPointTypeString;
             private byte MVSInput;
             private string MVSInputString;
 
             // internal lookup tables
             private static Dictionary<byte, string> CalibrationTypes;
+
             private static Dictionary<byte, string> MVSInputs;
+
             /// <summary>
-            /// 
+            ///
             /// </summary>
             /// <param name="timestamp">The date/Time when this record was retrieved from the device by the FDA</param>
             /// <param name="connID">ID of the connection</param>
@@ -3442,10 +3314,10 @@ namespace ROC
             /// <param name="eventPtrPos">This record position in the device</param>
             /// <param name="devPtrPos">Current event record</param>
             /// <param name="eventData">bytes that form a single event record</param>
-            public RocEventRecord(DateTime timestamp,Guid connID,string node,int eventPtrPos,int devPtrPos, byte[] eventData,string destTable,bool manual) // 22 bytes representing one event record in the device response to opcode 121)
-            {               
+            public RocEventRecord(DateTime timestamp, Guid connID, string node, int eventPtrPos, int devPtrPos, byte[] eventData, string destTable, bool manual) // 22 bytes representing one event record in the device response to opcode 121)
+            {
                 try
-                {                                  
+                {
                     // set the properties with the values that were passed in to the constructor
                     FDATimestamp = timestamp;
                     ConnectionID = connID;
@@ -3476,13 +3348,13 @@ namespace ROC
                         Valid = false;
                         return;
                     }
-                    
+
                     // default the EventTimestamp2 to the min date (only used in format 4), if EventTimestamp2 is min date when the record arrives at the DBMananger, a null will be entered in the table
                     EventTimestamp2 = DateTime.MinValue;
                     ParamFSTCal = eventData[1];
-  
+
                     RocEventFormats eventFormat = Globals.SystemManager.GetRocEventFormat(PointType);
-                    
+
                     if (eventFormat == null)
                     {
                         //Globals.SystemManager.LogApplicationEvent(Globals.GetOffsetUTC(), "ROCProtocol", "Unable to determine the event format to use for point type " + PointType + " (not found in RocEventFormats table)");
@@ -3490,7 +3362,6 @@ namespace ROC
                         Valid = false;
                         return;
                     }
-                    
 
                     Format = eventFormat.FORMAT;
 
@@ -3512,13 +3383,14 @@ namespace ROC
                             ValuesConverted = (dataType != null);
                             ReadFormat2(eventData, dataType);
                             break;
+
                         case 3: ReadFormat3(eventData); break;
                         case 4: ReadFormat4(eventData); break;
                         case 5: /*ReadFormat5(eventData);*/ break;
                         case 6: ReadFormat6(eventData); break;
                         default:
                             //Globals.SystemManager.LogApplicationEvent(Globals.GetOffsetUTC(), "ROCProtocol", "Invalid event format for point type " + PointType + " in RocEventFormats table.");
-                            Format = 202; // invalid format for this point type in RocEventFormats table 
+                            Format = 202; // invalid format for this point type in RocEventFormats table
                             Valid = false;
                             return;
                     }
@@ -3533,7 +3405,7 @@ namespace ROC
                                 EventDesc = " (DescShort = undefined)";
                             else
                                 EventDesc = eventFormat.DescShort;
-                        }                  
+                        }
                         EventDesc += " (" + PtNum + ")";
 
                         if (dataType == null)
@@ -3565,11 +3437,11 @@ namespace ROC
                 //return "Operator ID '" + Operator + "' Point " + PointType + ":" + PtNum + ":" + ParamFSTCal + ", " + EventText;
             }
 
-            private void ReadFormat2(byte[] eventData,RocDataTypes rocDataTypeEntry)
+            private void ReadFormat2(byte[] eventData, RocDataTypes rocDataTypeEntry)
             {
                 PointType = eventData[0];
                 PtNum = eventData[8];
-                
+
                 Operator = System.Text.Encoding.ASCII.GetString(eventData.Skip(9).Take(3).ToArray());
 
                 DataType ROCDatatype;
@@ -3578,7 +3450,7 @@ namespace ROC
                     ROCDatatype = DataType.GetType(rocDataTypeEntry.DataType);
                     if (ROCDatatype == null)
                     {
-                       // Globals.SystemManager.LogApplicationEvent(this, "", "Unrecognized data type '" + rocDataTypeEntry.DataType + "' in the RocDataTypes table for Point type " + PointType + ", parameter " + PtNum, true);
+                        // Globals.SystemManager.LogApplicationEvent(this, "", "Unrecognized data type '" + rocDataTypeEntry.DataType + "' in the RocDataTypes table for Point type " + PointType + ", parameter " + PtNum, true);
                         ValuesConverted = false;
                         Format = 302;
                         return;
@@ -3596,7 +3468,7 @@ namespace ROC
 
                     EventValue1 = Convert.ToSingle(eventVal1);
                     EventValue2 = Convert.ToSingle(eventVal2);
-                }              
+                }
             }
 
             private void ReadFormat3(byte[] eventData)
@@ -3604,7 +3476,7 @@ namespace ROC
                 PointType = eventData[0];
 
                 EventText = System.Text.Encoding.ASCII.GetString(eventData.Skip(8).Take(10).ToArray());
- 
+
                 //EventDesc = ;
 
                 //return "FST #" + ParamFSTCal + ", " + EventText + ", value = " + DeviceValue2;
@@ -3628,7 +3500,7 @@ namespace ROC
             //private void ReadFormat5(byte[] eventData)
             //{
             //    //EventDesc = ;
-            //    //return ""; 
+            //    //return "";
             //}
 
             private void ReadFormat6(byte[] eventData)
@@ -3676,19 +3548,15 @@ namespace ROC
                 else
                     CalibrationPointTypeString = "invalid calibration point type (" + eventData[20] + ")";
 
-                
-
                 string returnString = CalibrationPointType + " #" + PtNum;
 
                 if (CalibrationPointTypeString == "MVS")
                     returnString += " " + MVSInputString;
 
                 returnString += " calibration : " + CalibrationType;
-                
-               
+
                 EventValue1 = (float)(DataType.FL.FromBytes(eventData.Skip(12).Take(4).ToArray()));
                 EventValue2 = (float)(DataType.FL.FromBytes(eventData.Skip(16).Take(4).ToArray()));
-
 
                 EventDesc = returnString;
             }
@@ -3698,7 +3566,7 @@ namespace ROC
                 if (!updatePointers)
                     return "";
 
-                string sql =  "Update " + Globals.SystemManager.GetTableName("FDAHistoricReferences") + " set EventsLastPtrReadPosition = " + EventPtrPosDisplay + ", EventsLastPtrReadTimestamp = '" + DateTimeHelpers.FormatDateTime(FDATimestamp) + "' ";
+                string sql = "Update " + Globals.SystemManager.GetTableName("FDAHistoricReferences") + " set EventsLastPtrReadPosition = " + EventPtrPosDisplay + ", EventsLastPtrReadTimestamp = '" + DateTimeHelpers.FormatDateTime(FDATimestamp) + "' ";
                 sql += "where ConnectionUID = '" + ConnectionID.ToString() + "' and NodeDetails = '" + NodeDetails + "';";
 
                 return sql;
@@ -3706,7 +3574,6 @@ namespace ROC
 
             public override string GetWriteSQL()
             {
-  
                 string[] destTables = DestTable.Split(':');
 
                 string sql = "insert into " + destTables[0] + " (ConnectionUID,NodeDetails,Format,PointType,ParmFSTCal,EventPtrPosition,DevicePtrPosition,FDATimestamp,";
@@ -3717,7 +3584,7 @@ namespace ROC
                     sql += "NULL,";
                 else
                     sql += "'" + DateTimeHelpers.FormatDateTime(EventTimestamp2) + "',";
-                
+
                 sql += PtNum + ",'" + Operator + "','" + EventText + "'";
 
                 if (ValuesConverted)
@@ -3729,9 +3596,7 @@ namespace ROC
 
                 return sql;
             }
-
         }
-
 
         //*********************************************   ALARMS   ****************************************************
         public class RocAlarmRecord : AlarmEventRecord
@@ -3742,23 +3607,23 @@ namespace ROC
             public readonly int AlarmPtrPostion;   // position of this record
             public readonly int AlarmPtrPosDisplay; // the alarm pointer position for display purposes (1 based)
             public readonly int DevicePtrPostion;  // set by constructor
-            public readonly byte AlarmType;        // from alarm record bytes   
+            public readonly byte AlarmType;        // from alarm record bytes
             public readonly byte AlarmCode;        // from alarm record bytes
             public readonly DateTime AlarmTimestamp;  // from alarm record bytes
-            public string AlarmTag;                     // from alarm record bytes    
+            public string AlarmTag;                     // from alarm record bytes
             public UInt32 DeviceValue;              // from alarm record bytes
             public float AlarmValue;                // from alarm reccord bytes
-            public string AlarmDesc;                 // string compiled from AlarmType/AlarmCode (eg "DP - High Alarm Set")  
+            public string AlarmDesc;                 // string compiled from AlarmType/AlarmCode (eg "DP - High Alarm Set")
             public string DestTable;
             public bool UpdatePointers = true;
             private readonly byte AlarmTypeHighNibble;
             private readonly byte AlarmTypeLowNibble;
             private static Dictionary<byte, string> AlarmTypeHighNibbleLookup;
             private static Dictionary<byte, string> AlarmTypeLowNibbleLookup;  // alarm type low nibble lookup
-            private static Dictionary<byte,Dictionary<byte,string>> AlarmCodeLookup;   // <alarm type high nibble,<Alarmcode,alarmText>>
- 
+            private static Dictionary<byte, Dictionary<byte, string>> AlarmCodeLookup;   // <alarm type high nibble,<Alarmcode,alarmText>>
+
             /// <summary>
-            /// 
+            ///
             /// </summary>
             /// <param name="timestamp">The date/Time when this record was retrieved from the device by the FDA</param>
             /// <param name="connID">ID of the connection</param>
@@ -3766,7 +3631,7 @@ namespace ROC
             /// <param name="alarmPtrPos">Position of this record</param>
             /// <param name="devPtrPos">Current alarm record</param>
             /// <param name="alarmData">bytes that form a single alarm record</param>
-            public RocAlarmRecord(DateTime timestamp,Guid connID,string node,int alarmPtrPos, int devPtrPos,byte[] alarmData,string destTable,bool manual) // 22 bytes representing one Alarm record in the device response to opcode 121)
+            public RocAlarmRecord(DateTime timestamp, Guid connID, string node, int alarmPtrPos, int devPtrPos, byte[] alarmData, string destTable, bool manual) // 22 bytes representing one Alarm record in the device response to opcode 121)
             {
                 try
                 {
@@ -3928,10 +3793,6 @@ namespace ROC
 
                 return sql;
             }
-
-
         }
-
-
     }
 }

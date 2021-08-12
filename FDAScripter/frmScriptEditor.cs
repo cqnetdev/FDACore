@@ -1,13 +1,7 @@
 ﻿using Microsoft.CodeAnalysis;
 using System;
-using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.ComponentModel;
 using System.Data;
-using System.Drawing;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace FDAScripter
@@ -23,9 +17,7 @@ namespace FDAScripter
             InitializeComponent();
 
             RefreshScriptList();
-       
         }
-
 
         private void RefreshScriptList()
         {
@@ -37,7 +29,6 @@ namespace FDAScripter
             dgvScripts.Columns[1].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
         }
 
-    
         private void DGV_Scripts_SelectionChanged(object sender, EventArgs e)
         {
             if (dgvScripts.SelectedRows.Count < 1) return;
@@ -51,7 +42,6 @@ namespace FDAScripter
             inhibitTextChangedTrigger = true;
             btnSave.Enabled = false;
             tbCodeEditor.Text = result.Rows[0].Field<string>("script");
-           
         }
 
         private void CodeEditor_TextChanged(object sender, EventArgs e)
@@ -96,10 +86,9 @@ namespace FDAScripter
             }
 
             RefreshScriptList();
-           
+
             SetSelectedScript(nameDlg.ScriptName);
         }
-
 
         private static string MakeStringQuerySafe(string unsafeString)
         {
@@ -133,7 +122,6 @@ namespace FDAScripter
 
             return true;
         }
-
 
         private void SetSelectedScript(string scriptname)
         {
@@ -177,7 +165,7 @@ namespace FDAScripter
                 objectsForm.BringToFront();
         }
 
-        public void InsertFDAObject(string ID,string type)
+        public void InsertFDAObject(string ID, string type)
         {
             switch (type)
             {

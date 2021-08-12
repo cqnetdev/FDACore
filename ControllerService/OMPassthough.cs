@@ -1,28 +1,26 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using FDA;
+using Microsoft.Extensions.Logging;
+using System;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
-using ControllerService;
-using FDA;
-using Microsoft.Extensions.Logging;
 
 namespace ControllerService
 {
-    class OMPassthough : IDisposable
+    internal class OMPassthough : IDisposable
     {
         private TcpClient OMClient;
         private readonly int _fdaPort;
-        private readonly int  _clientPort;
+        private readonly int _clientPort;
         private readonly string _FDAAddress = "127.0.0.1";
 
         private TCPServer OMServer;
         private BackgroundWorker worker;
         private readonly ILogger<Worker> _logger;
 
-        public OMPassthough(int fdaPort,int clientPort, ILogger<Worker> logger)
+        public OMPassthough(int fdaPort, int clientPort, ILogger<Worker> logger)
         {
             _logger = logger;
             _fdaPort = fdaPort;
@@ -44,6 +42,7 @@ namespace ControllerService
             OMClient?.Dispose();
             OMServer?.Dispose();
         }
+
         public void Dispose()
         {
             worker.CancelAsync();
@@ -63,7 +62,7 @@ namespace ControllerService
             OMClient = new TcpClient
             {
                 ReceiveTimeout = 1
-            };                      // FDA operational messages port    
+            };                      // FDA operational messages port
 
             OMServer = TCPServer.NewTCPServer(_clientPort);  // server for external clients who wish to receive operational messages
             OMServer.ClientConnected += OMServer_ClientConnected;
@@ -78,13 +77,13 @@ namespace ControllerService
                 // if the FDA has been quiet for too long, check if its still there
                 if (OMClient.Connected && quietTimer.Elapsed > quietLimit)
                 {
-
                     try
                     {
                         _logger.LogInformation("FDA has been quiet for a while, checking to see if it's still alive");
                         OMClient.GetStream().Write(Encoding.UTF8.GetBytes("hey you there?"));
                         int respSize = OMClient.GetStream().Read(buffer, 0, 10);
-                    } catch
+                    }
+                    catch
                     {
                         FDAConnectionHalfOpen = true;
                     }
@@ -98,7 +97,6 @@ namespace ControllerService
                     {
                         _logger.LogInformation("FDA seems to be dead, going into re-connection mode");
                     }
-
                 }
 
                 // is the client connected to the FDA? go into a connection loop if not
@@ -145,8 +143,8 @@ namespace ControllerService
                         quietTimer.Restart();
                         logmessage = "OpMsg Data received from FDA";
                         // read the data from the FDA stream
-                        readsize = OMClient.GetStream().Read(buffer, 0, buffer.Length);                       
-                        data = new byte[readsize];                        
+                        readsize = OMClient.GetStream().Read(buffer, 0, buffer.Length);
+                        data = new byte[readsize];
                         Array.Copy(buffer, data, readsize);
                         messages = Encoding.UTF8.GetString(data);
 
@@ -158,21 +156,19 @@ namespace ControllerService
                             {
                                 messages = messages.Replace("\n", "\r\n");
                             }
-                           
+
                             OMServer.Send(Guid.Empty, messages);
                         }
                         else
                         {
                             logmessage += ", no clients connected so I'm dropping this data";
                         }
-
                     }
                 }
                 if (logmessage != "")
                     _logger.LogInformation(logmessage);
                 Thread.Sleep(50);
             }
-            
         }
 
         private void OMServer_ClientDisconnected(object sender, TCPServer.ClientEventArgs e)

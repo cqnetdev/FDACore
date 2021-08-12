@@ -1,13 +1,13 @@
-﻿using System;
+﻿using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Scripting;
 using Microsoft.CodeAnalysis.Scripting;
-using Microsoft.CodeAnalysis;
-using System.Threading;
+using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Collections.Immutable;
-using System.Threading.Tasks;
+using System.ComponentModel;
 using System.Globalization;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Scripting
 {
@@ -21,8 +21,10 @@ namespace Scripting
         private string _code;
         private Script _script;      // compiled script, ready for executing
         private Timer _timer;     // timer for executing user script on a set schedule
+
         //private Timer _runOnceTimer;      // timer for executing user script only once, at a particular time
         private readonly object _scriptableObjects;
+
         private readonly Type _scriptableObjectsType;
         private bool _enabled = false;
         private string _runspec = "";
@@ -30,16 +32,20 @@ namespace Scripting
         private readonly Dictionary<string, List<string>> _onChangeHandlers = new();  // for OnChange handling (trigger object ID, list of properties to watch for changes)
 
         /****************** internal event that is raised whenever this module is executed **********************/
+
         internal delegate void ScriptExecuteHandler(string scriptID);
+
         internal event ScriptExecuteHandler ScriptExecuted;
 
-        internal delegate void UserScriptErrorHandler(string scriptID,Exception ex);
+        internal delegate void UserScriptErrorHandler(string scriptID, Exception ex);
+
         internal event UserScriptErrorHandler ScriptError;
 
         internal delegate void CompileErrorHandler(string scriptID, ImmutableArray<Diagnostic> errors);
+
         internal event CompileErrorHandler CompileError;
-        
-        public UserScript (string id,string code,string runspec="",bool enabled=false)
+
+        public UserScript(string id, string code, string runspec = "", bool enabled = false)
         {
             _enabled = enabled;
             _scriptID = id;
@@ -47,8 +53,7 @@ namespace Scripting
             _scriptableObjects = Scripter._scriptInterface;
             _scriptableObjectsType = typeof(ScriptInterface);
 
-
-            SetupTimersOrTriggers(runspec);      
+            SetupTimersOrTriggers(runspec);
         }
 
         private void SetupTimersOrTriggers(string runspec)
@@ -60,49 +65,46 @@ namespace Scripting
 
             ClearTriggers();
 
-
             string[] runspecparts = runspec.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            
+
             if (runspecparts.Length > 0)
             {
                 switch (runspecparts[0].ToLower())
                 {
-                    case "every":                    
+                    case "every":
                         _timer = CreateSchedule(runspecparts);
                         break;
+
                     case "onchange":
                         SubscribeToTriggers(runspecparts);
                         break;
+
                     case "onceat":
                         _timer = ScheduleExecution(runspecparts);
                         break;
+
                     default:
                         throw new Exception("Invalid run specification (unrecognized trigger type '" + runspecparts[0] + "')");
-
                 }
             }
         }
-
 
         private Timer ScheduleExecution(string[] runspecparts)
         {
             if (runspecparts.Length < 2)
                 throw new Exception("Invalid run specification (missing scheduled executation time (HH:mm:ss)");
 
-         
             DateTime scheduledTime = GetDateTime(runspecparts, 1);
-            
+
             TimeSpan waitTime = scheduledTime.Subtract(DateTime.Now);
 
             if (waitTime < TimeSpan.Zero)
                 throw new Exception("Invalid run specification. Script run time must be in the future");
 
-
-            return new Timer(OnTimerTick, null, (long)waitTime.TotalMilliseconds,-1);
-            
+            return new Timer(OnTimerTick, null, (long)waitTime.TotalMilliseconds, -1);
         }
 
-        private static DateTime GetDateTime(string[] runspecparts,int idx)
+        private static DateTime GetDateTime(string[] runspecparts, int idx)
         {
             string timestring = runspecparts[idx];
 
@@ -141,31 +143,37 @@ namespace Scripting
                     if (waitms < 0)
                         waitms = intervalms;
                     return new Timer(OnTimerTick, null, waitms, intervalms);
+
                 case "second":
                     intervalms = Convert.ToInt32(quantity * 1000);
                     if (waitms < 0)
                         waitms = intervalms;
                     return new Timer(OnTimerTick, null, waitms, intervalms);
+
                 case "minutes":
                     intervalms = Convert.ToInt32(quantity * 60 * 1000);
                     if (waitms < 0)
                         waitms = intervalms;
                     return new Timer(OnTimerTick, null, waitms, intervalms);
+
                 case "minute":
                     intervalms = Convert.ToInt32(quantity * 60 * 1000);
                     if (waitms < 0)
                         waitms = intervalms;
                     return new Timer(OnTimerTick, null, waitms, intervalms);
+
                 case "hours":
                     intervalms = Convert.ToInt32(quantity * 24 * 60 * 1000);
                     if (waitms < 0)
                         waitms = intervalms;
                     return new Timer(OnTimerTick, null, waitms, intervalms);
+
                 case "hour":
                     intervalms = Convert.ToInt32(quantity * 24 * 60 * 1000);
                     if (waitms < 0)
                         waitms = intervalms;
                     return new Timer(OnTimerTick, null, waitms, intervalms);
+
                 default:
                     throw new Exception("Invalid run specification (unrecognized time unit '" + runspec[2] + "')");
             }
@@ -193,7 +201,7 @@ namespace Scripting
                 _script = CSharpScript.Create(_code, options, _scriptableObjectsType);
             }
 
-            // run it           
+            // run it
             try
             {
                 Task<ScriptState> result = null;
@@ -207,18 +215,14 @@ namespace Scripting
                 {
                     CompileError?.Invoke(_scriptID, ex.Diagnostics);
                     return;
-                }             
+                }
             }
             catch (Exception ex)
             {
-
                 ScriptError?.Invoke(_scriptID, ex);
             }
-          
-          
         }
 
-       
         private void SubscribeToTriggers(string[] runspec)
         {
             string[] trigger;
@@ -236,7 +240,8 @@ namespace Scripting
                 try
                 {
                     triggerObj = objects.Get(triggerID);
-                } catch
+                }
+                catch
                 {
                     _enabled = false;
                     throw new Exception("The trigger object '" + triggerID + "' for the script '" + ID + "' was not found, the script has been disabled");
@@ -248,12 +253,9 @@ namespace Scripting
                     _onChangeHandlers.Add(triggerID, new List<string>() { triggerobjectProperty });
 
                 triggerObj.PropertyChanged += OnChangeHandler;
-
-                
             }
         }
 
-        
         private void OnChangeHandler(object sender, PropertyChangedEventArgs e)
         {
             ScriptableObject triggerObj = (ScriptableObject)sender;
@@ -294,7 +296,6 @@ namespace Scripting
             _timer?.Dispose();
 
             ClearTriggers();
-                  
         }
     }
 }

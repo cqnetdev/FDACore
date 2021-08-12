@@ -1,9 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+﻿using Support;
+using System;
 using System.Text;
-using System.Threading.Tasks;
-using Support;
 
 namespace Common
 {
@@ -17,9 +14,9 @@ namespace Common
         public string ErrorCode;
         public string StackTrace;
 
-        public enum AppEventType {Debug, Error, ConfigErr}
+        public enum AppEventType { Debug, Error, ConfigErr }
 
-        public EventLogItem(DateTime timestamp,Exception ex,string description)
+        public EventLogItem(DateTime timestamp, Exception ex, string description)
         {
             Timestamp = timestamp;
             EventType = AppEventType.Error;
@@ -27,11 +24,11 @@ namespace Common
             if (ex.Data.Contains("ObjectName"))
                 ObjectName = ex.Data["ObjectName"].ToString();
             Description = description + ", exception: " + ex.Message;
-            ErrorCode = "0x"+Convert.ToString(ex.HResult, 16);
+            ErrorCode = "0x" + Convert.ToString(ex.HResult, 16);
             StackTrace = ex.StackTrace;
         }
 
-        public EventLogItem(DateTime timestamp, string objectType, string objectName, string description,bool ConfigError=false)
+        public EventLogItem(DateTime timestamp, string objectType, string objectName, string description, bool ConfigError = false)
         {
             Timestamp = timestamp;
             ObjectType = objectType;
@@ -43,7 +40,7 @@ namespace Common
                 EventType = AppEventType.Debug;
         }
 
-        public void ToSQL(Guid executionID,StringBuilder sb,bool firstItem)
+        public void ToSQL(Guid executionID, StringBuilder sb, bool firstItem)
         {
             string objname;
             string desc;
@@ -73,7 +70,7 @@ namespace Common
             sb.Append("','");
             sb.Append(ObjectType);
             sb.Append("','");
-            
+
             sb.Append(objname);
             sb.Append("','");
             sb.Append(desc);

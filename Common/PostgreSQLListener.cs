@@ -1,15 +1,12 @@
-using System;
-using System.Collections.Generic;
-using System.Text;
-using Npgsql;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using System.Data;
+using Npgsql;
+using System;
 using System.Reflection;
 
 namespace Common
 {
-    public class PostgreSQLListener<T> : IDisposable where T : new() 
+    public class PostgreSQLListener<T> : IDisposable where T : new()
     {
         private readonly string _channel = "db_notifications";
         private readonly string _connstring;
@@ -17,9 +14,11 @@ namespace Common
         private readonly string _table;
 
         public delegate void ConnErrorHandler(object sender, Exception e);
+
         public event ConnErrorHandler Error;
 
         public delegate void NotificationHandler(object sender, PostgreSQLNotification notifyEvent);
+
         public event NotificationHandler Notification;
 
         /// <summary>
@@ -27,13 +26,12 @@ namespace Common
         /// </summary>
         /// <param name="connString">The connection string for the database</param>
         /// <param name="tablename">The name of the table to listen for changes to</param>
-        public PostgreSQLListener(string connString,string tablename)
+        public PostgreSQLListener(string connString, string tablename)
         {
             _table = tablename.ToLower();
 
             // Connect to the database
             _connstring = connString;// + ";Keepalive=1";
-
 
             _conn = new NpgsqlConnection(connString);
             try
@@ -42,7 +40,7 @@ namespace Common
             }
             catch (Exception ex)
             {
-                Error?.Invoke(this,ex);
+                Error?.Invoke(this, ex);
                 return;
             }
 
@@ -69,14 +67,14 @@ namespace Common
             // start listening for notifications
             try
             {
-                using (NpgsqlCommand command = new ("listen " + _channel + ";", _conn))
+                using (NpgsqlCommand command = new("listen " + _channel + ";", _conn))
                 {
                     command.ExecuteNonQuery();
                 }
             }
             catch (Exception ex)
             {
-                Error?.Invoke(this,ex);
+                Error?.Invoke(this, ex);
             }
         }
 
@@ -92,17 +90,16 @@ namespace Common
                 {
                     command.ExecuteNonQuery();
                 }
-            }catch (Exception ex)
-            {
-                Error?.Invoke(this,ex);
             }
-
+            catch (Exception ex)
+            {
+                Error?.Invoke(this, ex);
+            }
         }
 
         // handle notifications of a change in one of the monitored table
         private void Conn_Notification(object sender, NpgsqlNotificationEventArgs e)
         {
-           
             JObject json = JObject.Parse(e.Payload);
 
             // get the name of the table that changed, if it's not the one this listener is watching, ignore it
@@ -119,9 +116,8 @@ namespace Common
             notificationData.schema = (string)json["schema"];
             notificationData.Timestamp = (DateTime)json["timestamp"];
 
-
             // get the key column name(s), and the key value(s) of the row that set off the trigger
-            string key_columns =((string)json["keycolumns"]).ToUpper();
+            string key_columns = ((string)json["keycolumns"]).ToUpper();
             string key_values = (string)json["keyvalues"];
 
             string[] keycolsarray = key_columns.Split(",");
@@ -146,7 +142,7 @@ namespace Common
             else
             {
                 string where = " where ";
-                for (int i=0;i<keycolsarray.Length;i++)
+                for (int i = 0; i < keycolsarray.Length; i++)
                 {
                     if (i > 0)
                         where += " and ";
@@ -157,7 +153,7 @@ namespace Common
                 // query for the row that changed or was inserted
                 string query = "select row_to_json(t) from( select * from " + table + where + ") t;";
                 string jsonResult;
-                using (NpgsqlConnection conn = new (_connstring))
+                using (NpgsqlConnection conn = new(_connstring))
                 {
                     conn.Open();
                     using (NpgsqlCommand command = conn.CreateCommand())
@@ -182,10 +178,7 @@ namespace Common
             StopListening();
             _conn?.Close();
             _conn.Dispose();
-            
         }
-
-     
 
         public class PostgreSQLNotifierError : EventArgs
         {
@@ -215,7 +208,5 @@ namespace Common
             public string table;
             public innerT row;
         }
-
-
     }
 }

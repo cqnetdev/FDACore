@@ -1,10 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace FDAManager
 {
@@ -13,8 +10,10 @@ namespace FDAManager
         // This size of the IV (in bytes) must = (keysize / 8).  Default keysize is 256, so the IV must be
         // 32 bytes long.  Using a 16 character string here gives us 32 bytes when converted to a byte array.
         private const string initVector = "p1MggfiEgGfqvVgz";
+
         // This constant is used to determine the keysize of the encryption algorithm
         private const int keysize = 256;
+
         //Encrypt
         public static string EncryptString(string plainText, string passPhrase)
         {
@@ -40,8 +39,8 @@ namespace FDAManager
             {
                 return string.Empty;
             }
-
         }
+
         //Decrypt
         public static string DecryptString(string cipherText, string passPhrase)
         {

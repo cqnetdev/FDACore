@@ -1,14 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.ComponentModel;
-using System.Drawing;
-using System.Data;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Windows.Forms;
-using System.Windows.Forms.DataVisualization;
 using System.IO;
+using System.Windows.Forms;
 using System.Windows.Forms.DataVisualization.Charting;
 
 namespace FDAManager
@@ -21,22 +14,20 @@ namespace FDAManager
         // public delegate void StopCaptureHandler(object sender, EventArgs e);
         // public event StopCaptureHandler StopCapture;
 
-
         public int Priority { get; set; }
         public Guid ConnectionID { get; set; }
 
         public string CurrentQueue { get { return ConnectionID.ToString() + "." + Priority; } }
 
-       // private bool capturing = false;
+        // private bool capturing = false;
 
         private class HistoryDataPoint
         {
             public int Priority { get; }
             public DateTime Timestamp { get; }
             public int Value { get; }
-           
 
-            public HistoryDataPoint(int priority,DateTime ts, int value)
+            public HistoryDataPoint(int priority, DateTime ts, int value)
             {
                 Priority = priority;
                 Timestamp = ts;
@@ -44,17 +35,23 @@ namespace FDAManager
             }
         }
 
-        private enum mode {Graph,Tab};
+        private enum mode { Graph, Tab };
+
         private mode _mode;
-        private mode CurrentMode { get { return _mode; } set
+
+        private mode CurrentMode
+        {
+            get { return _mode; }
+            set
             {
                 btn_graphview.Enabled = (value == mode.Tab);
                 btn_tabview.Enabled = !btn_graphview.Enabled;
-                
+
                 chart_queueHistory.Visible = (value == mode.Graph);
                 gridviewPanel.Visible = (value == mode.Tab);
                 _mode = value;
-            } }
+            }
+        }
 
         public QueueHistory()
         {
@@ -62,7 +59,7 @@ namespace FDAManager
             CurrentMode = mode.Graph;
         }
 
-        public void NewDataPoint(int priority, int value,DateTime timestamp)
+        public void NewDataPoint(int priority, int value, DateTime timestamp)
         {
             DataPoint newPoint = new();
             newPoint.SetValueXY(timestamp, value);
@@ -103,7 +100,6 @@ namespace FDAManager
             }
             dgvQHist.DataSource = null;
 
-           
             //if (capturing)
             //    btn_stopcapture_Click(this, new EventArgs());
         }
@@ -144,7 +140,8 @@ namespace FDAManager
                 }
                 fs.Close();
                 fs = null;
-            } catch (IOException ex)
+            }
+            catch (IOException ex)
             {
                 MessageBox.Show(ex.Message, "Export Error", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
             }
@@ -152,10 +149,6 @@ namespace FDAManager
 
         private void priorityEnabled_CheckedChanged(object sender, EventArgs e)
         {
-
         }
-
-
-
     }
 }

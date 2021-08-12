@@ -1,14 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Common;
-using System.Threading;
-using System.ComponentModel;
-using System.Data.SqlClient;
-using System.Diagnostics;
+﻿using Common;
 using Support;
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Text;
+using System.Threading;
 
 namespace FDA
 {
@@ -25,17 +21,18 @@ namespace FDA
         //private Timer _cacheCheckTimer;
 
         public delegate void CacheFlushHandler(object sender, CacheFlushEventArgs e);
+
         public event CacheFlushHandler CacheFlush;
 
-        public CacheManager(int sizeLimit,int timeout)
+        public CacheManager(int sizeLimit, int timeout)
         {
             CacheLimit = sizeLimit;
             CacheTimeout = timeout;
             _caches = new Dictionary<string, Cache>();
-           // _cacheCheckTimer = new Timer(CacheTimerOnTick, null, 1000, 1000);
+            // _cacheCheckTimer = new Timer(CacheTimerOnTick, null, 1000, 1000);
         }
 
-        public void CacheDataPoint(string destination,Tag tag)
+        public void CacheDataPoint(string destination, Tag tag)
         {
             // create a new cache for the destination if one doesn't already exist
             if (!_caches.ContainsKey(destination))
@@ -71,7 +68,7 @@ namespace FDA
         private void HandleCacheMaxSize(object sender, EventArgs e)
         {
             Cache cache = (Cache)sender;
-            Globals.SystemManager.LogApplicationEvent(this, "", "cache count for '" + cache.Destination + "' of " + cache.Count + " reached the limit of " + CacheLimit + ", flushing " + cache.Count + " data points to the database",false,true);
+            Globals.SystemManager.LogApplicationEvent(this, "", "cache count for '" + cache.Destination + "' of " + cache.Count + " reached the limit of " + CacheLimit + ", flushing " + cache.Count + " data points to the database", false, true);
             string sql = cache.GetBatch();
             if (sql != null)
             {
@@ -83,7 +80,7 @@ namespace FDA
         private void HandleCacheTimeout(object sender, EventArgs e)
         {
             Cache cache = (Cache)sender;
-            Globals.SystemManager.LogApplicationEvent(this, "", "cache age of '" + cache.Destination + "' of " + cache.Age + " exceeds the limit of " + CacheTimeout + ", flushing " + cache.Count + " data points to the database",false,true);
+            Globals.SystemManager.LogApplicationEvent(this, "", "cache age of '" + cache.Destination + "' of " + cache.Age + " exceeds the limit of " + CacheTimeout + ", flushing " + cache.Count + " data points to the database", false, true);
 
             lock (cache)
             {
@@ -96,11 +93,9 @@ namespace FDA
             }
         }
 
-
         public List<string> FlushAll()
         {
             List<string> BatchList = new();
-
 
             foreach (Cache cache in _caches.Values)
             {
@@ -129,12 +124,10 @@ namespace FDA
 
             public CacheFlushEventArgs(string query)
             {
-                Query = query; 
+                Query = query;
             }
         };
-
     }
-    
 
     internal class Cache : IDisposable
     {
@@ -143,7 +136,7 @@ namespace FDA
 
         public long Age = 0;// { get { if (_stopwatch != null) return _stopwatch.ElapsedMilliseconds; else return 0; } }
         public int Count;
- 
+
         private readonly Stopwatch _stopwatch;
         private Timer _ageTimer;
 
@@ -151,13 +144,14 @@ namespace FDA
         public int MaxSize;
 
         public delegate void TimeoutHandler(object sender, EventArgs e);
+
         public event TimeoutHandler CacheTimeout;
 
         public delegate void MaxSizeHandler(object sender, EventArgs e);
+
         public event MaxSizeHandler CacheMaxSizeReached;
 
-
-        public Cache(string destination,int timeout,int maxsize)
+        public Cache(string destination, int timeout, int maxsize)
         {
             Destination = destination;
             SQL = new StringBuilder();
@@ -186,7 +180,7 @@ namespace FDA
 
             // going from empty to not empty, start the cache age timer
             if (Count == 0)
-            {              
+            {
                 _ageTimer.Change(Timeout, System.Threading.Timeout.Infinite);
                 _stopwatch.Start();
             }
@@ -209,14 +203,13 @@ namespace FDA
                     SQL.Append(')');
                 }
 
-                    Count++;
+                Count++;
             }
-          
+
             if (Count >= MaxSize)
             {
                 CacheMaxSizeReached?.Invoke(this, new EventArgs());
             }
-
         }
 
         public string GetBatch()
@@ -228,7 +221,7 @@ namespace FDA
                     string batchSQL;
                     lock (SQL)
                     {
-                        batchSQL = SQL.ToString(); 
+                        batchSQL = SQL.ToString();
                         ResetBatch();
                     }
 
@@ -258,6 +251,7 @@ namespace FDA
         }
 
         #region IDisposable Support
+
         private bool disposedValue = false; // To detect redundant calls
 
         protected virtual void Dispose(bool disposing)
@@ -295,6 +289,7 @@ namespace FDA
             // TODO: uncomment the following line if the finalizer is overridden above.
             // GC.SuppressFinalize(this);
         }
-        #endregion
+
+        #endregion IDisposable Support
     }
 }

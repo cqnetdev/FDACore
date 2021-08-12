@@ -1,13 +1,6 @@
 ﻿using Microsoft.CodeAnalysis;
-using System;
-using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.ComponentModel;
-using System.Data;
-using System.Drawing;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace FDAScripter
@@ -19,7 +12,7 @@ namespace FDAScripter
             InitializeComponent();
 
             BindingList<ErrorItem> errors = new();
-            
+
             foreach (Diagnostic diag in diags)
                 errors.Add(new FrmCompileResult.ErrorItem(diag));
 
@@ -31,7 +24,7 @@ namespace FDAScripter
         {
             public string ID { get; }
             public string Description { get; }
-            public string Location{ get; }
+            public string Location { get; }
 
             public ErrorItem(Diagnostic ErrorItemSource)
             {
@@ -40,6 +33,5 @@ namespace FDAScripter
                 Location = "Line " + ErrorItemSource.Location.GetLineSpan().StartLinePosition;
             }
         }
-
     }
 }

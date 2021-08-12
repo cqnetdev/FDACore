@@ -1,21 +1,17 @@
+using Microsoft.Extensions.Configuration;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using System.Windows.Forms;
-using System.Xml.Serialization;
-using uPLibrary.Networking.M2Mqtt;
-using System.Net.Sockets;
-using System.Threading;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.Net.Sockets;
+using System.Reflection;
 using System.Text;
 using System.Text.Json;
-using System.Reflection;
-using Microsoft.Extensions.Configuration;
-
-
+using System.Threading;
+using System.Windows.Forms;
+using System.Xml.Serialization;
+using uPLibrary.Networking.M2Mqtt;
 
 namespace FDAManager
 {
@@ -23,6 +19,7 @@ namespace FDAManager
     {
         [XmlElement("LastConnection")]
         public Connection LastConnection { get; set; }
+
         [XmlArray("RecentConnections")]
         public List<Connection> RecentConnections { get; set; }
 
@@ -48,7 +45,6 @@ namespace FDAManager
 
         public Connection()
         {
-
         }
 
         public static bool operator ==(Connection lhs, Connection rhs)
@@ -58,7 +54,6 @@ namespace FDAManager
 
             if (lhs is object && rhs is null)
                 return false;
-
 
             return (lhs.Description == rhs.Description && lhs.Host == rhs.Host);
         }
@@ -89,14 +84,13 @@ namespace FDAManager
         }
     }
 
-
-    static class Program
+    internal static class Program
     {
         /// <summary>
         ///  The main entry point for the application.
         /// </summary>
         [STAThread]
-        static void Main(string[] args)
+        private static void Main(string[] args)
         {
             if (FDAManagerContext.ProcessRunning("FDAManager", true))
             {
@@ -110,13 +104,13 @@ namespace FDAManager
             Application.Run(new FDAManagerContext(args));
         }
 
-
         internal class FDAManagerContext : ApplicationContext
         {
             internal enum ConnectionStatus { Default, Disconnected, Connecting, Connected };
 
-            // statuses 
+            // statuses
             internal static ConnectionStatus _MQTTConnectionStatus = ConnectionStatus.Default;
+
             internal static ConnectionStatus _ControllerConnectionStatus = ConnectionStatus.Default;
             internal static string _CurrentFDA = "";
             internal static string _FDAName;
@@ -131,7 +125,6 @@ namespace FDAManager
             internal static string _FDAVersion = "";
             internal static string _FDADBType = "";
 
-
             internal static FDAStatus Status;
 
             internal static ConnectionHistory ConnHistory;
@@ -139,14 +132,16 @@ namespace FDAManager
             private static bool _paused = false;
             private static ToolStripMenuItem openGuiMenuItem;
             private static frmMain2 _mainForm;
+
             // private System.Threading.Timer dataReceivedCheckTimer;
             //private int dataReceivedCheckRate = 100;
             internal static bool elevatedPermissions = false;
-            internal static string Host;
 
+            internal static string Host;
 
             //private static int _FDAport = 9572;
             internal static MqttClient MQTT;
+
             internal static TcpClient FDAControllerClient;
 
             internal static BackgroundWorker bg_MQTTConnect;
@@ -156,17 +151,18 @@ namespace FDAManager
             private static System.Threading.Timer ControllerRetryTimer;
             private static System.Threading.Timer ControllerPinger;
 
-
             private static bool IntentionalDisconnect = false;
 
-            private readonly static TimeSpan ControllerPingRate = new (0, 0, 1);
+            private readonly static TimeSpan ControllerPingRate = new(0, 0, 1);
             //private readonly static TimeSpan ControllerRetryRate = new (0, 0, 5);
             //private readonly static TimeSpan ReconnectRate = new(0, 0, 5);
 
             public delegate void ConnectionStatusUpdateHandler(object sender, StatusUpdateArgs e);
+
             public static event ConnectionStatusUpdateHandler StatusUpdate;
 
             public delegate void FDANameUpdateHandler(object sender, string name);
+
             public static event FDANameUpdateHandler FDANameUpdate;
 
             public class StatusUpdateArgs : EventArgs
@@ -181,24 +177,21 @@ namespace FDAManager
                 }
             }
 
-
             public FDAManagerContext(string[] args)
             {
                 //dataReceivedCheckTimer = new System.Threading.Timer(TCPDataReceivedCheck, null, Timeout.Infinite, Timeout.Infinite);
                 for (int i = 0; i < args.Length; i++)
                     args[i] = args[i].ToUpper();
 
-
                 string exePath = System.Reflection.Assembly.GetEntryAssembly().Location;
                 FileVersionInfo versionInfo = FileVersionInfo.GetVersionInfo(exePath);
 
-
-                ToolStripMenuItem titleItem = new ("FDA Manager ver " + versionInfo.FileVersion);
-                openGuiMenuItem = new ("Open FDA Tools",new System.Drawing.Bitmap(20,20), OpenGui);
-                ToolStripMenuItem exitMenuItem = new ("Close FDA Manager", new System.Drawing.Bitmap(20, 20), DoExit);
+                ToolStripMenuItem titleItem = new("FDA Manager ver " + versionInfo.FileVersion);
+                openGuiMenuItem = new("Open FDA Tools", new System.Drawing.Bitmap(20, 20), OpenGui);
+                ToolStripMenuItem exitMenuItem = new("Close FDA Manager", new System.Drawing.Bitmap(20, 20), DoExit);
                 notifyIcon = new NotifyIcon()
                 {
-                    Icon = GetIcon("ManagerGray"), 
+                    Icon = GetIcon("ManagerGray"),
                     ContextMenuStrip = new ContextMenuStrip(),
                     Visible = false
                 };
@@ -208,7 +201,6 @@ namespace FDAManager
                 notifyIcon.ContextMenuStrip.Items.Add(new ToolStripSeparator());
                 notifyIcon.ContextMenuStrip.Items.Add(exitMenuItem);
                 notifyIcon.Visible = true;
-
 
                 bg_MQTTConnect = new BackgroundWorker();
                 bg_MQTTConnect.DoWork += Bg_MQTTConnect_DoWork;
@@ -222,17 +214,14 @@ namespace FDAManager
                 ControllerPinger = new System.Threading.Timer(PingController);
                 ControllerRetryTimer = new System.Threading.Timer(ControllerReconnectTimer_Tick);
 
-
-
-
                 // read in the history XML (or create an empy history object if the xml doesn't exist
                 if (File.Exists("ConnectionHistory.xml"))
                 {
                     try
                     {
-                        using (FileStream stream = new ("ConnectionHistory.xml", FileMode.Open))
+                        using (FileStream stream = new("ConnectionHistory.xml", FileMode.Open))
                         {
-                            XmlSerializer serializer = new (typeof(ConnectionHistory));
+                            XmlSerializer serializer = new(typeof(ConnectionHistory));
                             ConnHistory = (ConnectionHistory)serializer.Deserialize(stream);
                         }
                     }
@@ -245,11 +234,9 @@ namespace FDAManager
                 else
                     ConnHistory = new ConnectionHistory();
 
-
-
                 OpenGui(this, new EventArgs());
 
-                // get the details of the previous connection and try to reconnect to it            
+                // get the details of the previous connection and try to reconnect to it
                 //string connDetails = Properties.Settings.Default.LastConnectedFDA;
                 //string[] details = connDetails.Split('|');
                 //if (details.Length >= 2 && details[0] != "")
@@ -259,10 +246,7 @@ namespace FDAManager
                     ChangeHost(ConnHistory.LastConnection.Host, ConnHistory.LastConnection.Description);
                 }
                 //}
-
             }
-
-
 
             internal static void ChangeHost(string newHost, string newFDAName)
             {
@@ -278,14 +262,10 @@ namespace FDAManager
                     Host = newHost;
                     CurrentFDA = newFDAName + " (" + newHost + ")";
 
-
                     IntentionalDisconnect = false;
                     MQTTReconnectTimer.Change(Timeout.Infinite, Timeout.Infinite);
                     ControllerRetryTimer.Change(Timeout.Infinite, Timeout.Infinite);
                     ControllerPinger.Change(Timeout.Infinite, Timeout.Infinite);
-
-
-
 
                     if (bg_MQTTConnect == null)
                     {
@@ -300,7 +280,6 @@ namespace FDAManager
                         bg_ControllerConnect.DoWork += Bg_ControllerConnect_DoWork;
                         bg_ControllerConnect.RunWorkerCompleted += Bg_ControllerConnect_RunWorkerCompleted;
                     }
-
 
                     if (MainFormActive())
                     {
@@ -333,13 +312,10 @@ namespace FDAManager
                     FDAControllerClient.Dispose();
                     FDAControllerClient = null;
                     ControllerConnectionStatus = ConnectionStatus.Default;
-
                 }
 
                 Host = "";
                 FDAName = "";
-
-
 
                 UpdateFDAStatusIcon("default");
             }
@@ -445,7 +421,6 @@ namespace FDAManager
                 //string MQTTServer_Name = args[1];
                 // bool suppressMessages = (args[2] == "True");
 
-
                 bool isRetry = false;
 
             Retry:
@@ -512,7 +487,6 @@ namespace FDAManager
                 {
                     ConnHistory.LastConnection = new Connection(Host, FDAName);
 
-
                     MQTTConnectionStatus = ConnectionStatus.Connected;
                     MQTT.MqttMsgPublishReceived += MQTT_MqttMsgPublishReceived;
                     MQTT.ConnectionClosed += MQTT_ConnectionClosed;
@@ -523,7 +497,6 @@ namespace FDAManager
 
                     //MQTT.Subscribe(new string[] { "FDA/runstatus" }, new byte[] { 0 });
                     MQTT.Subscribe(new string[] { "FDA/identifier" }, new byte[] { 0 });
-
 
                     if (MainFormActive())
                     {
@@ -550,11 +523,9 @@ namespace FDAManager
 
                     if (MessageBox.Show(message, "Failed Connection", MessageBoxButtons.RetryCancel) == DialogResult.Retry)
                         bg_MQTTConnect.RunWorkerAsync(new string[] { results[0], results[1] });
-
                 }
-
-
             }
+
             private static void WaitForResponse(NetworkStream stream, int limit)
             {
                 int wait = 0;
@@ -614,7 +585,6 @@ namespace FDAManager
                     // and update the GUI, if it's open
                     _mainForm?.SetFDAStatus(Status);
 
-
                     // reset the ping timer
                     ControllerPinger.Change(ControllerPingRate, ControllerPingRate);
                 }
@@ -632,7 +602,6 @@ namespace FDAManager
                 {
                     bg_MQTTConnect.RunWorkerAsync(new string[] { Host, FDAName });
                 }
-
             }
 
             private static void ControllerReconnectTimer_Tick(object state)
@@ -652,9 +621,6 @@ namespace FDAManager
                     bg_MQTTConnect.RunWorkerAsync(new string[] { Host, FDAName, "True" }); // host/ip, description, supress messages (don't show failed to connect messages on re-connect attempts)
                 }
             }
-
-
-
 
             private static void MQTT_MqttMsgPublishReceived(object sender, uPLibrary.Networking.M2Mqtt.Messages.MqttMsgPublishEventArgs e)
             {
@@ -681,11 +647,8 @@ namespace FDAManager
                     case "FDA/identifier":
                         _FDAName = Encoding.UTF8.GetString(e.Message);
                         break;
-
                 }
             }
-
-
 
             private static bool MainFormActive()
             {
@@ -734,15 +697,12 @@ namespace FDAManager
                         notifyIcon.Icon = GetIcon("ManagerRed");//Properties.Resources.ManagerRed;
                         notifyIcon.Text = "FDA Stopped";
                         break;
+
                     case "default":
                         notifyIcon.Icon = GetIcon("ManagerGray");//Properties.Resources.ManagerGray;
                         break;
                 }
-
-
             }
-
-
 
             internal static void PauseFDA(object sender, EventArgs e)
             {
@@ -772,7 +732,6 @@ namespace FDAManager
                 }
             }
 
-
             internal static string SendCommandToFDAController(string command)
             {
                 try
@@ -792,7 +751,6 @@ namespace FDAManager
                             // read any response
                             byte[] response = new byte[1000];
 
-
                             if (FDAControllerClient.GetStream().DataAvailable)
                             {
                                 int readsize = FDAControllerClient.GetStream().Read(response, 0, 1000);
@@ -800,7 +758,6 @@ namespace FDAManager
                             }
                             else
                                 return "";
-
                         }
                         else
                         {
@@ -821,8 +778,6 @@ namespace FDAManager
 
                 return "";
             }
-
-
 
             //private static void HandleStartCommand(string FDA_ID, bool consolemode)
             //{
@@ -851,8 +806,6 @@ namespace FDAManager
             //    }
             //}
 
-
-
             private void OpenGui(object sender, EventArgs e)
             {
                 if (_mainForm == null)
@@ -864,10 +817,8 @@ namespace FDAManager
                     _mainForm.Disposed += MainForm_Disposed;
                     _mainForm.Shown += MainForm_Shown;
 
-
                     // start checking for subscription updates from the FDA
                     //dataReceivedCheckTimer.Change(dataReceivedCheckRate, Timeout.Infinite);
-
 
                     _mainForm.Show();
                     _mainForm.SetFDAStatus(Status);
@@ -880,8 +831,6 @@ namespace FDAManager
                     //{
                     //    _mainForm.SetConnectionMenuItems(!bg_MQTTConnect.IsBusy);
                     //}
-
-
                 }
                 else
                     _mainForm.Focus();
@@ -889,17 +838,13 @@ namespace FDAManager
 
             private void MainForm_Shown(object sender, EventArgs e)
             {
-
-
                 if (MQTTConnectionStatus == ConnectionStatus.Connected)
                 {
                     _mainForm.SetMQTT(MQTT);
                     _mainForm.MQTTConnected(_FDAName, Host);
                 }
 
-
                 _mainForm.SetFDAStatus(Status);
-
             }
 
             internal static bool ProcessRunning(string processname, bool self = false)
@@ -942,20 +887,17 @@ namespace FDAManager
                     FDAControllerClient = null;
                 }
 
-
-
                 // save the recent FDA connection history
                 try
                 {
-                    using (FileStream stream = new ("ConnectionHistory.xml", FileMode.Create))
+                    using (FileStream stream = new("ConnectionHistory.xml", FileMode.Create))
                     {
-                        XmlSerializer serializer = new (typeof(ConnectionHistory));
+                        XmlSerializer serializer = new(typeof(ConnectionHistory));
                         serializer.Serialize(stream, ConnHistory);
                     }
                 }
                 catch
                 {
-
                 }
 
                 Application.Exit();
@@ -997,14 +939,13 @@ namespace FDAManager
                     IConfiguration configuration = new ConfigurationBuilder().AddJsonFile("appsettings.json", false, true).Build();
                     appConfig = configuration.GetSection("AppSettings");
                     return appConfig[settingName];
-                } catch (Exception ex)
+                }
+                catch (Exception ex)
                 {
                     MessageBox.Show("Error while reading appsettings.json \"" + ex.Message + "\"");
                     return "";
                 }
             }
-
-
 
             public class FDAStatus
             {
@@ -1016,6 +957,7 @@ namespace FDAManager
                 public String RunMode { get; set; }
 
                 public int TotalQueueCount { get; set; }
+
                 public string JSON()
                 {
                     return JsonSerializer.Serialize<FDAStatus>(this);
@@ -1035,14 +977,7 @@ namespace FDAManager
 
                     return status;
                 }
-
             }
-
-
-      
-
-
-
         }
     }
 }

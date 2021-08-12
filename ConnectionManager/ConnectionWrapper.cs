@@ -1,16 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using Common;
+using System;
+using System.Diagnostics;
 using System.IO;
 using System.IO.Ports;
-using System.Net.Sockets;
-using System.Diagnostics;
-using Common;
 using System.Net;
-using System.Dynamic;
-using System.Net.Security;
+using System.Net.Sockets;
 using System.Threading;
 
 namespace FDA
@@ -22,7 +16,7 @@ namespace FDA
         private UdpClient _UDPClient;
         private readonly int _UDPPort;
         private IPEndPoint _receivedFrom;
-       
+
         private readonly string _connType = "";
         private readonly string _connectionID;
 
@@ -30,24 +24,24 @@ namespace FDA
         public int ReadTimeout { get; set; }
         public int WriteTimeout { get; set; }
 
-        public bool Connected {  get { return IsConnected();  } }
+        public bool Connected { get { return IsConnected(); } }
 
         #region interface methods
 
-        public ConnectionWrapper(TcpClient client,string connectionID)
+        public ConnectionWrapper(TcpClient client, string connectionID)
         {
             _tcpClient = client;
             _connType = "TCP";
             _connectionID = connectionID;
         }
 
-        public ConnectionWrapper(SerialPort serialPort,string connectionID)
+        public ConnectionWrapper(SerialPort serialPort, string connectionID)
         {
             _serialPort = serialPort;
             _connType = "Serial";
             _connectionID = connectionID;
         }
-      
+
         public ConnectionWrapper(UdpClient client, int port, string connectionID)
         {
             _connectionID = connectionID;
@@ -59,14 +53,13 @@ namespace FDA
 
         private bool IsConnected()
         {
-            bool  connected = false;
+            bool connected = false;
             switch (_connType.ToUpper())
             {
-                case "UDP": return _UDPClient.Client.IsBound; 
+                case "UDP": return _UDPClient.Client.IsBound;
                 case "SERIAL": return _serialPort.IsOpen;
             }
             return connected;
-
         }
 
         public bool Flush()
@@ -90,10 +83,10 @@ namespace FDA
                         garbageBin.Write(garbagePail, 0, garbageCount);
                     }
                     stopwatch.Stop();
-                    
+
                     if (garbageBin.Length >= 2000 || stopwatch.ElapsedMilliseconds >= 1000)
                     {
-                       flushResult = false;
+                        flushResult = false;
                     }
 
                     if (garbageBin.Length > 0 && garbageBin.Length < 2000 && stopwatch.ElapsedMilliseconds < 1000)
@@ -102,12 +95,14 @@ namespace FDA
                     }
 
                     garbageBin.SetLength(0);
-           
+
                     break;
+
                 case "SERIAL":
                     _serialPort.DiscardInBuffer();
                     _serialPort.DiscardOutBuffer();
                     break;
+
                 case "UDP":
                     if (_UDPClient.Available > 0)
                     {
@@ -139,26 +134,27 @@ namespace FDA
             return flushResult;
         }
 
-        public int Read(byte[] buffer,int offset,int count)
+        public int Read(byte[] buffer, int offset, int count)
         {
-          int bytesRead = 0;
- 
-     
-          switch (_connType.ToUpper())
+            int bytesRead = 0;
+
+            switch (_connType.ToUpper())
             {
-                case "TCP":                   
+                case "TCP":
                     bytesRead = _tcpClient.GetStream().Read(buffer, offset, count);
                     break;
+
                 case "SERIAL":
                     bytesRead = _serialPort.Read(buffer, offset, count);
                     break;
+
                 case "UDP":
                     byte[] temp;
                     temp = _UDPClient.Receive(ref _receivedFrom);
                     Array.Copy(temp, buffer, temp.Length);
                     bytesRead = temp.Length;
                     break;
-        }
+            }
 
             return bytesRead;
         }
@@ -186,7 +182,6 @@ namespace FDA
             }
 
             return true;
-
         }
 
         public bool Write(byte[] buffer, int offset, int count)
@@ -200,11 +195,13 @@ namespace FDA
                         return true;
                     }
                     break;
+
                 case "SERIAL":
-                    _serialPort.Write(buffer, offset,count);
+                    _serialPort.Write(buffer, offset, count);
                     return true;
+
                 case "UDP":
-                    _UDPClient.Send(buffer,buffer.Length);
+                    _UDPClient.Send(buffer, buffer.Length);
                     return true;
             }
             return false;
@@ -217,35 +214,42 @@ namespace FDA
                 case "TCP":
                     _tcpClient?.Close();
                     break;
+
                 case "SERIAL":
                     _serialPort?.Close();
                     break;
+
                 case "UDP":
                     _UDPClient?.Close();
                     break;
             }
-        }     
+        }
 
-        #endregion
+        #endregion interface methods
 
         #region internal methods
+
         private bool CheckIfDataAvailable()
         {
             switch (_connType.ToUpper())
             {
                 case "TCP":
                     return _tcpClient.GetStream().DataAvailable;
+
                 case "SERIAL":
                     return (_serialPort.BytesToRead > 0);
+
                 case "UDP":
                     return _UDPClient.Available > 0;
+
                 default: return false;
             }
         }
 
-        #endregion
+        #endregion internal methods
 
         #region IDisposable Support
+
         private bool disposedValue = false; // To detect redundant calls
 
         protected virtual void Dispose(bool disposing)
@@ -261,7 +265,6 @@ namespace FDA
                     _UDPClient?.Dispose();
                     _UDPClient = null;
                 }
-
 
                 // TODO: free unmanaged resources (unmanaged objects) and override a finalizer below.
                 // TODO: set large fields to null.
@@ -284,9 +287,7 @@ namespace FDA
             // TODO: uncomment the following line if the finalizer is overridden above.
             GC.SuppressFinalize(this);
         }
-        #endregion
 
-
-
+        #endregion IDisposable Support
     }
 }

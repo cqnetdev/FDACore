@@ -1,8 +1,7 @@
-﻿using System;
+﻿using Support;
+using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Text;
-using Support;
 
 namespace Common
 {
@@ -17,10 +16,13 @@ namespace Common
 
         // these three properties are the setup value that were passed in when the tag was created
         protected string _tagID;
+
         protected string _arguments;
 
         public static Dictionary<Guid, FDADataPointDefinitionStructure> Tags;
+
         public delegate void OnUpdateHandler(object sender, EventArgs e);
+
         public event OnUpdateHandler OnUpdate;
 
         public static DerivedTag Create(string tagID, string tagtype, string arguments)
@@ -29,10 +31,9 @@ namespace Common
             {
                 "bitser" => new BitSeriesDerivedTag(tagID, arguments),
                 "bitmask" => new BitmaskDerivedTag(tagID, arguments),
-                "" => new DerivedTag(tagID,""), // no derived tag type specified, create a basic derived tag that doesn't use any other tag as a source, can only be updated by a script
+                "" => new DerivedTag(tagID, ""), // no derived tag type specified, create a basic derived tag that doesn't use any other tag as a source, can only be updated by a script
                 _ => null   // unrecognized derived  tag type
             };
-
         }
 
         // base class constructor
@@ -52,7 +53,7 @@ namespace Common
 
         private void DerivedTag_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
-            if (e.PropertyName=="LastRead")
+            if (e.PropertyName == "LastRead")
             {
                 OnUpdate?.Invoke(this, new EventArgs());
             }
@@ -74,7 +75,6 @@ namespace Common
 
         public virtual void AlterArguments(string arguments)
         {
-
         }
 
         //protected void RaiseOnUpdateEvent()
@@ -94,7 +94,6 @@ namespace Common
                 return false;
         }
 
-
         protected static UInt32 UInt32FromByteArray(BitArray bitArray)
         {
             Byte[] array = new byte[4];
@@ -106,7 +105,6 @@ namespace Common
         {
             GC.SuppressFinalize(this);
         }
-
     }
 
     public class BitSeriesDerivedTag : DerivedTag
@@ -118,7 +116,6 @@ namespace Common
         private byte _startBit;
         private byte _numBits;
         private FDADataPointDefinitionStructure _sourceTag;
-
 
         public BitSeriesDerivedTag(string tagid, string arguments) : base(tagid, arguments)
         {
@@ -149,8 +146,6 @@ namespace Common
             }
 
             _valid = true;
-
-
 
             // examine the arguments and make sure they're all there and valid
             string[] argumentsList = _arguments.Split(':');
@@ -194,7 +189,7 @@ namespace Common
             }
             _startBit = byte.Parse(argumentsList[1]);
 
-            // third argument (count) must be an integer, and the sum of the start bit # and the count must between 1 and 32           
+            // third argument (count) must be an integer, and the sum of the start bit # and the count must between 1 and 32
             UInt32 maxCount = (UInt32)(32 - _startBit);
             if (!IsIntegerInRange(argumentsList[2], 1, maxCount))
             {
@@ -204,7 +199,6 @@ namespace Common
                 return;
             }
             _numBits = byte.Parse(argumentsList[2]);
-
 
             // valid configuration, subscribe to update events from the source tag
             _valid = true;
@@ -229,7 +223,7 @@ namespace Common
             string typename = _sourceTag.LastRead.DataType.Name.ToLower();
             if (!(typename == "uint8" || typename == "uint16" || typename == "uint32"))
             {
-                Globals.SystemManager?.LogApplicationEvent(this,ID.ToString(),"Soft tag " + ID + " unable to calculate, because of incompatible data type. Bitseries soft tags require an unsigned int (8,16, or 32 bits)");
+                Globals.SystemManager?.LogApplicationEvent(this, ID.ToString(), "Soft tag " + ID + " unable to calculate, because of incompatible data type. Bitseries soft tags require an unsigned int (8,16, or 32 bits)");
                 return;
             }
 
@@ -266,7 +260,7 @@ namespace Common
                     _sourceTag.LastRead.DestTable,
                     _sourceTag.LastRead.DataType,
                     _sourceTag.LastRead.WriteMode);
-            
+
             /* old style
             LastReadDataValue = (double)UInt32FromByteArray(dstBits);
             LastReadDataType = _sourceTag.LastReadDataType;
@@ -300,8 +294,6 @@ namespace Common
             Initialize();
         }
     }
-    
-
 
     public class BitmaskDerivedTag : DerivedTag
     {
@@ -311,9 +303,8 @@ namespace Common
         private FDADataPointDefinitionStructure _sourceTag;
         private UInt32 _bitmask;
 
-
         public BitmaskDerivedTag(string tagid, string arguments) : base(tagid, arguments)
-        {          
+        {
             _derived_tag_type = "bitmask";
             read_detail_01 = "bitmask";
         }
@@ -390,7 +381,6 @@ namespace Common
 
         private void SourceTag_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
-
             // we're only interested in changes to the timestamp, this means the value has updated (even if it hasn't changed)
             if (e.PropertyName != "LastRead")
                 return;
@@ -432,8 +422,7 @@ namespace Common
                   _sourceTag.LastRead.WriteMode
                 );
 
-
-            //RaiseOnUpdateEvent(); // let anyone who's listening know that this derived tag has been updated 
+            //RaiseOnUpdateEvent(); // let anyone who's listening know that this derived tag has been updated
         }
 
         public override void Dispose()
@@ -514,7 +503,6 @@ namespace Common
             {
                 sourceTag.PropertyChanged += SourceTag_PropertyChanged;
             }
-
         }
 
         public override void Alter(string arguments)
@@ -539,14 +527,13 @@ namespace Common
                 return;
 
             FDADataPointDefinitionStructure updatedSourceTag = (FDADataPointDefinitionStructure)sender;
-            
+
             // the tag that changed is disabled, ignore it
             if (!updatedSourceTag.DPDSEnabled)
                 return;
             // this derived tag is disabled, ignore the change to the source tag
             if (DPDSEnabled)
                 return;
-
 
             Double sum = 0;
             int quality = 192;
@@ -567,14 +554,9 @@ namespace Common
             LastReadDataValue = sum;
             LastReadQuality = quality;
             LastReadDataTimestamp = timestamp;
-            
 
             //RaiseOnUpdateEvent(); // let anyone who's listening know that this tag has been updated
-
-
         }
-
-
     }
     */
 }

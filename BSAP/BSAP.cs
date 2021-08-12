@@ -21,7 +21,7 @@ namespace BSAP
         private const byte FS1_typeAndvalue = 0xC0;
         private const byte FS1_typeAndvalueAndMSD = 0xD0;
         private const byte FSS = 0x01;
-        
+
         private const int MaxSignalsPerMessage = 38;  // prevent responses that go over the message size limit
 
         private const byte NodeStatus = 0x00;
@@ -2000,6 +2000,7 @@ namespace BSAP
                 validationErrors.Add(error);
             }
         }
+
         private static List<byte> SerialFinalizeMessage(List<byte> partialMessage)
         {
             // fill in the serial and sequence numbers
@@ -2245,6 +2246,7 @@ namespace BSAP
 
             return;
         }
+
         public sealed class DataType : DataTypeBase
         {
             public static readonly DataType Analog = new("FL", 4, typeof(float));

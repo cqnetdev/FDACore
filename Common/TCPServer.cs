@@ -1,19 +1,12 @@
-﻿using System;
+﻿using Support;
+using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.ComponentModel;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
-using Common;
+using System.Text;
 using System.Threading;
-using System.Runtime.Serialization.Formatters.Binary;
-using System.IO;
-using System.Security.Cryptography.X509Certificates;
-using System.Net.Security;
-using System.Security.Authentication;
-using Support;
 
 namespace FDA
 {
@@ -24,8 +17,8 @@ namespace FDA
 
         private readonly int _tickRate = 100; //ms
         private readonly TcpListener _server;
-        Dictionary<Guid, Client> _clients;
-        System.Threading.Timer _timer;
+        private Dictionary<Guid, Client> _clients;
+        private System.Threading.Timer _timer;
         private static Exception LastError = null;
         public string WelcomeMessage = "";
 
@@ -36,19 +29,22 @@ namespace FDA
         public int ClientCount { get { return _clients.Count; } }
 
         public delegate void TCPCommandHandler(object sender, TCPCommandEventArgs e);
+
         public event TCPCommandHandler DataAvailable;
 
         public delegate void DisconnectedHandler(object sender, ClientEventArgs e);
+
         public event DisconnectedHandler ClientDisconnected;
 
         public delegate void ConnectedHandler(object sender, ClientEventArgs e);
+
         public event ConnectedHandler ClientConnected;
 
         /// <summary>
         /// Create a new TCP Server o nthe specified port
         /// </summary>
         /// <param name="listeningPort"></param>
-        private TCPServer(int listeningPort,string name="")
+        private TCPServer(int listeningPort, string name = "")
         {
             _serverName = name;
             _listeningPort = listeningPort;
@@ -56,13 +52,12 @@ namespace FDA
             _clients = new Dictionary<Guid, Client>();
         }
 
-        public static TCPServer NewTCPServer(int listeningPort,string name="")
+        public static TCPServer NewTCPServer(int listeningPort, string name = "")
         {
-           
             TCPServer newServer;
             try
             {
-                newServer = new TCPServer(listeningPort,name);
+                newServer = new TCPServer(listeningPort, name);
                 //FileStream fs = new FileStream(_serverCertificatePath, FileMode.Open);
                 //byte[] certificateData = new byte[fs.Length];
                 //fs.Read(certificateData, 0, certificateData.Length);
@@ -84,7 +79,8 @@ namespace FDA
             try
             {
                 _server.Start();
-            } catch (Exception ex)
+            }
+            catch (Exception ex)
             {
                 AsyncConsole.WriteLine("Error starting TCP server '" + _serverName + "' on port " + Port + ": " + ex.Message);
                 success = false;
@@ -102,9 +98,10 @@ namespace FDA
         {
             return LastError;
         }
+
         public bool Send(Guid clientID, string message)
         {
-            bool broadcast = (clientID == Guid.Empty);   // Guid.Empty = broadcast to all clients 
+            bool broadcast = (clientID == Guid.Empty);   // Guid.Empty = broadcast to all clients
 
             // check for null message
             if (message == null)
@@ -141,7 +138,7 @@ namespace FDA
         protected virtual void OnTick(Object o)
         {
             _timer.Change(Timeout.Infinite, Timeout.Infinite);
-            
+
             if (isDisposing)
             {
                 goto ResetTimer;
@@ -153,13 +150,12 @@ namespace FDA
                 Client client = new(_server.AcceptTcpClient()/*, _serverCertificate*/);
                 if (client.Connected)
                 {
-
                     client.Disconnected += ClientDisconnectedHandler;
 
                     _clients.Add(client.ID, client);
                     if (WelcomeMessage != "")
                     {
-                        client.SendQueue.Enqueue(Encoding.UTF8.GetBytes(WelcomeMessage+"\n"));
+                        client.SendQueue.Enqueue(Encoding.UTF8.GetBytes(WelcomeMessage + "\n"));
                     }
 
                     //Globals.SystemManager.LogApplicationEvent(this, "", "Accepted TCP connection from " + client.Address);
@@ -182,7 +178,7 @@ namespace FDA
                 }
             }
 
-            ResetTimer:
+        ResetTimer:
             _timer.Change(_tickRate, Timeout.Infinite);
         }
 
@@ -207,7 +203,9 @@ namespace FDA
             public String Address { get => _address; }
             public bool Connected { get => IsConnected(_connection.Client); }
             public Guid ID { get => _clientID; }
+
             public delegate void DisconnectedEventHandler(object sender, EventArgs e);
+
             public event DisconnectedEventHandler Disconnected;
 
             //public delegate void DataReceivedHandler(object sender, DataReceivedEventArgs e);
@@ -247,7 +245,6 @@ namespace FDA
                     {
                         _connection.GetStream().ReadTimeout = 1000;
 
-                       
                         byte[] readBuffer = new byte[65535];
                         byte[] messageArray;
                         byte[] header = new byte[3];
@@ -256,10 +253,10 @@ namespace FDA
                         while (Connected && IsConnected(_connection.Client) && !_workerThread.CancellationPending /*&& stream.IsAuthenticated*/)  //while the client is connected at both ends, we look for incoming messages or messages queued for sending
                         {
                             while (_connection.GetStream().DataAvailable)
-                            {    
+                            {
                                 readSize = stream.Read(readBuffer, 0, readBuffer.Length);
                                 messageArray = new byte[readSize];
-                                Array.Copy(readBuffer, messageArray,readSize);
+                                Array.Copy(readBuffer, messageArray, readSize);
 
                                 lock (ReceivedQueue)
                                 {
@@ -282,7 +279,6 @@ namespace FDA
                         stream.Close();
                         stream.Dispose();
                     }
-
 
                     e.Result = Address + " disconnected from FDA TCP server";
                 }
@@ -310,7 +306,7 @@ namespace FDA
 
             /*
             bool ClientCertificateValidation(Object sender, X509Certificate certificate, X509Chain chain, SslPolicyErrors sslPolicyErrors)
-            {               
+            {
                 if (sslPolicyErrors == SslPolicyErrors.None) { return true; }
                 if (sslPolicyErrors == SslPolicyErrors.RemoteCertificateChainErrors) { return true; } //we don't have a proper certificate tree
                 return false;
@@ -331,12 +327,11 @@ namespace FDA
 
             public void Dispose()
             {
-
                 if (_workerThread != null)
                 {
                     if (_workerThread.IsBusy)
                         _workerThread.CancelAsync();
-                    
+
                     //while (_workerThread.IsBusy)
                     //    Thread.Sleep(10);
                 }
@@ -344,7 +339,6 @@ namespace FDA
                 lock (SendQueue) { SendQueue.Clear(); }
             }
         }
-
 
         public class ClientEventArgs : EventArgs
         {
@@ -354,14 +348,12 @@ namespace FDA
             public Guid ClientID { get { return _clientID; } }
             public string ClientAddress { get { return _address; } }
 
-
             internal ClientEventArgs(Guid clientID, string address)
             {
                 _clientID = clientID;
                 _address = address;
             }
         }
-
 
         public class TCPCommandEventArgs : EventArgs
         {
@@ -374,7 +366,6 @@ namespace FDA
                 _data = data;
                 _clientID = client;
                 _host = host;
-
             }
 
             public byte[] Data { get { return _data; } }
@@ -386,10 +377,10 @@ namespace FDA
             {
                 get { return Message; }
             }
-
         }
 
         #region IDisposable Support
+
         private bool disposedValue = false; // To detect redundant calls
 
         protected virtual void Dispose(bool disposing)
@@ -425,9 +416,7 @@ namespace FDA
             // TODO: uncomment the following line if the finalizer is overridden above.
             GC.SuppressFinalize(this);
         }
-        #endregion
 
-
+        #endregion IDisposable Support
     }
 }
-

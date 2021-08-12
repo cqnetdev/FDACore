@@ -4,12 +4,12 @@ using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Net.Sockets;
-using System.Text;
-using System.Windows.Forms;
-using System.ServiceProcess;
-using System.Security.Principal;
-using System.Text.Json;
 using System.Runtime.Versioning;
+using System.Security.Principal;
+using System.ServiceProcess;
+using System.Text;
+using System.Text.Json;
+using System.Windows.Forms;
 
 namespace FDAController
 {
@@ -29,7 +29,6 @@ namespace FDAController
 
         private delegate void SafePropertyUpdateDelgate(Control control, string property, object value);
 
-     
         public FrmMain()
         {
             InitializeComponent();
@@ -43,8 +42,7 @@ namespace FDAController
 
             // set the Tag properties of the buttons to the names of the services, so we know what service to start/stop when they're clicked
             btnController.Tag = "FDAControllerService";
-            btnMQTT.Tag = "mosquitto"; 
-
+            btnMQTT.Tag = "mosquitto";
 
             //timer = new Timer();
             //timer.Interval = 1000;
@@ -54,7 +52,6 @@ namespace FDAController
 
         private void SafePropertySet(Control control, string property, object value)
         {
-
             if (control.InvokeRequired)
             {
                 control.Invoke(new SafePropertyUpdateDelgate(SafePropertySet), new object[] { control, property, value });
@@ -64,7 +61,6 @@ namespace FDAController
                 control.GetType().GetProperty(property).SetValue(control, value);
             }
         }
-
 
         private bool CheckControllerService()
         {
@@ -110,24 +106,21 @@ namespace FDAController
             SafePropertySet(btnFDAMonitor, "Enabled", controllerStatus);
 
             SetButtonMode(btnController, controllerStatus);
-            
 
             return controllerStatus;
-
         }
 
         private void SetButtonMode(Button button, bool status)
         {
-           
             if (status)
             {
                 SafePropertySet(button, "Text", "Stop");
-               // ttFDAStart.Active = false;
+                // ttFDAStart.Active = false;
             }
             else
             {
                 SafePropertySet(button, "Text", "Start");
-               // ttFDAStart.Active = true;
+                // ttFDAStart.Active = true;
             }
         }
 
@@ -158,7 +151,7 @@ namespace FDAController
             Color textcolor;
             string result;
             string statusText;
-            
+
             bool runstatus = ProcessRunning("FDACore");
 
             // is the FDA running?
@@ -189,7 +182,6 @@ namespace FDAController
                         statusText += ", the status is '" + status.RunStatus + "'";
                     }
 
-                  
                     if (status.RunMode != "")
                     {
                         statusText += "\nFDACore mode is '" + status.RunMode + "'";
@@ -202,30 +194,22 @@ namespace FDAController
                         statusText += "\n" + status.TotalQueueCount + " items in the communications queues";
                     }
                 }
-               
             }
             else
             {
                 statusText = "FDACore process is not running";
                 textcolor = BadColor;
-             
 
                 if (!_isStarting && controllerRunning)
                 {
                     SafePropertySet(btnFDA, "Enabled", true);
                     SafePropertySet(btnFDA, "Text", "Start");
-                   
                 }
-
             }
             SafePropertySet(lblFDA, "Text", statusText);
             SafePropertySet(lblFDA, "ForeColor", textcolor);
 
             SetButtonMode(btnFDA, runstatus);
-
-
-    
-
         }
 
         private void Bg_StatusChecker_DoWork(object sender, DoWorkEventArgs e)
@@ -237,7 +221,6 @@ namespace FDAController
                 {
                     controllerStatus = CheckControllerService();
 
-
                     CheckMosquittoService();
 
                     CheckFDAProcess(controllerStatus);
@@ -247,9 +230,7 @@ namespace FDAController
                 }
                 catch { }
             }
-          
         }
-
 
         private static string SendRequest(string address, int port, string request)
         {
@@ -293,7 +274,6 @@ namespace FDAController
                 }
 
                 client.Close();
-
             }
 
             response = new byte[bytesRead];
@@ -304,18 +284,15 @@ namespace FDAController
 
         private void BtnStartConsole_Click(object sender, EventArgs e)
         {
-           
             StartFDA("-console");
         }
 
         private void BtnFDA_click(object sender, EventArgs e)
-        {       
+        {
         }
-      
 
         private void BtnFDA_MouseClick(object sender, MouseEventArgs e)
         {
-   
             if (!ProcessRunning("FDACore"))
             {
                 if (e.Button == MouseButtons.Right)
@@ -329,7 +306,6 @@ namespace FDAController
             }
             else
                 StopFDA();
-
         }
 
         private void MenuItemStartFDAbg_Click(object sender, EventArgs e)
@@ -356,10 +332,9 @@ namespace FDAController
             }
         }
 
-
         private void BtnFDAMonitor_Click(object sender, EventArgs e)
         {
-            RunConsoleCommand("telnet.exe", "127.0.0.1 9570"); 
+            RunConsoleCommand("telnet.exe", "127.0.0.1 9570");
         }
 
         private void StartFDA(string args)
@@ -370,16 +345,13 @@ namespace FDAController
 
             string applicationDir = "C:\\IntricateFDA\\FDACore\\";
 
-            if (File.Exists(applicationDir+"FDACore.exe"))
+            if (File.Exists(applicationDir + "FDACore.exe"))
                 RunConsoleCommand("cmd.exe", "/c FDACore.exe " + args, applicationDir);
             else
             {
                 MessageBox.Show("FDA executable not found in the current folder \"" + applicationDir + "\\FDACore.exe");
             }
-
         }
-
- 
 
         private static void RunConsoleCommand(string command, string args, string workingDir = "")
         {
@@ -404,7 +376,6 @@ namespace FDAController
                 //string output = process.StandardOutput.ReadToEnd();
                 //string error = process.StandardError.ReadToEnd();
 
-
                 //process.WaitForExit();
             }
             catch (Exception ex)
@@ -422,7 +393,7 @@ namespace FDAController
             Process[] proc = Process.GetProcessesByName(processname);
             return (self && proc.Length > 1) || (!self && proc.Length > 0);
         }
-        
+
         private void StartStopBtn_Click(object sender, EventArgs e)
         {
             // check if controller gui was run as admin
@@ -442,15 +413,12 @@ namespace FDAController
                     sc.Stop();
                 if (sc.Status == ServiceControllerStatus.Stopped)
                     sc.Start();
-            } catch (Exception ex)
+            }
+            catch (Exception ex)
             {
                 MessageBox.Show(ex.Message);
             }
-       
-
         }
-
-
 
         public class FDAStatus
         {
@@ -466,7 +434,7 @@ namespace FDAController
             public FDAStatus()
             {
                 UpTime = new TimeSpan(0);
-                RunStatus  = "";
+                RunStatus = "";
                 Version = "";
                 DB = "";
                 RunMode = "";
@@ -493,9 +461,5 @@ namespace FDAController
                 return status;
             }
         }
-
     }
 }
-
-
-

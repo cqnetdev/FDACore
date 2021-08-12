@@ -1,14 +1,13 @@
 ﻿using Common;
-using System;
-using System.Collections.Generic;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
-using OPC;
-using System.Runtime.CompilerServices;
 using Opc.UaFx;
 using Opc.UaFx.Client;
+using OPC;
+using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace FDA
 {
@@ -17,12 +16,13 @@ namespace FDA
     {
         // public properties
         public int SocketConnectionRetryDelay { get => _socketConnectionRetryDelay; set { _socketConnectionRetryDelay = value; HandlePropertyChanged(); } }
+
         public int PostConnectionCommsDelay { get => _postConnectionCommsDelay; set { _postConnectionCommsDelay = value; HandlePropertyChanged(); } }
         public bool ConnectionEnabled { get => _connectionEnabled; set { _connectionEnabled = value; HandlePropertyChanged(); } }
         public bool CommunicationsEnabled { get => _communicationsEnabled; set { _communicationsEnabled = value; HandlePropertyChanged(); } }
         public ConnStatus ConnectionStatus { get => _connStatus; private set { _connStatus = value; HandlePropertyChanged(); } }
         public Guid ConnectionID { get => _connectionID; }
-        public string Description { get => _description; set => _description = value; } 
+        public string Description { get => _description; set => _description = value; }
         public int MaxSocketConnectionAttempts { get => _maxSocketConnectionAttempts; set { _maxSocketConnectionAttempts = value; HandlePropertyChanged(); } }
         public bool CommsLogEnabled { get => _commsLogEnabled; set { _commsLogEnabled = value; HandlePropertyChanged(); } }
         public ConnType ConnectionType { get => _connType; set => _connType = value; }
@@ -40,15 +40,17 @@ namespace FDA
 
         // public events
         public delegate void DataUpdateHandler(object sender, TransactionEventArgs e);
+
         public event DataUpdateHandler DataUpdate;
 
-
         // enums
-        public enum ConnType {OPCUA,OPCDA,MQTT};
+        public enum ConnType { OPCUA, OPCDA, MQTT };
+
         public enum ConnStatus { Disconnected, ConnectionRetry_Delay, Connected_Ready, Connecting, Connected_Delayed }
 
         // connection settings from database
         private int _socketConnectionRetryDelay = 10;     // seconds
+
         private int _postConnectionCommsDelay = 0;        // milliseconds
         private bool _connectionEnabled = false;
         private bool _communicationsEnabled = false;
@@ -58,6 +60,7 @@ namespace FDA
 
         // pubsub common member variables
         private ConnType _connType;
+
         private string _host;
         private int _port;
         private ConnStatus _connStatus = ConnStatus.Disconnected;
@@ -74,15 +77,14 @@ namespace FDA
         private int _priority2Count;
         private int _priority3Count;
 
-
         // OPC specific member variables
         private OPC.Client _OPCClient;
+
         private string _progID;  // OPC DA only;
         private string _classID; // OPC DA only;
         private readonly Dictionary<Guid, OpcSubscription> _OpcSubLookup = new();
 
-     
-        public PubSubConnectionManager(Guid id, string description) 
+        public PubSubConnectionManager(Guid id, string description)
         {
             base.ID = id.ToString();
             base.ObjectType = "connection";
@@ -93,21 +95,20 @@ namespace FDA
             _queueManager = new QueueManager(this, 4);
         }
 
-        public void ConfigureAsOPCUA(string host,int port)
+        public void ConfigureAsOPCUA(string host, int port)
         {
             _host = host;
             _port = port;
             _connType = ConnType.OPCUA;
         }
 
-        public void ConfigureAsOPCDA(string host,string progID, string classID)
+        public void ConfigureAsOPCDA(string host, string progID, string classID)
         {
             _host = host;
             _progID = progID;
             _classID = classID;
             _connType = ConnType.OPCDA;
         }
-     
 
         private void ConnectAsync()
         {
@@ -115,10 +116,8 @@ namespace FDA
             _connectionTask = Task.Factory.StartNew(new Action(DoConnect), _connectionCancel.Token);
         }
 
-
         private async void DoConnect()
         {
-
             DateTime startTime = Globals.FDANow();
             Stopwatch connectionTimer = new();
 
@@ -146,12 +145,13 @@ namespace FDA
                 {
                     int attemptCount = 0;
                     while (!result && attemptCount < MaxSocketConnectionAttempts && !_connectionCancel.IsCancellationRequested)
-                    {                       
+                    {
                         ConnectionStatus = ConnStatus.Connecting;
                         try
                         {
                             result = _OPCClient.Connect();
-                        } catch (Exception ex)
+                        }
+                        catch (Exception ex)
                         {
                             LogConnectionCommsEvent(attemptCount, Globals.FDANow(), connectionTimer.Elapsed, 0, "Connection '" + Description + "' failed to connect: " + ex.Message);
                         }
@@ -166,7 +166,7 @@ namespace FDA
 
                     if (!result)
                     {
-                        LogConnectionCommsEvent(attemptCount,Globals.FDANow(), connectionTimer.Elapsed, 0, "Connection " + Description + " Failed to connect to " + _host);
+                        LogConnectionCommsEvent(attemptCount, Globals.FDANow(), connectionTimer.Elapsed, 0, "Connection " + Description + " Failed to connect to " + _host);
                         LogCommsEvent(Globals.FDANow(), "Connection: " + Description + " Initiating reconnection delay of " + SocketConnectionRetryDelay + " second(s)");
 
                         ConnectionStatus = ConnStatus.ConnectionRetry_Delay;
@@ -187,14 +187,13 @@ namespace FDA
                         _OPCClient.DataChange += OPCClient_DataChange;
                         _OPCClient.BreakDetected += OPCClient_BreakDetected;
 
-                        // apply subscriptions                  
+                        // apply subscriptions
                         foreach (DataSubscription sub in _subscriptions.Values)
                         {
                             ApplySubscription(sub);
                         }
                     }
                 }
-
             }
 
             if (ConnectionStatus == ConnStatus.Connected_Ready && _queueManager.TotalQueueCount > 0)
@@ -210,7 +209,7 @@ namespace FDA
 
                 if (!isAlreadyRunning)
                 {
-                     _DemandHandlerCancellationToken = new CancellationTokenSource();
+                    _DemandHandlerCancellationToken = new CancellationTokenSource();
                     _connectionTask = Task.Factory.StartNew(new Action(HandleOnDemandRequests), _DemandHandlerCancellationToken.Token);
                 }
             }
@@ -219,7 +218,7 @@ namespace FDA
         private void OPCClient_BreakDetected()
         {
             ConnectionStatus = ConnStatus.Disconnected;
-            LogConnectionCommsEvent(0,Globals.FDANow(),TimeSpan.Zero, 0, "Connection " + Description + " connection broken");
+            LogConnectionCommsEvent(0, Globals.FDANow(), TimeSpan.Zero, 0, "Connection " + Description + " connection broken");
 
             if (ConnectionEnabled)
             {
@@ -248,7 +247,7 @@ namespace FDA
             DataRequest request = CreateReadDataRequest(
                 data_timestamp,
                 new List<OpcValue> { item.LastDataChange.Value },
-                new List<Guid> {datapoint_reference},
+                new List<Guid> { datapoint_reference },
                 subscriptionInfo.destination_table
                 );
 
@@ -256,14 +255,13 @@ namespace FDA
             Globals.SystemManager.LogCommsEvent(logItem);
             Thread.Sleep(1);
 
-
-            TransactionEventArgs eventArgs = new (request);
+            TransactionEventArgs eventArgs = new(request);
             DataUpdate?.Invoke(this, eventArgs);
         }
 
-        private DataRequest CreateReadDataRequest(DateTime timestamp,List<OpcValue> readResult, List<Guid> tagID,string destTable)
+        private DataRequest CreateReadDataRequest(DateTime timestamp, List<OpcValue> readResult, List<Guid> tagID, string destTable)
         {
-            DataRequest request = new ()
+            DataRequest request = new()
             {
                 Protocol = "OPC",
                 ConnectionID = _connectionID,
@@ -280,7 +278,7 @@ namespace FDA
 
             request.SetStatus(DataRequest.RequestStatus.Pending);
 
-            for (int i = 0;i<readResult.Count;i++)
+            for (int i = 0; i < readResult.Count; i++)
             {
                 Tag thisTag = new(tagID[i])
                 {
@@ -309,7 +307,6 @@ namespace FDA
                 request.TagList.Add(thisTag);
             }
 
-
             return request;
         }
 
@@ -336,20 +333,19 @@ namespace FDA
                 _OpcSubLookup.Clear();
                 //_subscriptions.Clear();
             }
-         
+
             _OPCClient = null;
 
             //ConnectionStatus = ConnStatus.Disconnected;
         }
 
-        public void Subscribe(DataSubscription sub) 
+        public void Subscribe(DataSubscription sub)
         {
-            _subscriptions.Add(sub.subscription_id,sub);
+            _subscriptions.Add(sub.subscription_id, sub);
 
             if (ConnectionStatus == ConnStatus.Connected_Ready)
-                ApplySubscription(sub);         
+                ApplySubscription(sub);
         }
-
 
         public void UnSubscribe(DataSubscription subdef)
         {
@@ -364,7 +360,7 @@ namespace FDA
                         LogCommsEvent(Globals.FDANow(), "OPC Subscription ID " + subdef.subscription_id + " un-subscribed");
                         return;
                     }
-                }           
+                }
             }
         }
 
@@ -386,7 +382,7 @@ namespace FDA
                 // did  the subscription enabled status change?
                 if (subdef.enabled != oldSubDef.enabled)
                 {
-                   UpdateSubEnabledStatus(subdef);
+                    UpdateSubEnabledStatus(subdef);
                 }
 
                 // did the interval change?
@@ -402,16 +398,16 @@ namespace FDA
 
                     foreach (OpcMonitoredItem item in targetSub.MonitoredItems)
                         item.Filter = filter;
-                }    
+                }
 
-                // update the subscription info 
+                // update the subscription info
                 targetSub.Tag = subdef;
                 _subscriptions[subdef.subscription_id] = subdef;
 
                 targetSub.ApplyChanges();
             }
         }
-        
+
         private static OpcDataChangeFilter CreateOpcFilter(DataSubscription subdef)
         {
             OpcDataChangeTrigger trigger;
@@ -420,7 +416,7 @@ namespace FDA
             else
                 trigger = OpcDataChangeTrigger.StatusValue;
 
-            OpcDataChangeFilter filter = new (trigger);
+            OpcDataChangeFilter filter = new(trigger);
             filter.DeadbandType = subdef.deadband_type.ToLower() switch
             {
                 "percent" => OpcDeadbandType.Percent,
@@ -471,7 +467,7 @@ namespace FDA
                     }
 
                     LogCommsEvent(Globals.FDANow(), "OPC Subscription ID " + subdef.subscription_id + " " + action);
-                }              
+                }
             }
         }
 
@@ -479,13 +475,12 @@ namespace FDA
         {
             if (_connType == ConnType.OPCUA || _connType == ConnType.OPCDA)
             {
-               _OPCClient.Subscribe(subdef);                
+                _OPCClient.Subscribe(subdef);
             }
         }
 
         private void HandlePropertyChanged([CallerMemberName] string propertyName = "", long timestamp = 0)
         {
-            
             // raise a property changed event (for property changes that don't require special handling)
             NotifyPropertyChanged(propertyName, timestamp);
 
@@ -500,18 +495,19 @@ namespace FDA
                     else
                         Disconnect();
                     break;
+
                 case "CommunicationsEnabled":
                     if (_OPCClient == null)
                         return;
                     if (!CommunicationsEnabled)
                     {
                         if (_connType == ConnType.OPCUA || _connType == ConnType.OPCDA)
-                        
-                        // disable all OPC subscriptions
-                        foreach (OpcSubscription sub in _OPCClient.Subscriptions)
-                        {
-                            sub.ChangeMonitoringMode(OpcMonitoringMode.Disabled);
-                        }
+
+                            // disable all OPC subscriptions
+                            foreach (OpcSubscription sub in _OPCClient.Subscriptions)
+                            {
+                                sub.ChangeMonitoringMode(OpcMonitoringMode.Disabled);
+                            }
                     }
                     else
                     {
@@ -527,7 +523,6 @@ namespace FDA
                     break;
             }
         }
-
 
         public void QueueTransactionGroup(Common.RequestGroup requestGroup)
         {
@@ -546,30 +541,24 @@ namespace FDA
                 _DemandHandlerCancellationToken = new CancellationTokenSource();
                 _DemandHandlerTask = Task.Factory.StartNew(new Action(HandleOnDemandRequests), _DemandHandlerCancellationToken.Token);
             }
-
         }
-
 
         private void HandleOnDemandRequests()
         {
             DataRequest dataRequest;
             while (_queueManager.TotalQueueCount > 0 && !_DemandHandlerCancellationToken.IsCancellationRequested && _OPCClient.Connected)
             {
-
                 // get the next request group
                 RequestGroup reqGroup = _queueManager.GetNextRequestGroup();
                 List<OpcValue> results = _OPCClient.ReadNodes(reqGroup.DBGroupRequestConfig.DataPointBlockRequestListVals, out List<Guid> datapointdefs);
 
-
                 // Create a DataRequest object to pass back as the result
-                dataRequest = CreateReadDataRequest(Globals.FDANow(), results,datapointdefs, reqGroup.DestinationID);
-            
+                dataRequest = CreateReadDataRequest(Globals.FDANow(), results, datapointdefs, reqGroup.DestinationID);
 
-                TransactionLogItem logItem = new (dataRequest, 1, this.ConnectionID, reqGroup.ID, results.Count, "1", "");
+                TransactionLogItem logItem = new(dataRequest, 1, this.ConnectionID, reqGroup.ID, results.Count, "1", "");
                 Globals.SystemManager.LogCommsEvent(logItem);
 
-
-                TransactionEventArgs eventArgs = new (dataRequest);
+                TransactionEventArgs eventArgs = new(dataRequest);
                 DataUpdate?.Invoke(this, eventArgs);
                 /*
                 // break into individual requests
@@ -598,12 +587,11 @@ namespace FDA
 
                         // read the tag
                         returnedResult = _OPCClient.Read(path, ns);
-                        
+
                         // Create a DataRequest object to pass back as the result
                         dataRequest = CreateReadDataRequest(Globals.FDANow(), path + ";" + ns, tagID, reqGroup.DestinationID, returnedResult);
                     }
 
-                   
                     TransactionLogItem logItem = new TransactionLogItem(dataRequest, 1, this.ConnectionID, reqGroup.ID, requests.Length, reqIdx.ToString(), "");
                     Globals.SystemManager.LogCommsEvent(logItem);
                     Thread.Sleep(1);
@@ -613,7 +601,6 @@ namespace FDA
                 }
                 */
             }
-
         }
 
         public void ResetConnection()
@@ -627,7 +614,6 @@ namespace FDA
             Globals.SystemManager.LogCommsEvent(ConnectionID, timestamp, msg);
             Thread.Sleep(1);
         }
-
 
         internal void LogConnectionCommsEvent(int attemptNum, DateTime startTime, TimeSpan elapsed, byte success, string message)
         {
@@ -657,7 +643,6 @@ namespace FDA
 
             // wait for both tasks to exit
             Task.WaitAll(new Task[] { _connectionTask, _DemandHandlerTask });
-  
 
             _OPCClient?.Dispose();
         }

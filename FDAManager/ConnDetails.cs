@@ -1,25 +1,19 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.ComponentModel;
-using System.Drawing;
-using System.Data;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Windows.Forms;
+
 //using Common;
 using System.Runtime.CompilerServices;
-using FDAManager;
+using System.Text;
+using System.Windows.Forms;
 
 namespace FDAManager
 {
-
     public partial class ConnDetailsCtrl : UserControl
     {
         private ConnDetails _connDetailsObj;
         public ConnDetails ConnDetailsObj { get { return _connDetailsObj; } set { _connDetailsObj = value; UpdateDataBinding(); } }
-        public string DbConnStr { get => _dbConnStr; set { _dbConnStr = value;} }
-        public string FDAExecutionID { get => _executionID; set { _executionID = value;  } }
+        public string DbConnStr { get => _dbConnStr; set { _dbConnStr = value; } }
+        public string FDAExecutionID { get => _executionID; set { _executionID = value; } }
 
         private string _dbConnStr = "";
         private string _executionID = "";
@@ -29,9 +23,8 @@ namespace FDAManager
             InitializeComponent();
         }
 
-  
         private void UpdateDataBinding()
-        {            
+        {
             foreach (Control ctrl in this.Controls)
             {
                 if (ctrl.GetType() == typeof(GroupBox))
@@ -43,7 +36,6 @@ namespace FDAManager
                     }
                 }
             }
-            
 
             if (_connDetailsObj == null)
                 return;
@@ -64,8 +56,6 @@ namespace FDAManager
 
             Refresh();
         }
-
- 
 
         public class ConnDetails : INotifyPropertyChanged
         {
@@ -94,8 +84,6 @@ namespace FDAManager
 
             private DateTime _lastCommsDT;
 
-
-
             public string ID { get { return _ID; } set { _ID = value; NotifyPropertyChanged(); } }
             public bool ConnectionEnabled { get { return _connEnabled; } set { _connEnabled = value; NotifyPropertyChanged(); } }
             public bool CommunicationsEnabled { get { return _commsEnabled; } set { _commsEnabled = value; NotifyPropertyChanged(); } }
@@ -118,7 +106,7 @@ namespace FDAManager
             public int Priority1QueueCount { get { return _priority1QueueCount; } set { _priority1QueueCount = value; NotifyPropertyChanged(); } }
             public int Priority2QueueCount { get { return _priority2QueueCount; } set { _priority2QueueCount = value; NotifyPropertyChanged(); } }
             public int Priority3QueueCount { get { return _priority3QueueCount; } set { _priority3QueueCount = value; NotifyPropertyChanged(); } }
-            public string ConnDetail {  get { return _conndetail; } set { _conndetail = value; NotifyPropertyChanged(); } }
+            public string ConnDetail { get { return _conndetail; } set { _conndetail = value; NotifyPropertyChanged(); } }
 
             public event PropertyChangedEventHandler PropertyChanged;
 
@@ -169,24 +157,19 @@ namespace FDAManager
                     case "socketconnectionretrydelay": SocketConnectionRetryDelay = BitConverter.ToInt32(valueBytes, 0); break;
                     case "postconnectioncommsdelay": PostConnectionCommsDelay = BitConverter.ToInt32(valueBytes, 0); break;
                     case "interrequestdelay": InterRequestDelay = BitConverter.ToInt32(valueBytes, 0); break;
-                    case "maxrequestattempts": MaxRequestAttempts = BitConverter.ToInt32(valueBytes,0); break;
-                    case "requestresponsetimeout": RequestResponseTimeout = BitConverter.ToInt32(valueBytes,0); break;
+                    case "maxrequestattempts": MaxRequestAttempts = BitConverter.ToInt32(valueBytes, 0); break;
+                    case "requestresponsetimeout": RequestResponseTimeout = BitConverter.ToInt32(valueBytes, 0); break;
                     case "connectionstatus": ConnectionStatus = Encoding.UTF8.GetString(valueBytes); break;
-                    case "idledisconnect": IdleDisconnect = BitConverter.ToBoolean(valueBytes,0); break;
-                    case "idledisconnecttime": IdleDisconnectTime = BitConverter.ToInt32(valueBytes,0); break;
+                    case "idledisconnect": IdleDisconnect = BitConverter.ToBoolean(valueBytes, 0); break;
+                    case "idledisconnecttime": IdleDisconnectTime = BitConverter.ToInt32(valueBytes, 0); break;
                     case "description": Description = Encoding.UTF8.GetString(valueBytes); break;
                     case "priority0count": Priority0QueueCount = BitConverter.ToInt32(valueBytes, 0); break;
                     case "priority1count": Priority1QueueCount = BitConverter.ToInt32(valueBytes, 0); break;
                     case "priority2count": Priority2QueueCount = BitConverter.ToInt32(valueBytes, 0); break;
                     case "priority3count": Priority3QueueCount = BitConverter.ToInt32(valueBytes, 0); break;
-                    case "conndetails": ConnDetail = Encoding.UTF8.GetString(valueBytes); break;                        
+                    case "conndetails": ConnDetail = Encoding.UTF8.GetString(valueBytes); break;
                 }
-
             }
-
         }
-
-
     }
-
 }

@@ -1,14 +1,11 @@
-﻿using System;
+﻿using Scripting;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
-using System.Text;
-using Scripting;
-using Common;
 
 namespace FDA
 {
-
     public class ScriptableRRConnection : ScriptableObject
     {
         public static List<ScriptableRRConnection> WrapConn(Dictionary<Guid, RRConnectionManager> toWrap)
@@ -22,10 +19,7 @@ namespace FDA
             return output;
         }
 
-
-
         private readonly RRConnectionManager _connMgr;
-
 
         public bool ConnectionEnabled { get => _connMgr.ConnectionEnabled; set { _connMgr.ConnectionEnabled = value; OnPropertyChanged(); } }
         public bool CommsEnabled { get => _connMgr.CommunicationsEnabled; set { _connMgr.CommunicationsEnabled = value; OnPropertyChanged(); } }
@@ -38,7 +32,6 @@ namespace FDA
             _connMgr.PropertyChanged += ConnMgr_PropertyChanged;
         }
 
-     
         private void ConnMgr_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
             OnPropertyChanged(e.PropertyName);

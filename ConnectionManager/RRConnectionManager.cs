@@ -1,18 +1,17 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.ComponentModel;
-using System.Net.Sockets;
-using System.IO;
+﻿using BSAP;
 using Common;
 using Modbus;
-using System.Runtime.CompilerServices;
+using ROC;
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
+using System.IO;
 using System.IO.Ports;
 using System.Net;
-using ROC;
-using BSAP;
+using System.Net.Sockets;
+using System.Runtime.CompilerServices;
+using System.Threading;
 
 namespace FDA
 {
@@ -27,7 +26,7 @@ namespace FDA
         /*
         private string _name;
         private string _userNotes;
-        
+
         private byte[] _testPacket;
         private short _deviceConnectionTestPacketSchedule; // minutes
         private DateTime _connectDateTime;
@@ -69,6 +68,7 @@ namespace FDA
 
         // serial connection parameters
         private SerialPort _serialPort;
+
         private string _serialPortName = "";
         private int _serialBaudRate = 2400;
         private Parity _serialParity = Parity.None;
@@ -78,6 +78,7 @@ namespace FDA
 
         // TCP connection parameters
         private TcpClient _tcpConnection;
+
         private string _host;
         private int _portNumber;
         private bool _LocalConnected;
@@ -85,12 +86,14 @@ namespace FDA
 
         // private connection manager objects
         private Timer SocketConnectionRetryTimer;
+
         public QueueManager _queueManager;
         private Common.CircularBuffer<TimeSpan> _recentTimeMeasurements;
         private bool _commsLogEnabled;
 
         // queue counts
         private int _priority0Count;
+
         private int _priority1Count;
         private int _priority2Count;
         private int _priority3Count;
@@ -101,9 +104,11 @@ namespace FDA
 
         //private delegate void RequeueHandler(object sender,EventArgs e);
         //private event RequeueHandler RequeueGroup;
-        #endregion
+
+        #endregion private properties/objects
 
         #region public properties
+
         public int InterRequestDelay { get => _interRequestDelay; set { if (value != _interRequestDelay) { _interRequestDelay = value; HandlePropertyChanged(); } } }
         public string RemoteIPAddress { get => _host; set { if (value != _host) { _host = value; HandlePropertyChanged(); } } }
         public int PortNumber { get => _portNumber; set { if (value != _portNumber) { _portNumber = value; HandlePropertyChanged(); } } }
@@ -142,19 +147,16 @@ namespace FDA
         public int TotalQueueCount { get => _queueManager.TotalQueueCount; }
 
         // public types/events/delegates/classes
-  
+
         public enum ConnType { Serial, Ethernet, EthernetUDP };
 
-
         public delegate void RequestCompleteHandler(object sender, TransactionEventArgs e);
-        public event RequestCompleteHandler TransactionComplete;
 
+        public event RequestCompleteHandler TransactionComplete;
 
         //public event PropertyChangedEventHandler PropertyChanged;
 
-
- 
-        #endregion
+        #endregion public properties
 
         #region constructors
 
@@ -163,7 +165,7 @@ namespace FDA
         {
             base.ID = ID.ToString();
             base.ObjectType = "connection";
-           
+
             // set all properties to be retained in MQTT except for the queue counts
             string[] MQTTRetainProperties = new string[]
             {
@@ -214,8 +216,6 @@ namespace FDA
             };
 
             base.SetMQTTIncludeTimestampProperties(MQTTIncludeTimestampProps);
-            
-
 
             runTime = new Stopwatch();
             initTime = Globals.FDANow();
@@ -245,15 +245,15 @@ namespace FDA
 
             _bgCompletedTransHandler.DoWork += BgCompletedTransHandler_DoWork;
             _completedTransQueue = new Queue<DataRequest>();
-            
+
             // start the communication thread
             _bgCompletedTransHandler.RunWorkerAsync();
 
             //this.RequeueGroup += RequeueGroupHandler;
 
-            _connectionIdleTimer = new Timer(ConnectionTimeoutHandler,null,_idleDisconnectTime*1000,Timeout.Infinite);
+            _connectionIdleTimer = new Timer(ConnectionTimeoutHandler, null, _idleDisconnectTime * 1000, Timeout.Infinite);
 
-            _queueManager = new QueueManager(this,4);
+            _queueManager = new QueueManager(this, 4);
             _queueManager.QueueActivated += QueueActivated;
             _queueManager.QueueEmpty += QueueEmpty;
 
@@ -305,7 +305,7 @@ namespace FDA
                             Thread.Sleep(20);
                         }
                         else
-                            Thread.Sleep(500); 
+                            Thread.Sleep(500);
                     }
                 }
                 catch (Exception ex)
@@ -328,20 +328,20 @@ namespace FDA
         {
             if (!_bgCommsWorker.IsBusy && _idleDisconnect & ConnectionStatus == Globals.ConnStatus.Connected_Ready)
             {
-                Globals.SystemManager.LogApplicationEvent(this, Description, "Connection maximum idle time of " + _idleDisconnectTime +  " seconds reached, disconnecting");
+                Globals.SystemManager.LogApplicationEvent(this, Description, "Connection maximum idle time of " + _idleDisconnectTime + " seconds reached, disconnecting");
                 Disconnect();
             }
         }
 
         private void QueueEmpty(object sender, QueueManager.QueueCountEventArgs e)
         {
-            LogCommsEvent(initTime.Add(runTime.Elapsed),"Connection: " + Description + " (" + ConnectionID + "), Queue " + e.QueueNumber + " empty");
+            LogCommsEvent(initTime.Add(runTime.Elapsed), "Connection: " + Description + " (" + ConnectionID + "), Queue " + e.QueueNumber + " empty");
         }
 
         private void QueueActivated(object sender, QueueManager.QueueCountEventArgs e)
         {
             if (e.ChangeFromZero)
-                LogCommsEvent(initTime.Add(runTime.Elapsed),"Connection: " + Description + " (" + ConnectionID + "), Queue " + e.QueueNumber + " changed from empty to non-empty");
+                LogCommsEvent(initTime.Add(runTime.Elapsed), "Connection: " + Description + " (" + ConnectionID + "), Queue " + e.QueueNumber + " changed from empty to non-empty");
 
             if (!_bgCommsWorker.IsBusy)
             {
@@ -351,7 +351,7 @@ namespace FDA
                 }
                 else
                 {
-                    LogCommsEvent(initTime.Add(runTime.Elapsed),"Connection:" + Description + " (" + ConnectionID + "), Queue is not empty.  ");
+                    LogCommsEvent(initTime.Add(runTime.Elapsed), "Connection:" + Description + " (" + ConnectionID + "), Queue is not empty.  ");
                 }
             }
         }
@@ -366,12 +366,12 @@ namespace FDA
             //SerialParity = parity;
             //SerialDataBits = dataBits;
             //SerialStopBits = stopbits;
-            //SerialHandshake = handshake;            
+            //SerialHandshake = handshake;
             ConnectionType = ConnType.Serial;
         }
 
         // constructor for TCP or UDP connections
-        public RRConnectionManager(Guid ID, string description, string host, int port,string protocol = "TCP")
+        public RRConnectionManager(Guid ID, string description, string host, int port, string protocol = "TCP")
         {
             CommonConstructor(ID, description);
             RemoteIPAddress = host;
@@ -382,35 +382,32 @@ namespace FDA
                 ConnectionType = ConnType.EthernetUDP;
         }
 
-       
-        #endregion
+        #endregion constructors
 
         #region Events and EventHandlers
 
-        private void HandlePropertyChanged([CallerMemberName] string propertyName = "",long timestamp=0)
+        private void HandlePropertyChanged([CallerMemberName] string propertyName = "", long timestamp = 0)
         {
             // raise a property changed event (for property changes that don't require special handling)
             //PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-            NotifyPropertyChanged(propertyName,timestamp);
+            NotifyPropertyChanged(propertyName, timestamp);
 
             // take care of any actions needed as a result of the property changes
             switch (propertyName)
             {
                 case "ConnectionEnabled": HandleConnectionEnabledStatusChange(ConnectionEnabled); break;
-                case "CommunicationsEnabled": HandleCommsEnabledStatusChange(CommunicationsEnabled);break;
+                case "CommunicationsEnabled": HandleCommsEnabledStatusChange(CommunicationsEnabled); break;
                 case "RemoteIPAddress": ResetConnection(); break;
                 case "PortNumber": ResetConnection(); break;
-                case "ConnectionStatus": Globals.SystemManager.LogApplicationEvent(this, Description," Connection status : " + ConnectionStatus.ToString()); break;
+                case "ConnectionStatus": Globals.SystemManager.LogApplicationEvent(this, Description, " Connection status : " + ConnectionStatus.ToString()); break;
                     //case "ConnectionStatus": LogCommsEvent(Globals.GetOffsetUTC(),"Connection " + Description + ": source connection status = " + ConnectionStatus); break;
             }
             if (propertyName.StartsWith("Serial"))
                 ResetConnection();
         }
 
-
         private void ResetConnection()
         {
-
             // disconnect
             if (ConnectionStatus == Globals.ConnStatus.Connected_Ready || ConnectionStatus == Globals.ConnStatus.Connected_Delayed)
                 HandleConnectionEnabledStatusChange(false);
@@ -423,7 +420,7 @@ namespace FDA
         {
             if (enabled && ConnectionStatus != Globals.ConnStatus.ConnectionRetry_Delay)
             {
-                 if (!_bgCommsWorker.IsBusy && Globals.FDAStatus == Globals.AppState.Normal || Globals.FDAStatus == Globals.AppState.Starting)
+                if (!_bgCommsWorker.IsBusy && Globals.FDAStatus == Globals.AppState.Normal || Globals.FDAStatus == Globals.AppState.Starting)
                     _bgCommsWorker.RunWorkerAsync();
             }
             else
@@ -467,7 +464,7 @@ namespace FDA
                 TimeSpan timeLimit = TimeSpan.FromMilliseconds(_socketConnectionAttemptTimeout * _maxSocketConnectionAttempts * 2);
                 Stopwatch timeoutTimer = new();
                 timeoutTimer.Start();
-                while (timeoutTimer.Elapsed < timeLimit &&  _bgCommsWorker.IsBusy)
+                while (timeoutTimer.Elapsed < timeLimit && _bgCommsWorker.IsBusy)
                 {
                     Thread.Sleep(50);
                 }
@@ -476,7 +473,6 @@ namespace FDA
                     Globals.SystemManager.LogApplicationEvent(this, "", "Timeout while waiting for comms thread to exit");
 
                 timeoutTimer.Stop();
-
             }
             else
             {
@@ -488,7 +484,7 @@ namespace FDA
         private void SocketConnectionRetryTick(object state)
         {
             SocketConnectionRetryTimer.Change(Timeout.Infinite, Timeout.Infinite);
-            if (!_bgCommsWorker.IsBusy && ConnectionEnabled==true && Globals.FDAStatus == Globals.AppState.Normal)
+            if (!_bgCommsWorker.IsBusy && ConnectionEnabled == true && Globals.FDAStatus == Globals.AppState.Normal)
                 _bgCommsWorker.RunWorkerAsync();
         }
 
@@ -506,7 +502,7 @@ namespace FDA
                 if (ConnectionEnabled && ConnectionType == ConnType.Ethernet && !(TCPLocalConnected && TCPRemoteConnected))
                 {
                     Globals.SystemManager.LogApplicationEvent(this, Description, "Failed to connect to remote device, waiting for " + SocketConnectionRetryDelay + " seconds before trying again");
-                    Globals.SystemManager.LogCommsEvent(ConnectionID,initTime.Add(runTime.Elapsed), "Failed to connect to remote device, waiting for " + SocketConnectionRetryDelay + " seconds before trying again");
+                    Globals.SystemManager.LogCommsEvent(ConnectionID, initTime.Add(runTime.Elapsed), "Failed to connect to remote device, waiting for " + SocketConnectionRetryDelay + " seconds before trying again");
                     if (SocketConnectionRetryTimer == null)
                     {
                         SocketConnectionRetryTimer = new Timer(SocketConnectionRetryTick, null, SocketConnectionRetryDelay * 1000, Timeout.Infinite);
@@ -525,12 +521,12 @@ namespace FDA
                         _connectionIdleTimer.Change(_idleDisconnectTime * 1000, Timeout.Infinite);
                     }
                 }
-            } catch (Exception ex)
+            }
+            catch (Exception ex)
             {
                 Globals.SystemManager.LogApplicationError(initTime.Add(runTime.Elapsed), ex, "Error occurred in BgCommsWorker_RunWorkerCompleted()");
-            }            
+            }
         }
-
 
         private void AddToCompletedQueue(DataRequest trans)
         {
@@ -539,7 +535,8 @@ namespace FDA
                 _completedTransQueue.Enqueue(trans);
             }
         }
-        #endregion
+
+        #endregion Events and EventHandlers
 
         #region public functions
 
@@ -552,9 +549,9 @@ namespace FDA
             }
             //Globals.SystemManager.LogApplicationEvent(this, "", "Connection " + requestGroup.ConnectionID + "[" + requestGroup.Priority + "] received group " + requestGroup.ID + " from Data Acquisition Manager");
 
-            return _queueManager.QueueTransactionGroup(requestGroup);   
+            return _queueManager.QueueTransactionGroup(requestGroup);
         }
-  
+
         /*
         private UInt16 GetAverageTransactionTime()
         {
@@ -562,7 +559,7 @@ namespace FDA
 
             if (buffer.Count == 0)
                 return 0;
-                      
+
             double doubleAverageTicks = buffer.Average(timeSpan => timeSpan.Ticks);
             long longAverageTicks = Convert.ToInt64(doubleAverageTicks);
 
@@ -576,13 +573,13 @@ namespace FDA
             return (UInt16)_queueManager.GetEstimatedBacklogtime(priority).TotalSeconds;
         }
         */
+
         public int GetQueueCount(int priority)
         {
             return _queueManager.GetQueueCount(priority);
         }
 
-
-        #endregion
+        #endregion public functions
 
         #region private helper functions
 
@@ -596,15 +593,15 @@ namespace FDA
 
             if (currentGroup.CommsLogEnabled || CommsLogEnabled)
             {
-                TransactionLogItem logItem = new(currentRequest, attemptCount, this.ConnectionID, currentGroup.ID, currentRequest.GroupSize, currentRequest.GroupIdxNumber,"Queue " + currentGroup.Priority + " count = " + _queueManager.GetQueueCount(currentGroup.Priority));
+                TransactionLogItem logItem = new(currentRequest, attemptCount, this.ConnectionID, currentGroup.ID, currentRequest.GroupSize, currentRequest.GroupIdxNumber, "Queue " + currentGroup.Priority + " count = " + _queueManager.GetQueueCount(currentGroup.Priority));
                 Globals.SystemManager.LogCommsEvent(logItem);
                 Thread.Sleep(1);
-            }           
+            }
         }
 
         private void LogAckEvent(DateTime eventTime, DataRequest currentRequest)
         {
-            AcknowledgementEvent ack = new(currentRequest,this.ConnectionID, eventTime, currentRequest.AckBytes, currentRequest.GroupID, currentRequest.GroupSize, currentRequest.GroupIdxNumber);
+            AcknowledgementEvent ack = new(currentRequest, this.ConnectionID, eventTime, currentRequest.AckBytes, currentRequest.GroupID, currentRequest.GroupSize, currentRequest.GroupIdxNumber);
             Globals.SystemManager.LogAckEvent(ack);
         }
 
@@ -613,28 +610,25 @@ namespace FDA
             //TCPLocalConnected = IsTCPLocalConnected();
             //TCPRemoteConnected = IsTCPClientConnected();
             return " L" + Convert.ToInt32(TCPLocalConnected) + ":R" + Convert.ToInt32(TCPRemoteConnected) + ":CN" + Convert.ToInt32(ConnectionEnabled) + ":CM" + Convert.ToInt32(CommunicationsEnabled);
-
         }
 
-        internal void LogCommsEvent(DateTime timestamp,string msg)
+        internal void LogCommsEvent(DateTime timestamp, string msg)
         {
             Globals.SystemManager.LogCommsEvent(ConnectionID, timestamp, msg + GetStatusSuffix());
             Thread.Sleep(1);
         }
-      
 
-        internal void LogConnectionCommsEvent(int attemptNum,DateTime startTime,TimeSpan elapsed,byte success, string message)
+        internal void LogConnectionCommsEvent(int attemptNum, DateTime startTime, TimeSpan elapsed, byte success, string message)
         {
-            Globals.SystemManager.LogConnectionCommsEvent(ConnectionID,attemptNum,startTime, elapsed, success, message + GetStatusSuffix());
+            Globals.SystemManager.LogConnectionCommsEvent(ConnectionID, attemptNum, startTime, elapsed, success, message + GetStatusSuffix());
             Thread.Sleep(1);
         }
 
-        private static void ProtocolResponseValidityCheck(DataRequest transaction,bool finalAttempt)
+        private static void ProtocolResponseValidityCheck(DataRequest transaction, bool finalAttempt)
         {
-            
             switch (transaction.Protocol.ToUpper())
             {
-                case "ROC": ROCProtocol.ValidateResponse(transaction,finalAttempt); break;
+                case "ROC": ROCProtocol.ValidateResponse(transaction, finalAttempt); break;
                 case "MODBUS": ModbusProtocol.ValidateResponse(transaction); break;
                 case "MODBUSTCP": ModbusProtocol.ValidateResponse(transaction); break;
                 case "ENRONMODBUS": ModbusProtocol.ValidateResponse(transaction); break;
@@ -644,8 +638,6 @@ namespace FDA
             }
         }
 
-     
-
         private void AddRequestTimeSpanToBuffer(DateTime startTime, DateTime endTime)
         {
             _recentTimeMeasurements.AddItem(endTime.Subtract(startTime));
@@ -654,7 +646,7 @@ namespace FDA
         private bool IsTCPClientConnected()
         {
             bool clientConnected;
-       
+
             if (_tcpConnection == null)
                 clientConnected = false;
             else
@@ -681,22 +673,22 @@ namespace FDA
             {
                 //clientConnected = false;
                 ConnectionStatus = Globals.ConnStatus.Disconnected;
-                LogCommsEvent(initTime.Add(runTime.Elapsed),"Connection: " + Description + " - remote device not connected");
+                LogCommsEvent(initTime.Add(runTime.Elapsed), "Connection: " + Description + " - remote device not connected");
             }
 
-            
             return clientConnected;
         }
 
-        #endregion
+        #endregion private helper functions
 
         #region communications
+
         private bool CommsThreadCancelled()
         {
             bool canceling = (_bgCommsWorker.CancellationPending || Globals.FDAStatus == Globals.AppState.ShuttingDown || Globals.FDAStatus == Globals.AppState.Pausing);
             if (canceling)
                 Globals.SystemManager.LogApplicationEvent(this, Description, "Stopping communications thread");
-            return canceling;     
+            return canceling;
         }
 
         private bool IsTCPLocalConnected()
@@ -730,6 +722,7 @@ namespace FDA
                         else
                             result = true;
                         break;
+
                     case ConnType.EthernetUDP:
                         if (_stream == null)
                         {
@@ -758,16 +751,17 @@ namespace FDA
                                 result = true;
                         }
 
-                       
                         break;
+
                     case ConnType.Serial:
                         if (!(ConnectionStatus == Globals.ConnStatus.Connected_Ready))
                             SerialConnect();
                         if (ConnectionStatus == Globals.ConnStatus.Connected_Ready)
                             result = true;
-                        break;                   
+                        break;
+
                     default:
-                        LogCommsEvent(initTime.Add(runTime.Elapsed),"Connection: " + Description + " Unsupported connection type");
+                        LogCommsEvent(initTime.Add(runTime.Elapsed), "Connection: " + Description + " Unsupported connection type");
                         result = false;
                         break;
                 }
@@ -777,7 +771,7 @@ namespace FDA
                 if (ConnectionStatus == Globals.ConnStatus.Connected_Ready)
                 {
                     Globals.SystemManager.LogApplicationEvent(this, Description, "Disconnecting (ConnectionEnabled = false");
-                    LogCommsEvent(initTime.Add(runTime.Elapsed),"Disconnecting");
+                    LogCommsEvent(initTime.Add(runTime.Elapsed), "Disconnecting");
                     Disconnect();
                     result = false;
                 }
@@ -785,19 +779,16 @@ namespace FDA
             return result;
         }
 
-      
-               
         private void BgCommsWorker_DoWork(object sender, DoWorkEventArgs e)
         {
             if (!(Globals.FDAStatus == Globals.AppState.Starting || Globals.FDAStatus == Globals.AppState.Normal))
                 return;
 
-           // Globals.SystemManager.LogApplicationEvent(this, Description, "Comms thread started");
-            LogCommsEvent(initTime.Add(runTime.Elapsed),"Comms thread started");
+            // Globals.SystemManager.LogApplicationEvent(this, Description, "Comms thread started");
+            LogCommsEvent(initTime.Add(runTime.Elapsed), "Comms thread started");
 
             try
             {
-
                 int attemptCount;
                 Int32 bytesRead;
                 Int32 totalBytes;
@@ -814,7 +805,6 @@ namespace FDA
 
                 connActive = ConnectionManagement();
 
-
                 if (connActive)
                     _connectionIdleTimer.Change(Timeout.Infinite, Timeout.Infinite);
                 else
@@ -824,18 +814,13 @@ namespace FDA
 
                 while (_queueManager.TotalQueueCount > 0 && CommunicationsEnabled) // repeat as long as there are request groups found in the queue
                 {
-                   
-
                     if (CommsThreadCancelled()) return;
 
-                  
                     RequestGroup currentRequestGroup = null;
 
                     //Thread.Sleep(InterRequestDelay);
 
                     currentRequestGroup = _queueManager.GetNextRequestGroup();
-
-                  
 
                     // if the request group has been deleted or disabled since it was queued, skip it (ignore this for system requested groups)
                     if (currentRequestGroup.RequesterType != Globals.RequesterType.System)
@@ -847,7 +832,6 @@ namespace FDA
                             if (!template.DRGEnabled)
                             continue;
                     }
-
 
                     // send it to the protocol to get the requests built
                     // but only do this if it hasn't already been done
@@ -926,16 +910,13 @@ namespace FDA
                             interRequestDelay = _interRequestDelay;
                             requestRetryDelay = _requestRetryDelay;
                         }
-    
 
                         if (CommsThreadCancelled()) return;
-
 
                         // reset for the next transaction
                         attemptCount = 0;
                         totalBytes = 0;
-                        memStream.SetLength(0); // reset the memory stream  
-
+                        memStream.SetLength(0); // reset the memory stream
 
                         // if flushing the receive buffer fails (too much data in the buffer, or data continuously pouring in for > 1 sec), exit the comms thread
                         /*
@@ -967,7 +948,6 @@ namespace FDA
                         {
                             if (CommsThreadCancelled()) return;
 
-
                             connActive = ConnectionManagement();
 
                             if (!connActive)
@@ -991,7 +971,7 @@ namespace FDA
 
                             bytesRead = 0;          // number of bytes received in one read
                             totalBytes = 0;         // total number of bytes received
-                            memStream.SetLength(0); // reset the memory stream  
+                            memStream.SetLength(0); // reset the memory stream
 
                             // if flushing the receive buffer fails (too much data in the buffer, or data continuously pouring in for > 1 sec), exit the comms thread
                             if (!_stream.Flush())
@@ -1005,7 +985,7 @@ namespace FDA
                                 eventTime = initTime.Add(runTime.Elapsed);
                                 if (eventTime.ToString() == _lastLogTimestamp.ToString()) eventTime = eventTime.AddMilliseconds(1);
                                 _lastLogTimestamp = eventTime;
-                                Globals.SystemManager.LogCommsEvent(ConnectionID,eventTime, "Pre-transmit receive buffer flush found more than 2 kB of data or continuous data for more than 1 second.Resetting the noisy connection (waiting " + SocketConnectionRetryDelay + " seconds before re-connecting)");
+                                Globals.SystemManager.LogCommsEvent(ConnectionID, eventTime, "Pre-transmit receive buffer flush found more than 2 kB of data or continuous data for more than 1 second.Resetting the noisy connection (waiting " + SocketConnectionRetryDelay + " seconds before re-connecting)");
 
                                 if (ConnectionType == ConnType.Ethernet)
                                 {
@@ -1015,17 +995,15 @@ namespace FDA
                                 }
                             }
 
-                            
                             //_stream.SetDestination()
 
                             // send the request (increment the attempt counter and return to the top of the loop if not successful)
                             if (!SendRequest(currentRequest))
                                 continue;
 
-
-                            // read the response               
+                            // read the response
                             Array.Clear(readBuffer, 0, readBuffer.Length); // clear the input buffer
-                           
+
                             checkReadBufferCount = 0;
                             extraData = false;
 
@@ -1053,7 +1031,6 @@ namespace FDA
                                         memStream.Write(readBuffer, 0, bytesRead);
                                         //Message("read " + bytesRead + " bytes");
                                     }
-
 
                                     // one extra wait cycle to check for more data than expected
                                     // if more data is found, resume the wait/read cyle until it times out to ensure that all data has been received
@@ -1100,20 +1077,18 @@ namespace FDA
 
                             // request a response validity check from the protocol (CRC + anything else important to the protocol)
                             // if the response is valid, the protocol will extract the data and interpret it, and put the values in the "ReturnValues" array
-                            ProtocolResponseValidityCheck(currentRequest,attemptCount == MaxRequestAttempts);
+                            ProtocolResponseValidityCheck(currentRequest, attemptCount == MaxRequestAttempts);
 
                             // if the protocol produced an acknowledgement to be sent back to the device, do that now
                             if (currentRequest.AckBytes != null)
                             {
-                                
-                                _stream.Write(currentRequest.AckBytes,0,currentRequest.AckBytes.Length);
+                                _stream.Write(currentRequest.AckBytes, 0, currentRequest.AckBytes.Length);
                                 eventTime = initTime.Add(runTime.Elapsed);
                                 if (eventTime.ToString() == _lastLogTimestamp.ToString()) eventTime = eventTime.AddMilliseconds(1);
                                 _lastLogTimestamp = eventTime;
 
                                 LogAckEvent(eventTime, currentRequest);
                             }
-                                                   
 
                             // original message has an error repair suggestion from the protocol, try it
                             if (currentRequest.Status == DataRequest.RequestStatus.Error && currentRequest.ErrorCorrectionRequest != null && errorRepairRequest == null)
@@ -1145,14 +1120,11 @@ namespace FDA
                                 }
                             }
 
-
                             if (currentRequest.Status != DataRequest.RequestStatus.Success)
                             {
-                                
                                 LogCommsEvent(currentRequest, currentRequestGroup, attemptCount);
                                 continue;
                             }
-
                         } // end of attempt loop
 
                         // if after all attempts are exhausted and the request is not a success, indicate that the group
@@ -1208,8 +1180,6 @@ namespace FDA
                                 AddToCompletedQueue(currentRequest);
                         }
 
-                        
-
                         // record the response timestamp as the completion time for the group
                         // (gets overwritten with each request)
                         currentRequestGroup.CommsCompletedTimestamp = currentRequest.ResponseTimestamp;
@@ -1218,8 +1188,6 @@ namespace FDA
                         requestIdx += 1;
 
                         //LogCommsEvent("Request Group \"" + currentRequestGroup.Description + "\" complete");
-                        
-
                     } // end of loop that handles a single request within a group
 
                     if (currentRequestGroup.containsFailedReq && currentRequestGroup.RequeueCount > 0)
@@ -1229,7 +1197,7 @@ namespace FDA
                             if (currentRequestGroup.ProtocolRequestList[0].MessageType == DataRequest.RequestType.Backfill)
                                 currentRequestGroup.ProtocolRequestList.Clear();
 
-                        // if any of the requests in the group failed, requeue the group                        
+                        // if any of the requests in the group failed, requeue the group
                         RequeueGroup(currentRequestGroup);
                     }
                 } // end of loop for a request group
@@ -1241,8 +1209,6 @@ namespace FDA
                 Globals.SystemManager.LogApplicationError(initTime.Add(runTime.Elapsed), ex, "Error in comms thread (general error catching)");
             }
         }
-
-     
 
         private bool SendRequest(DataRequest currentTrans)
         {
@@ -1260,22 +1226,22 @@ namespace FDA
                 currentTrans.ResponseBytes = Array.Empty<byte>();
                 currentTrans.ErrorMessage = ex.Message;
                 currentTrans.SetStatus(DataRequest.RequestStatus.Error);
-                Globals.SystemManager.LogApplicationError(initTime.Add(runTime.Elapsed), ex,"Error occurred while attempting to send request " + currentTrans.GroupIdxNumber + " of group " + currentTrans.GroupID);
+                Globals.SystemManager.LogApplicationError(initTime.Add(runTime.Elapsed), ex, "Error occurred while attempting to send request " + currentTrans.GroupIdxNumber + " of group " + currentTrans.GroupID);
                 return false;
             }
         }
 
- /* Feb 17 - removed this background worker, all connection operations now handled in the comms thread (prvent thread conflicts)
-        private void BgConnection_DoWork(object sender, DoWorkEventArgs e)
-        {
-            switch (ConnectionType)
-            {
-                case ConnType.Ethernet: TCPConnect(); break;
-                case ConnType.Serial: SerialConnect(); break;
-                default: LogCommsEvent("Connection: " + Description + " Unsupported connection type for connection '" + Description + "', valid types are 'Ethernet' or 'Serial'"); break;
-            }
-        }
-*/
+        /* Feb 17 - removed this background worker, all connection operations now handled in the comms thread (prvent thread conflicts)
+               private void BgConnection_DoWork(object sender, DoWorkEventArgs e)
+               {
+                   switch (ConnectionType)
+                   {
+                       case ConnType.Ethernet: TCPConnect(); break;
+                       case ConnType.Serial: SerialConnect(); break;
+                       default: LogCommsEvent("Connection: " + Description + " Unsupported connection type for connection '" + Description + "', valid types are 'Ethernet' or 'Serial'"); break;
+                   }
+               }
+       */
 
         private void SerialConnect()
         {
@@ -1317,7 +1283,6 @@ namespace FDA
                 errorMsg = ex.Message;
             }
 
-            
             try
             {
                 _serialPort.Open();
@@ -1326,7 +1291,7 @@ namespace FDA
             {
                 connectionTimer.Stop();
                 ConnectionStatus = Globals.ConnStatus.Disconnected;
-                errorMsg = ex.Message;               
+                errorMsg = ex.Message;
             }
 
             if (_serialPort.IsOpen)
@@ -1334,14 +1299,14 @@ namespace FDA
                 connectionTimer.Stop();
                 ConnectionStatus = Globals.ConnStatus.Connected_Ready;
                 status = 1;
-                _stream = new ConnectionWrapper(_serialPort,ConnectionID.ToString());
+                _stream = new ConnectionWrapper(_serialPort, ConnectionID.ToString());
                 _LocalConnected = true;
             }
             else
             {
                 connectionTimer.Stop();
                 ConnectionStatus = Globals.ConnStatus.Disconnected;
-                Globals.SystemManager.LogApplicationEvent(this,"Connection '" + Description +"'", "Failed to connect : " + errorMsg);
+                Globals.SystemManager.LogApplicationEvent(this, "Connection '" + Description + "'", "Failed to connect : " + errorMsg);
                 //errorMsg = "Failed to open " + _serialPort.PortName + " : unknown reason";
             }
 
@@ -1351,9 +1316,8 @@ namespace FDA
             else
                 logMessage = "Connection: " + Description + ": Failed to Connect ('" + errorMsg + "')";
 
-            Globals.SystemManager.LogConnectionCommsEvent(ConnectionID,1 ,startTime, connectionTimer.Elapsed, status, logMessage);
+            Globals.SystemManager.LogConnectionCommsEvent(ConnectionID, 1, startTime, connectionTimer.Elapsed, status, logMessage);
         }
-
 
         private void TCPConnect()
         {
@@ -1385,7 +1349,6 @@ namespace FDA
                     SendTimeout = RequestResponseTimeout,
                     ReceiveBufferSize = 1024
                 };
-
             }
             catch (Exception ex)
             {
@@ -1399,59 +1362,58 @@ namespace FDA
 
             //while (!_tcpConnection.Connected && !Globals.ShuttingDown && !CommsThreadCancelled() )
             //{
-                connectionTimer.Reset();
-                connectionTimer.Start();
-                //attemptCount = 1;
-                try
+            connectionTimer.Reset();
+            connectionTimer.Start();
+            //attemptCount = 1;
+            try
+            {
+                while (!_tcpConnection.Connected && attemptCount <= MaxSocketConnectionAttempts && !CommsThreadCancelled())
                 {
-                    while (!_tcpConnection.Connected && attemptCount <= MaxSocketConnectionAttempts && !CommsThreadCancelled())
-                    {
-
-                        ConnectionStatus = Globals.ConnStatus.Connecting;
-                        string errorMsg = "";
-                        attemptTimer.Reset();
-                        attemptTimer.Start();
-                        if (Globals.FDAStatus == Globals.AppState.ShuttingDown)
-                        {
-                            connectionTimer.Stop();
-                            ConnectionStatus = Globals.ConnStatus.Disconnected;
-                            LogConnectionCommsEvent(attemptCount, initTime.Add(runTime.Elapsed), attemptTimer.Elapsed, 0, "Connection: " + Description + " Connection attempt cancelled");
-                            return;
-                        }
-
-                        try
-                        {
-                            Globals.SystemManager.LogApplicationEvent(this, this.Description, "Connecting to " + RemoteIPAddress + ":" + PortNumber + "...");
-                            _tcpConnection.Connect(RemoteIPAddress, PortNumber);
-                        }
-                        catch (Exception ex)
-                        {
-                            //Globals.Logger.LogApplicationError(Globals.GetOffsetUTC(), ex);
-                            connectionTimer.Stop();
-                            ConnectionStatus = Globals.ConnStatus.Disconnected;
-                            TCPLocalConnected = false;
-                            TCPRemoteConnected = false;
-                            LogConnectionCommsEvent(attemptCount, initTime.Add(runTime.Elapsed), attemptTimer.Elapsed, 0, "Connection " + Description + " Failed to connect to " + _host + ":" + _portNumber);
-                            errorMsg = ex.Message;
-                            attemptCount++;
-                        }
-                    }
-
-                    if (!_tcpConnection.Connected)
+                    ConnectionStatus = Globals.ConnStatus.Connecting;
+                    string errorMsg = "";
+                    attemptTimer.Reset();
+                    attemptTimer.Start();
+                    if (Globals.FDAStatus == Globals.AppState.ShuttingDown)
                     {
                         connectionTimer.Stop();
-                        LogConnectionCommsEvent(attemptCount,startTime, connectionTimer.Elapsed, 0,"Connection " + Description + ": Connecting - Failed to connect to " + _host + ":" + _portNumber);
+                        ConnectionStatus = Globals.ConnStatus.Disconnected;
+                        LogConnectionCommsEvent(attemptCount, initTime.Add(runTime.Elapsed), attemptTimer.Elapsed, 0, "Connection: " + Description + " Connection attempt cancelled");
+                        return;
+                    }
+
+                    try
+                    {
+                        Globals.SystemManager.LogApplicationEvent(this, this.Description, "Connecting to " + RemoteIPAddress + ":" + PortNumber + "...");
+                        _tcpConnection.Connect(RemoteIPAddress, PortNumber);
+                    }
+                    catch (Exception ex)
+                    {
+                        //Globals.Logger.LogApplicationError(Globals.GetOffsetUTC(), ex);
+                        connectionTimer.Stop();
+                        ConnectionStatus = Globals.ConnStatus.Disconnected;
                         TCPLocalConnected = false;
                         TCPRemoteConnected = false;
-                        ConnectionStatus = Globals.ConnStatus.Disconnected;
-                        LogCommsEvent(initTime.Add(runTime.Elapsed),"Connection: " + Description + " Initiating reconnection delay of " + SocketConnectionRetryDelay + " second(s)");
-                        Thread.Sleep(SocketConnectionRetryDelay * 1000);
+                        LogConnectionCommsEvent(attemptCount, initTime.Add(runTime.Elapsed), attemptTimer.Elapsed, 0, "Connection " + Description + " Failed to connect to " + _host + ":" + _portNumber);
+                        errorMsg = ex.Message;
+                        attemptCount++;
                     }
                 }
-                catch (Exception ex)
+
+                if (!_tcpConnection.Connected)
                 {
-                    Globals.SystemManager.LogApplicationError(initTime.Add(runTime.Elapsed), ex, "Error while attempting to establish a TCP connection to " + _host + ":" + _portNumber + " (" + Description + ")");
+                    connectionTimer.Stop();
+                    LogConnectionCommsEvent(attemptCount, startTime, connectionTimer.Elapsed, 0, "Connection " + Description + ": Connecting - Failed to connect to " + _host + ":" + _portNumber);
+                    TCPLocalConnected = false;
+                    TCPRemoteConnected = false;
+                    ConnectionStatus = Globals.ConnStatus.Disconnected;
+                    LogCommsEvent(initTime.Add(runTime.Elapsed), "Connection: " + Description + " Initiating reconnection delay of " + SocketConnectionRetryDelay + " second(s)");
+                    Thread.Sleep(SocketConnectionRetryDelay * 1000);
                 }
+            }
+            catch (Exception ex)
+            {
+                Globals.SystemManager.LogApplicationError(initTime.Add(runTime.Elapsed), ex, "Error while attempting to establish a TCP connection to " + _host + ":" + _portNumber + " (" + Description + ")");
+            }
             //}
 
             TCPLocalConnected = IsTCPLocalConnected();
@@ -1472,7 +1434,7 @@ namespace FDA
 
                     if (PostConnectionCommsDelay > 0)
                     {
-                        LogCommsEvent(initTime.Add(runTime.Elapsed),"Connection: " + Description + " Post Connection delay of " + PostConnectionCommsDelay + " ms");
+                        LogCommsEvent(initTime.Add(runTime.Elapsed), "Connection: " + Description + " Post Connection delay of " + PostConnectionCommsDelay + " ms");
                         ConnectionStatus = Globals.ConnStatus.Connected_Delayed;
                         Thread.Sleep(PostConnectionCommsDelay);
                         ConnectionStatus = Globals.ConnStatus.Connected_Ready;
@@ -1485,10 +1447,9 @@ namespace FDA
                     Globals.SystemManager.LogApplicationError(initTime.Add(runTime.Elapsed), ex, "Error occurred after TCP connection established (" + Description + "), during post connection processing");
                     ConnectionStatus = Globals.ConnStatus.Disconnected;
                 }
-
             }
             else
-                ConnectionStatus = Globals.ConnStatus.Disconnected;           
+                ConnectionStatus = Globals.ConnStatus.Disconnected;
         }
 
         private void UDPConnect()
@@ -1512,13 +1473,13 @@ namespace FDA
 
             if (udp.Client.IsBound)
                 _LocalConnected = true;
-                
+
             //IPEndPoint remoteEP = new IPEndPoint(IPAddress.Parse(RemoteIPAddress), PortNumber);
             _stream = new ConnectionWrapper(udp, PortNumber, ConnectionID.ToString());
             udp.Client.ReceiveTimeout = RequestResponseTimeout;
 
             //udp.Connect(remoteEP);
-    
+
             if (PostConnectionCommsDelay > 0)
             {
                 LogCommsEvent(initTime.Add(runTime.Elapsed), "Connection: " + Description + " Post Connection delay of " + PostConnectionCommsDelay + " ms");
@@ -1531,8 +1492,6 @@ namespace FDA
                 Globals.SystemManager.LogApplicationEvent(this, this.Description, "UDPConnect() success, bound port " + PortNumber);
                 ConnectionStatus = Globals.ConnStatus.Connected_Ready;
             }
-    
-            
         }
 
         private void Disconnect()
@@ -1543,47 +1502,47 @@ namespace FDA
                 {
                     _stream.Close();
                     _stream.Dispose();
-                    _stream = null; 
+                    _stream = null;
                     TCPLocalConnected = false;
                     TCPRemoteConnected = false;
                     ConnectionStatus = Globals.ConnStatus.Disconnected;
                 }
 
-               
-            /*
-                if (_tcpConnection != null)
-                {
-                    _tcpConnection.Close();
-                    _tcpConnection.Dispose();
-                    _tcpConnection = null;
-                    TCPLocalConnected = false;
-                    TCPRemoteConnected = false;
-                    ConnectionStatus = Globals.ConnStatus.Disconnected;
-                }
-                else
-                {
-                    TCPLocalConnected = false;
-                    TCPRemoteConnected = false;
-                    ConnectionStatus = Globals.ConnStatus.Disconnected;
-                }
+                /*
+                    if (_tcpConnection != null)
+                    {
+                        _tcpConnection.Close();
+                        _tcpConnection.Dispose();
+                        _tcpConnection = null;
+                        TCPLocalConnected = false;
+                        TCPRemoteConnected = false;
+                        ConnectionStatus = Globals.ConnStatus.Disconnected;
+                    }
+                    else
+                    {
+                        TCPLocalConnected = false;
+                        TCPRemoteConnected = false;
+                        ConnectionStatus = Globals.ConnStatus.Disconnected;
+                    }
 
-                if (_serialPort != null)
-                {
-                    _serialPort.Close();
-                    _serialPort.Dispose();
-                    _serialPort = null;
-                }
-            */
-            } catch (Exception ex)
+                    if (_serialPort != null)
+                    {
+                        _serialPort.Close();
+                        _serialPort.Dispose();
+                        _serialPort = null;
+                    }
+                */
+            }
+            catch (Exception ex)
             {
                 Globals.SystemManager.LogApplicationError(initTime.Add(runTime.Elapsed), ex, "Error during disconnection (" + Description + ")");
             }
-           
         }
 
-        #endregion
+        #endregion communications
 
         #region cleanup
+
         public void Dispose()
         {
             GC.SuppressFinalize(this);
@@ -1598,10 +1557,8 @@ namespace FDA
             _bgCommsWorker.CancelAsync();
             _bgCompletedTransHandler.CancelAsync();
 
-            
-            
             // wait for the comms worker and completed transaction handling threads to exit
-            Globals.SystemManager.LogApplicationEvent(this,Description,"Shutting down connection '" + Description + "' background processes");
+            Globals.SystemManager.LogApplicationEvent(this, Description, "Shutting down connection '" + Description + "' background processes");
             while (_bgCommsWorker.IsBusy || _bgCompletedTransHandler.IsBusy)
             {
                 Thread.Sleep(50);
@@ -1636,6 +1593,7 @@ namespace FDA
 
             Globals.SystemManager.LogApplicationEvent(this, Description, "Connection '" + Description + "' shutdown complete");
         }
-        #endregion
+
+        #endregion cleanup
     }
 }

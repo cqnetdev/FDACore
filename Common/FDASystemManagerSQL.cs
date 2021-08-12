@@ -1,8 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
-using System.Text;
 using System.Threading;
 using TableDependency.SqlClient;
 using TableDependency.SqlClient.Base.Enums;
@@ -11,12 +9,12 @@ namespace Common
 {
     public class FDASystemManagerSQL : FDASystemManager, IDisposable
     {
-
-        SqlTableDependency<RocDataTypes> _rocDataTypesMonitor;
-        SqlTableDependency<RocEventFormats> _RocEventsFormatsMonitor;
-        SqlTableDependency<FDAConfig> _appConfigMonitor;
+        private SqlTableDependency<RocDataTypes> _rocDataTypesMonitor;
+        private SqlTableDependency<RocEventFormats> _RocEventsFormatsMonitor;
+        private SqlTableDependency<FDAConfig> _appConfigMonitor;
 
         public delegate void AppConfigMonitorError(object sender, TableDependency.SqlClient.Base.EventArgs.ErrorEventArgs e);
+
         public event AppConfigMonitorError AppconfigMonitorError;
 
         public FDASystemManagerSQL(string DBInstance, string systemDBName, string login, string pass, string version, Guid executionID) : base(DBInstance, systemDBName, login, pass, version, executionID)
@@ -81,7 +79,7 @@ namespace Common
                 _rocDataTypesMonitor.Start();
             }
 
-            // set up monitoring of RocEventFormats table 
+            // set up monitoring of RocEventFormats table
             try
             {
                 _RocEventsFormatsMonitor = new SqlTableDependency<RocEventFormats>(SystemDBConnectionString, "RocEventFormats");
@@ -113,9 +111,6 @@ namespace Common
             StartListening();
         }
 
-      
-
-
         protected override void Cleanup()
         {
             _appConfigMonitor?.Stop();
@@ -128,12 +123,12 @@ namespace Common
             _RocEventsFormatsMonitor?.Dispose();
         }
 
-        protected override int ExecuteNonQuery(string sql,string connString)
+        protected override int ExecuteNonQuery(string sql, string connString)
         {
             int rowsaffected = -99;
             int retries = 0;
             int maxRetries = 3;
-            Retry:
+        Retry:
 
             using (SqlConnection conn = new(connString))
             {
@@ -169,7 +164,6 @@ namespace Common
                         Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "ExecuteNonQuery() Failed to execute query after " + (maxRetries + 1) + " attempts. Query = " + sql);
                         return -99;
                     }
-
                 }
 
                 conn.Close();
@@ -178,12 +172,12 @@ namespace Common
             return rowsaffected;
         }
 
-        protected override DataTable ExecuteQuery(string sql,string connString)
+        protected override DataTable ExecuteQuery(string sql, string connString)
         {
             int retries = 0;
             int maxRetries = 3;
             DataTable result = new();
-            Retry:
+        Retry:
             using (SqlConnection conn = new(connString))
             {
                 try
@@ -222,12 +216,12 @@ namespace Common
             return result;
         }
 
-        protected override object ExecuteScalar(string sql,string connString)
+        protected override object ExecuteScalar(string sql, string connString)
         {
             int maxRetries = 3;
             int retries = 0;
 
-            Retry:
+        Retry:
             using (SqlConnection conn = new(connString))
             {
                 try
@@ -239,7 +233,6 @@ namespace Common
                     Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "ExecuteScalar() Failed to connect to database");
                     return null;
                 }
-
 
                 using (SqlCommand sqlCommand = conn.CreateCommand())
                 {
@@ -264,9 +257,7 @@ namespace Common
                             return null;
                         }
                     }
-
                 }
-
             }
         }
 
@@ -285,7 +276,6 @@ namespace Common
             _appConfigMonitor?.Start();
             _rocDataTypesMonitor?.Start();
             _RocEventsFormatsMonitor?.Start();
-
         }
 
         private void AppConfigMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<FDAConfig> e)
@@ -313,12 +303,12 @@ namespace Common
             AppconfigMonitorError?.Invoke(this, e);
         }
 
-        void TriggerCleanup()
+        private void TriggerCleanup()
         {
-            // get a list of triggers to be cleaned  
+            // get a list of triggers to be cleaned
             string triggerDropSQL = "";
             string triggerQuerySQL = "select TR.name as trigname,U.name as tablename from (select name, parent_obj from sysobjects where type = 'TR') TR inner join (select name, id from sysobjects where name in ('FDAConfig', 'RocDataTypes', 'RocEventFormats')) U on TR.parent_obj = U.id;";
-            DataTable triggers = ExecuteQuery(triggerQuerySQL,SystemDBConnectionString);
+            DataTable triggers = ExecuteQuery(triggerQuerySQL, SystemDBConnectionString);
 
             string triggerName;
             string tableName;
@@ -326,12 +316,11 @@ namespace Common
             {
                 triggerName = (string)row["trigname"];
                 tableName = (string)row["tablename"];
-                Globals.SystemManager.LogApplicationEvent(this, "", "Removing old trigger '" + triggerName + "' from table '" + tableName + "'",false,true);
+                Globals.SystemManager.LogApplicationEvent(this, "", "Removing old trigger '" + triggerName + "' from table '" + tableName + "'", false, true);
                 triggerDropSQL += "drop trigger if exists [" + triggerName + "];";
 
-                ExecuteNonQuery(triggerDropSQL,SystemDBConnectionString);
-            }         
-
+                ExecuteNonQuery(triggerDropSQL, SystemDBConnectionString);
+            }
         }
 
         private void RocEventsFormatsMonitor_OnChanged(object sender, TableDependency.SqlClient.Base.EventArgs.RecordChangedEventArgs<RocEventFormats> e)
@@ -339,13 +328,11 @@ namespace Common
             ROCEventsNotification(e.ChangeType.ToString().ToUpper(), e.Entity);
         }
 
-
         private void RocEventsFormatsMonitor_OnStatusChanged(object sender, TableDependency.SqlClient.Base.EventArgs.StatusChangedEventArgs e)
         {
             if (e.Status != TableDependencyStatus.StopDueToError)
                 LogApplicationEvent(Globals.FDANow(), "SQLTableDependency", "RocEventFormatsMonitor", "Status change: " + e.Status.ToString());
         }
-
 
         private void RocEventFormatsMonitor_OnError(object sender, TableDependency.SqlClient.Base.EventArgs.ErrorEventArgs e)
         {
@@ -355,7 +342,7 @@ namespace Common
             _RocEventsFormatsMonitor = null;
             Globals.SystemManager.LogApplicationError(Globals.FDANow(), e.Error, "SQL Table change monitor object (RocEventFormats) error: " + e.Error.Message);
         }
-    
+
         private void RocDataTypesMonitor_OnStatusChanged(object sender, TableDependency.SqlClient.Base.EventArgs.StatusChangedEventArgs e)
         {
             if (e.Status != TableDependencyStatus.StopDueToError)

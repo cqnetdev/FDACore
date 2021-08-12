@@ -1,11 +1,11 @@
-﻿using System;
+﻿using Support;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Threading;
+using System.Data;
 using System.Diagnostics;
 using System.Text;
-using System.Data;
-using Support;
+using System.Threading;
 
 namespace Common
 {
@@ -21,13 +21,9 @@ namespace Common
 
         private Dictionary<string, FDAConfig> _appConfig;
 
-
         private Dictionary<string, RocDataTypes> _rocDataTypes;
-  
 
         private Dictionary<int, RocEventFormats> _RocEventFormats;
-        
-  
 
         private readonly Queue<CommsLogItemBase> _commsLogInputBuffer;
         private readonly Queue<EventLogItem> _eventLogInputBuffer;
@@ -42,9 +38,8 @@ namespace Common
         protected readonly string systemDBPass;
 
         public delegate void ConfigChangeHandler(object sender, ConfigEventArgs e);
-        public event ConfigChangeHandler ConfigChange;
 
-   
+        public event ConfigChangeHandler ConfigChange;
 
         public FDASystemManager(string DBInstance, string systemDBName, string login, string pass, string version, Guid executionID)
         {
@@ -53,9 +48,7 @@ namespace Common
             // Default enable debug messages to true
             EnableDebugMessages = true;
 
-            SystemDBConnectionString = GetSystemDBConnectionString(DBInstance,systemDBName,login,pass);
-            
-           
+            SystemDBConnectionString = GetSystemDBConnectionString(DBInstance, systemDBName, login, pass);
 
             systemDBSQLInstance = DBInstance;
             systemDBLogin = login;
@@ -72,7 +65,6 @@ namespace Common
             _bgEventLogger = new BackgroundWorker();
             _bgEventLogger.DoWork += BGEventLogger_DoWork;
 
-
             // load the FDAConfig table from the database
             LoadAppConfigOptions();
 
@@ -80,8 +72,8 @@ namespace Common
             string FDAdb = "FDA";
             string FDALogin = systemDBLogin;
             string FDAPass = systemDBPass;
-            
-            Dictionary<string,FDAConfig> options = GetAppConfig();
+
+            Dictionary<string, FDAConfig> options = GetAppConfig();
 
             if (options != null)
             {
@@ -89,7 +81,7 @@ namespace Common
                     FDAdb = options["FDADBName"].OptionValue;
             }
 
-            AppDBConnectionString = GetAppDBConnectionString(FDASqlInstance, FDAdb,FDALogin,FDAPass);
+            AppDBConnectionString = GetAppDBConnectionString(FDASqlInstance, FDAdb, FDALogin, FDAPass);
 
             ReadOnlyOptions = new List<string>();
             ReadOnlyOptions.AddRange(new string[] {"AppLog","CommsLog","DataPointDefinitionStructures","FDADataBlockRequestGroup","FDADBLogin","FDADBName","FDADBPass",
@@ -109,16 +101,11 @@ namespace Common
 
             LogApplicationEvent(Globals.FDANow(), "FDA Application", "", "Starting FDA (version " + version + "), Execution ID: " + executionID);
 
-
-
             LogApplicationEvent(this, "", "Starting system manager");
             // LogApplicationEvent(Globals.GetOffsetUTC(),this.GetType().ToString(), "", "Starting system manager");
 
-          
-
             // load ROC lookup tables
             LoadRocLookupTables();
-
         }
 
         public string GetAppDBConnectionString()
@@ -126,10 +113,9 @@ namespace Common
             return AppDBConnectionString;
         }
 
+        protected abstract string GetSystemDBConnectionString(string instance, string dbname, string user, string pass);
 
-        protected abstract string GetSystemDBConnectionString(string instance,string dbname,string user,string pass);
-
-        protected void ROCDataTypes_Notification(string operation,RocDataTypes dataType)
+        protected void ROCDataTypes_Notification(string operation, RocDataTypes dataType)
         {
             string message = "";
 
@@ -139,10 +125,11 @@ namespace Common
                     if (_rocDataTypes == null)
                         _rocDataTypes = new Dictionary<string, RocDataTypes>();
                     if (!_rocDataTypes.ContainsKey(dataType.Key))
-                        _rocDataTypes.Add(dataType.Key,dataType);
+                        _rocDataTypes.Add(dataType.Key, dataType);
                     message = "RocDataTypes new row - PointType:Parameter = " + dataType.Key;
 
                     break;
+
                 case "DELETE":
                     if (_rocDataTypes != null)
                     {
@@ -152,6 +139,7 @@ namespace Common
                     message = "RocDataTypes row deleted - PointType:Parameter = " + dataType.Key;
 
                     break;
+
                 case "UPDATE":
                     if (_rocDataTypes == null)
                         _rocDataTypes = new Dictionary<string, RocDataTypes>();
@@ -168,10 +156,7 @@ namespace Common
             Globals.SystemManager.LogApplicationEvent(this, "", message);
         }
 
-
-    
-
-        protected void ROCEventsNotification(string operation,RocEventFormats eventFormat)
+        protected void ROCEventsNotification(string operation, RocEventFormats eventFormat)
         {
             string message = "";
 
@@ -185,6 +170,7 @@ namespace Common
                     message = "RocEventFormats new row: PointType = " + eventFormat.POINTTYPE;
 
                     break;
+
                 case "DELETE":
                     if (_rocDataTypes != null)
                     {
@@ -194,6 +180,7 @@ namespace Common
                     message = "RocEventFormats row deleted: PointType = " + eventFormat.POINTTYPE;
 
                     break;
+
                 case "UPDATE":
                     if (_RocEventFormats == null)
                         _RocEventFormats = new Dictionary<int, RocEventFormats>();
@@ -211,13 +198,6 @@ namespace Common
             Globals.SystemManager.LogApplicationEvent(this, "", message);
         }
 
-
-
-      
-
-
-  
-
         private void LoadRocLookupTables()
         {
             if (_rocDataTypes == null)
@@ -232,10 +212,9 @@ namespace Common
 
             //SqlDataReader dataReader = ExecuteDataQuery("select PointType,Format,DescShort,DescLong from RocEventFormats");
             string query = "select PointType,Format,DescShort,DescLong from RocEventFormats";
-    
 
             int pointType = -1;
-            DataTable result = ExecuteQuery(query,SystemDBConnectionString);
+            DataTable result = ExecuteQuery(query, SystemDBConnectionString);
             foreach (DataRow row in result.Rows)
             {
                 try
@@ -255,10 +234,6 @@ namespace Common
                     Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Failed to parse RocEventFormats PointType " + pointType);
                 }
             }
-                    
-                
-           
-
 
             //------------------ load RocDataTypes table into a Dictionary --------------------
 
@@ -267,12 +242,12 @@ namespace Common
             RocDataTypes datatypeEntry;
 
             pointType = -1;
-            result = ExecuteQuery(query,SystemDBConnectionString);
+            result = ExecuteQuery(query, SystemDBConnectionString);
             foreach (DataRow row in result.Rows)
             {
                 try
                 {
-                    pointType =(Int32)row["PointType"];
+                    pointType = (Int32)row["PointType"];
                     datatypeEntry = new RocDataTypes()
                     {
                         POINTTYPE = (Int32)row["PointType"],
@@ -289,8 +264,6 @@ namespace Common
                     Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Failed to parse RocEventFormats PointType " + pointType);
                 }
             }
-                    
-   
         }
 
         public RocDataTypes GetRocDataType(int pointType, int parm)
@@ -319,49 +292,47 @@ namespace Common
             // load app config settings (if present)
             string optionName = "";
             string query;
-     
-                query = "SELECT count(1) from (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'fdaconfig') A;";
-                    
-                object result = ExecuteScalar(query,SystemDBConnectionString);
-                bool tableExists = false;
-                if (result != null)
+
+            query = "SELECT count(1) from (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'fdaconfig') A;";
+
+            object result = ExecuteScalar(query, SystemDBConnectionString);
+            bool tableExists = false;
+            if (result != null)
+            {
+                tableExists = ((Int32)Convert.ChangeType(result, typeof(Int32)) > 0);
+            }
+
+            if (tableExists)
+            {
+                query = "select OptionName,OptionValue,ConfigType from FDAConfig";
+                DataTable resultsTable = ExecuteQuery(query, SystemDBConnectionString);
+                foreach (DataRow row in resultsTable.Rows)
                 {
-                        tableExists = ((Int32)Convert.ChangeType(result,typeof(Int32)) > 0);
-                }
-                
-                if (tableExists)
-                {
-                   query = "select OptionName,OptionValue,ConfigType from FDAConfig";
-                    DataTable resultsTable = ExecuteQuery(query,SystemDBConnectionString);
-                    foreach (DataRow row in resultsTable.Rows)
+                    try
                     {
-                        try
-                        {
-                            optionName = (string)row["OptionName"];
-                            _appConfig.Add(optionName,
-                                new FDAConfig()
-                                {
-                                    OPTIONNAME = optionName,
-                                    OptionValue = (string)row["OptionValue"],
-                                    ConfigType = (Int32)row["ConfigType"]
-                                });
-                        }
-                        catch (Exception ex)
-                        {
-                            Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Failed to parse option '" + optionName);
-                            return false;
-                        }
-                    }  
-                }     
+                        optionName = (string)row["OptionName"];
+                        _appConfig.Add(optionName,
+                            new FDAConfig()
+                            {
+                                OPTIONNAME = optionName,
+                                OptionValue = (string)row["OptionValue"],
+                                ConfigType = (Int32)row["ConfigType"]
+                            });
+                    }
+                    catch (Exception ex)
+                    {
+                        Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Failed to parse option '" + optionName);
+                        return false;
+                    }
+                }
+            }
             StartListening();
             return true;
         }
 
         protected abstract void StartListening();
 
-       protected abstract string GetAppDBConnectionString(string instance, string db, string login, string pass);
-
-   
+        protected abstract string GetAppDBConnectionString(string instance, string db, string login, string pass);
 
         public string GetTableName(string defaultName)
         {
@@ -377,8 +348,7 @@ namespace Common
             return _appConfig;
         }
 
-
-        protected void AppConfigNotification(string changeType,FDAConfig config)
+        protected void AppConfigNotification(string changeType, FDAConfig config)
         {
             string restartMessage = " (change will be applied after a restart)";
             string message = "";
@@ -396,7 +366,7 @@ namespace Common
                     if (!isReadOnly)
                         _appConfig.Add(config.OPTIONNAME, config);
 
-                    message = "FDAConfig new option entered : " +config.OPTIONNAME + " = " + config.OptionValue;
+                    message = "FDAConfig new option entered : " + config.OPTIONNAME + " = " + config.OptionValue;
 
                     // publish the default comms stats table to MQTT
                     if (config.OPTIONNAME.ToUpper() == "COMMSSTATS")
@@ -412,7 +382,7 @@ namespace Common
                         if (!isReadOnly)
                             _appConfig[config.OPTIONNAME] = config;
 
-                        message = "FDAConfig option change : " + config.OPTIONNAME + " = " +config.OptionValue;
+                        message = "FDAConfig option change : " + config.OPTIONNAME + " = " + config.OptionValue;
 
                         if (config.OPTIONNAME.ToUpper() == "COMMSSTATS")
                         {
@@ -448,7 +418,6 @@ namespace Common
                         {
                             PublishCommsStatsTable(config.OPTIONNAME);
                         }
-
                     }
 
                 if (isReadOnly)
@@ -460,10 +429,6 @@ namespace Common
             }
         }
 
-
-
-    
-         
         private static void PublishCommsStatsTable(string table)
         {
             // publish changes to the default CommsStats output table to MQTT
@@ -471,13 +436,10 @@ namespace Common
             Globals.MQTT.Publish("FDA/DefaultCommsStatsTable", tableBytes, 0, true);
         }
 
-
-    
-
         public void LogApplicationError(DateTime timestamp, Exception ex, string description = "")
         {
             string eventText = DateTimeHelpers.FormatDateTime(timestamp) + ": " + ex.Message + ", " + description;
-            
+
             // display it in the console if we're in interactive mode
             if (Environment.UserInteractive)
             {
@@ -499,7 +461,6 @@ namespace Common
                     _bgEventLogger.RunWorkerAsync();
             }
         }
-
 
         public void LogApplicationEvent(object caller, string callerName, string description, bool configError = false, bool detailed = false)
         {
@@ -538,14 +499,11 @@ namespace Common
 
                 if (!_bgEventLogger.IsBusy)
                     _bgEventLogger.RunWorkerAsync();
-
             }
-
         }
 
         public void LogCommsEvent(TransactionLogItem logItem)
         {
-
             lock (_commsLogInputBuffer)
             {
                 _commsLogInputBuffer.Enqueue(logItem);
@@ -557,7 +515,6 @@ namespace Common
 
         public void LogAckEvent(AcknowledgementEvent logItem)
         {
-
             lock (_commsLogInputBuffer)
             {
                 _commsLogInputBuffer.Enqueue(logItem);
@@ -593,21 +550,16 @@ namespace Common
             }
         }
 
-
         private void BGEventLogger_DoWork(object sender, DoWorkEventArgs e)
         {
             string query;
             EventLogItem logItem;
             StringBuilder batchbuilder = new();
             string tblName = Globals.SystemManager.GetTableName("AppLog");
-  
 
             while (_eventLogInputBuffer.Count > 0)
             {
-
-
                 //logItem = _eventLogInputBuffer.Peek();
-
 
                 // batch up to 50 events together for writing to the db
                 int batchCount = 0;
@@ -624,11 +576,10 @@ namespace Common
 
                 query = batchbuilder.ToString();
 
-                ExecuteNonQuery(query,AppDBConnectionString);
+                ExecuteNonQuery(query, AppDBConnectionString);
 
                 Thread.Sleep(200);   // short break between batches gives other threads a chance to queue new events
             }
-            
         }
 
         private static void ResetEventBatch(StringBuilder sb, string table)
@@ -638,8 +589,6 @@ namespace Common
             sb.Append(table);
             sb.Append(" (FDAExecutionID,Timestamp,EventType,ObjectType,ObjectName,Description,ErrorCode,StackTrace) VALUES ");
         }
-
-
 
         private void BGCommsLogger_DoWork(object sender, DoWorkEventArgs e)
         {
@@ -667,11 +616,11 @@ namespace Common
                 if (batchCount > 0)
                 {
                     query = batchBuilder.ToString();
-                    ExecuteNonQuery(query,AppDBConnectionString);
+                    ExecuteNonQuery(query, AppDBConnectionString);
                 }
 
                 Thread.Sleep(200);
-            }         
+            }
         }
 
         private static void ResetCommsBatch(StringBuilder sb, string table)
@@ -682,39 +631,34 @@ namespace Common
             sb.Append(" (FDAExecutionID, connectionID, DeviceAddress, Attempt, TimestampUTC1, TimestampUTC2, ElapsedPeriod, TransCode, TransStatus, ApplicationMessage,DBRGUID,DBRGIdx,DBRGSize,Details01,TxSize,Details02,RxSize,ProtocolNote,Protocol) values ");
         }
 
+        protected abstract DataTable ExecuteQuery(string sql, string dbConnString);
 
-        protected abstract DataTable ExecuteQuery(string sql,string dbConnString);
-    
+        protected abstract int ExecuteNonQuery(string sql, string dbConnString);
 
-        protected abstract int ExecuteNonQuery(string sql,string dbConnString);
-      
-        protected abstract object ExecuteScalar(string sql,string dbConnString);
-     
+        protected abstract object ExecuteScalar(string sql, string dbConnString);
 
-        private int ExecuteSQLSync(string sql,string connString, bool isScalar = false)
+        private int ExecuteSQLSync(string sql, string connString, bool isScalar = false)
         {
             int result;
 
             if (isScalar)
-                result = (int)ExecuteScalar(sql,connString);
+                result = (int)ExecuteScalar(sql, connString);
             else
-                result = ExecuteNonQuery(sql,connString);
-                 
+                result = ExecuteNonQuery(sql, connString);
+
             return result;
         }
-
-
 
         public void LogStartup(Guid instanceID, DateTime timestamp, string version)
         {
             string sql = "select cast(count(1) as integer) from INFORMATION_SCHEMA.COLUMNS where TABLE_NAME = 'fdastarts' and COLUMN_NAME = 'fdaversion';";
-            int versioncolumnCheck = ExecuteSQLSync(sql,SystemDBConnectionString,true);
+            int versioncolumnCheck = ExecuteSQLSync(sql, SystemDBConnectionString, true);
             bool versionColExists = true;
 
             if (versioncolumnCheck < 1)
             {
                 sql = "ALTER TABLE FDAStarts ADD FDAVersion varchar(50);";
-                versionColExists = (ExecuteSQLSync(sql,SystemDBConnectionString) == -1);
+                versionColExists = (ExecuteSQLSync(sql, SystemDBConnectionString) == -1);
             }
 
             if (versionColExists)
@@ -725,12 +669,12 @@ namespace Common
             {
                 sql = "insert into FDAStarts(FDAExecutionID, UTCTimestamp) values('" + instanceID.ToString() + "', '" + DateTimeHelpers.FormatDateTime(timestamp) + "'); ";
             }
-          
-            ExecuteSQLSync(sql,SystemDBConnectionString, false);
 
+            ExecuteSQLSync(sql, SystemDBConnectionString, false);
         }
 
         #region IDisposable Support
+
         protected abstract void Cleanup();
 
         private bool disposedValue = false; // To detect redundant calls
@@ -752,18 +696,16 @@ namespace Common
 
                         stopwatch.Reset();
                         stopwatch.Start();
-                        
+
                         while (_bgCommsLogger.IsBusy && stopwatch.Elapsed.Seconds < 5)
                             Thread.Sleep(50);
                         stopwatch.Stop();
-                        
+
                         _bgCommsLogger.Dispose();
                     }
 
-
                     if (_bgEventLogger != null)
                     {
-
                         if (_bgEventLogger.IsBusy)
                         {
                             Globals.SystemManager.LogApplicationEvent(this, "", "Waiting for event logger thread to finish and exit");
@@ -801,10 +743,7 @@ namespace Common
             // TODO: uncomment the following line if the finalizer is overridden above.
             GC.SuppressFinalize(this);
         }
-        #endregion
 
+        #endregion IDisposable Support
     }
-
-
-
 }

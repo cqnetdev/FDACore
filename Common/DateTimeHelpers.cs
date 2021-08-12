@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace Support
 {
@@ -69,7 +67,4 @@ namespace Support
             return (char)(value + '0');
         }
     }
-
-  
-
 }

@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -14,11 +13,10 @@ namespace Common
         private readonly static int _flushRate = 500;
 
         private static FDA.TCPServer _TCPServer;
-       
 
         public static void Start()
         {
-            _TCPServer = FDA.TCPServer.NewTCPServer(9573,"Operational Messages Server");
+            _TCPServer = FDA.TCPServer.NewTCPServer(9573, "Operational Messages Server");
             _TCPServer.Start();
             _TCPServer.ClientConnected += TCPServer_ClientConnected;
             _TCPServer.ClientDisconnected += TCPServer_ClientDisconnected;
@@ -31,14 +29,13 @@ namespace Common
 
         private static void TCPServer_ClientConnected(object sender, FDA.TCPServer.ClientEventArgs e)
         {
-           
             LogEvent("TCP client (" + e.ClientAddress + ") connected on port " + _TCPServer.Port);
         }
 
         static private void LogEvent(string message)
         {
             if (Globals.SystemManager != null)
-                Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "TCPServer",_TCPServer.ServerName, message);
+                Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "TCPServer", _TCPServer.ServerName, message);
             else
                 Console.WriteLine(Globals.FDANow().ToString() + ": " + message);
         }
@@ -46,7 +43,6 @@ namespace Common
         public static void Stop()
         {
             _TCPServer.Dispose();
-
         }
 
         public static void Write(string value)
@@ -54,19 +50,23 @@ namespace Common
             lock (_sb) _sb.Append(value);
             ScheduleFlush();
         }
+
         public static void Write(string format, params object[] args)
         {
             lock (_sb) _sb.AppendFormat(format, args);
             ScheduleFlush();
         }
+
         public static void WriteLine(string value)
         {
             Write(value + Environment.NewLine);
         }
+
         public static void WriteLine(string format, params object[] args)
         {
             Write(format + Environment.NewLine, args);
         }
+
         public static void WriteLine()
         {
             WriteLine("");

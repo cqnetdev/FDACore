@@ -1,17 +1,13 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-using Opc.UaFx;
+﻿using Opc.UaFx;
 using Opc.UaFx.Server;
+using System.Collections.Generic;
 
 namespace OPC
 {
-    class NodeManager : OpcNodeManager
+    internal class NodeManager : OpcNodeManager
     {
-
         public NodeManager() : base("http://FDA/")
         {
-
         }
 
         protected override IEnumerable<IOpcNode> CreateNodes(OpcNodeReferenceCollection references)
@@ -28,6 +24,5 @@ namespace OPC
             // Return each custom root node using yield return.
             yield return FDANode;
         }
-
     }
 }

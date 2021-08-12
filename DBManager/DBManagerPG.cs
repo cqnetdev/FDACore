@@ -1,35 +1,31 @@
-﻿using System;
-using Common;
-using System.Threading;
+﻿using Common;
 using Npgsql;
+using System;
 using System.Data;
-
+using System.Threading;
 
 namespace FDA
 {
     public class DBManagerPG : DBManager, IDisposable
     {
-
-        PostgreSQLListener<FDARequestGroupScheduler> _schedMonitor;
-        PostgreSQLListener<FDARequestGroupDemand> _demandMonitor;
-        PostgreSQLListener<FDADataBlockRequestGroup> _requestGroupDefMonitor;
-        PostgreSQLListener<FDADataPointDefinitionStructure> _dataPointDefMonitor;
-        PostgreSQLListener<FDASourceConnection> _connectionDefMonitor;
-        PostgreSQLListener<FDADevice> _deviceDefMonitor;
-        PostgreSQLListener<FDATask> _taskDefMonitor;
-        PostgreSQLListener<DataSubscription> _datasubscriptionMonitor;
-        PostgreSQLListener<UserScriptDefinition> _userScriptsMonitor;
+        private PostgreSQLListener<FDARequestGroupScheduler> _schedMonitor;
+        private PostgreSQLListener<FDARequestGroupDemand> _demandMonitor;
+        private PostgreSQLListener<FDADataBlockRequestGroup> _requestGroupDefMonitor;
+        private PostgreSQLListener<FDADataPointDefinitionStructure> _dataPointDefMonitor;
+        private PostgreSQLListener<FDASourceConnection> _connectionDefMonitor;
+        private PostgreSQLListener<FDADevice> _deviceDefMonitor;
+        private PostgreSQLListener<FDATask> _taskDefMonitor;
+        private PostgreSQLListener<DataSubscription> _datasubscriptionMonitor;
+        private PostgreSQLListener<UserScriptDefinition> _userScriptsMonitor;
 
         // constructor
         public DBManagerPG(string connString) : base(connString)
         {
-              
         }
 
-  
         protected override bool TestConnection()
         {
-            using (NpgsqlConnection conn = new (ConnectionString))
+            using (NpgsqlConnection conn = new(ConnectionString))
             {
                 try
                 {
@@ -46,9 +42,7 @@ namespace FDA
         public static string GenerateConnectionString(string instance, string database, string user, string pass)
         {
             return "Server=" + instance + ";Database=" + database + ";user=" + user + ";password=" + pass;
-
         }
-
 
         protected override DataTable ExecuteQuery(string sql)
         {
@@ -56,7 +50,7 @@ namespace FDA
             int maxRetries = 3;
             DataTable result = new();
         Retry:
-            using (NpgsqlConnection conn = new (ConnectionString))
+            using (NpgsqlConnection conn = new(ConnectionString))
             {
                 try
                 {
@@ -70,7 +64,7 @@ namespace FDA
 
                 try
                 {
-                    using (NpgsqlDataAdapter da = new (sql, conn))
+                    using (NpgsqlDataAdapter da = new(sql, conn))
                     {
                         da.Fill(result);
                     }
@@ -99,9 +93,9 @@ namespace FDA
             int rowsaffected = -99;
             int retries = 0;
             int maxRetries = 3;
-            Retry:
+        Retry:
 
-            using (NpgsqlConnection conn = new (ConnectionString))
+            using (NpgsqlConnection conn = new(ConnectionString))
             {
                 try
                 {
@@ -119,8 +113,8 @@ namespace FDA
                     {
                         retries++;
                         sqlCommand.CommandText = sql;
-                        rowsaffected = sqlCommand.ExecuteNonQuery();                       
-                    }                   
+                        rowsaffected = sqlCommand.ExecuteNonQuery();
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -135,13 +129,12 @@ namespace FDA
                         Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "ExecuteNonQuery() Failed to execute query after " + (maxRetries + 1) + " attempts. Query = " + sql);
                         return -99;
                     }
-
                 }
-          
+
                 conn.Close();
             }
 
-            return rowsaffected;         
+            return rowsaffected;
         }
 
         protected override object ExecuteScalar(string sql)
@@ -149,8 +142,8 @@ namespace FDA
             int maxRetries = 3;
             int retries = 0;
 
-            Retry:
-            using (NpgsqlConnection conn = new (ConnectionString))
+        Retry:
+            using (NpgsqlConnection conn = new(ConnectionString))
             {
                 try
                 {
@@ -161,7 +154,6 @@ namespace FDA
                     Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "ExecuteScalar() Failed to connect to database");
                     return null;
                 }
-
 
                 using (NpgsqlCommand sqlCommand = conn.CreateCommand())
                 {
@@ -186,12 +178,9 @@ namespace FDA
                             return null;
                         }
                     }
-
                 }
-               
             }
         }
-
 
         protected override DateTime GetDBStartTime()
         {
@@ -202,14 +191,11 @@ namespace FDA
                 startTime = (DateTime)scalarResult;
 
             return startTime;
-
         }
-
 
         public override void Initialize()
         {
             base.Initialize();
-
 
             // PostgreSQL table monitors
             _schedMonitor = new PostgreSQLListener<FDARequestGroupScheduler>(ConnectionString, Globals.SystemManager.GetTableName("FDARequestGroupScheduler"));
@@ -230,7 +216,7 @@ namespace FDA
             _schedMonitor.Notification += SchedMonitor_Notification;
             _requestGroupDefMonitor.Notification += RequestGroupDefMonitor_Notification;
             _connectionDefMonitor.Notification += ConnectionDefMonitor_Notification;
-            _dataPointDefMonitor.Notification += DataPointDefMonitor_Notification; 
+            _dataPointDefMonitor.Notification += DataPointDefMonitor_Notification;
             if (_datasubscriptionMonitor != null)
                 _datasubscriptionMonitor.Notification += DatasubscriptionMonitor_Notification;
             if (_deviceDefMonitor != null)
@@ -255,22 +241,12 @@ namespace FDA
                 _userScriptsMonitor.Error += PostgresSQLMonitor_Error;
 
             StartChangeMonitoring();
-
-            
-
-            
-
         }
 
-
-        private void PostgresSQLMonitor_Error(object sender,Exception e)
+        private void PostgresSQLMonitor_Error(object sender, Exception e)
         {
             Globals.SystemManager.LogApplicationError(Globals.FDANow(), e, "Error reported by PostgreSQLListener : " + e.Message);
         }
-
-
-     
-    
 
         protected new bool PreReqCheck()
         {
@@ -280,14 +256,13 @@ namespace FDA
             // postgreSQL specific pre-req checks (none for now)
             bool PGCheck = true;
 
-
-            return baseCheck && PGCheck;              
+            return baseCheck && PGCheck;
         }
 
         // these build table queries are for SQL, need to create postgresql versions
         protected override bool BuildAppLogTable(string tableName)
         {
-            string sql="CREATE TABLE applog(fdaexecutionid uuid NOT NULL,\"timestamp\" timestamp(6) NOT NULL,eventtype varchar(10) NOT NULL,objecttype varchar(100) NOT NULL,objectname varchar(500) NULL,description text NULL,errorcode varchar(10) NULL,stacktrace text NULL);";
+            string sql = "CREATE TABLE applog(fdaexecutionid uuid NOT NULL,\"timestamp\" timestamp(6) NOT NULL,eventtype varchar(10) NOT NULL,objecttype varchar(100) NOT NULL,objectname varchar(500) NULL,description text NULL,errorcode varchar(10) NULL,stacktrace text NULL);";
             int result = ExecuteNonQuery(sql);
             return (result == -1);
         }
@@ -299,10 +274,7 @@ namespace FDA
             return (result == -1);
         }
 
-   
-
         #region configuration change monitoring
-
 
         // start monitoring for config changes
         public override void StartChangeMonitoring()
@@ -327,7 +299,6 @@ namespace FDA
             {
                 Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Error when starting Table Change Monitoring objects");
             }
-
         }
 
         //pause monitoring for config changes
@@ -349,12 +320,7 @@ namespace FDA
             Globals.SystemManager.LogApplicationEvent(this, "", "Database change monitoring stopped");
         }
 
-
-
         #region PostgreSQL table change events
-
-
-
 
         private void UserScriptsMonitor_Notification(object sender, PostgreSQLListener<UserScriptDefinition>.PostgreSQLNotification notifyEvent)
         {
@@ -369,7 +335,6 @@ namespace FDA
             FDATask task = notifyEvent.Notification.row;
             TaskMonitorNotification(changeType, task);
         }
-
 
         private void DatasubscriptionMonitor_Notification(object sender, PostgreSQLListener<DataSubscription>.PostgreSQLNotification notifyEvent)
         {
@@ -398,7 +363,6 @@ namespace FDA
             FDASourceConnection connection = notifyEvent.Notification.row;
 
             SourceConnectionMonitorNotification(changeType, connection);
-
         }
 
         private void RequestGroupDefMonitor_Notification(object sender, PostgreSQLListener<FDADataBlockRequestGroup>.PostgreSQLNotification notifyEvent)
@@ -406,7 +370,6 @@ namespace FDA
             string changeType = notifyEvent.Notification.operation;
             FDADataBlockRequestGroup requestGroup = notifyEvent.Notification.row;
             RequestGroupMonitorNotification(changeType, requestGroup);
-
         }
 
         private void SchedMonitor_Notification(object sender, PostgreSQLListener<FDARequestGroupScheduler>.PostgreSQLNotification notifyEvent)
@@ -424,12 +387,12 @@ namespace FDA
 
             DemandMonitorNotification(changeType, demand);
         }
-        #endregion
 
-     
-    
+        #endregion PostgreSQL table change events
+
         #region IDisposable Support
-         public override void Dispose()
+
+        public override void Dispose()
         {
             GC.SuppressFinalize(this);
             // postgreSQL specific disposal
@@ -441,7 +404,6 @@ namespace FDA
             _datasubscriptionMonitor?.StopListening();
             _userScriptsMonitor?.StopListening();
 
-
             _demandMonitor?.Dispose();
             _schedMonitor?.Dispose();
             _dataPointDefMonitor?.Dispose();
@@ -452,13 +414,10 @@ namespace FDA
 
             // general disposal
             base.Dispose();
-
         }
-        #endregion
 
-    #endregion
+        #endregion IDisposable Support
+
+        #endregion configuration change monitoring
     }
-
-
 }
-

@@ -1,13 +1,8 @@
-﻿using System;
+﻿using System.Collections;
 using System.Collections.Generic;
-using System.Collections;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Common
 {
-
     public class CircularBuffer<T> : IEnumerable
     {
         private readonly T[] _buffer;
@@ -26,12 +21,11 @@ namespace Common
 
         public List<T> GetBuffer()
         {
-            List<T> bufferCopy = new (_buffer.Length);
+            List<T> bufferCopy = new(_buffer.Length);
             foreach (T item in _buffer)
                 bufferCopy.Add(item);
             return bufferCopy;
         }
-
 
         public IEnumerator GetEnumerator()
         {
@@ -84,6 +78,5 @@ namespace Common
         {
             _count = 0;
         }
-
     }
 }

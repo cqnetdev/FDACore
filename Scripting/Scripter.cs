@@ -1,34 +1,34 @@
-﻿using System;
+﻿using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Scripting;
 using Microsoft.CodeAnalysis.Scripting;
-using Microsoft.CodeAnalysis;
-using System.Threading;
+using System;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
 using System.Collections.Immutable;
 
 namespace Scripting
 {
-   
     public static class Scripter
     {
-        // private   
+        // private
         private static readonly Dictionary<string, UserScript> _scripts = new();
 
         // internal
         internal static ScriptInterface _scriptInterface = new();
+
         internal static List<string> _imports = new();
         internal static List<string> _references = new();
 
-        // public     
+        // public
         public delegate void CompileErrorHandler(string scriptID, List<string> errors);
+
         public static event CompileErrorHandler CompileError;
 
         public delegate void ScriptTriggeredHandler(string scriptID);
+
         public static event ScriptTriggeredHandler ScriptTriggered;
 
         public delegate void RuntimeErrorHandler(string scriptID, string error);
+
         public static event RuntimeErrorHandler RunTimeError;
 
         private static bool Enabled = false;
@@ -78,7 +78,6 @@ namespace Scripting
             _references.AddRange(libs);
         }
 
-
         public static ImmutableArray<Diagnostic> CheckScript(string code)
         {
             Script _script = CSharpScript.Create(code, ScriptOptions.Default.AddReferences(_references).WithImports(_imports), typeof(ScriptInterface));
@@ -88,7 +87,7 @@ namespace Scripting
             return result;
         }
 
-        public static void LoadScript(string id,string code, bool enabled=false,string runspec="")
+        public static void LoadScript(string id, string code, bool enabled = false, string runspec = "")
         {
             string completeCode = code;
 
@@ -109,13 +108,11 @@ namespace Scripting
                 _scripts[id].ScriptExecuted -= HandleScriptExecutedEvent;
                 _scripts[id].ScriptError -= HandleScriptErrorEvent;
                 _scripts[id].Dispose();
-                _scripts.Remove(id);              
+                _scripts.Remove(id);
             }
-           
-
         }
 
-        private static void HandleScriptErrorEvent(string scriptID,Exception ex)
+        private static void HandleScriptErrorEvent(string scriptID, Exception ex)
         {
             RunTimeError?.Invoke(scriptID, ex.GetBaseException().Message);
         }
@@ -125,7 +122,7 @@ namespace Scripting
             ScriptTriggered?.Invoke(scriptID);
         }
 
-        private static void HandleCompileError(string scriptid,System.Collections.Immutable.ImmutableArray<Diagnostic> errors)
+        private static void HandleCompileError(string scriptid, System.Collections.Immutable.ImmutableArray<Diagnostic> errors)
         {
             List<string> errorMsgs = new();
             foreach (Diagnostic diag in errors)
@@ -134,9 +131,6 @@ namespace Scripting
             }
             CompileError?.Invoke(scriptid, errorMsgs);
         }
-
-
-
 
         public static UserScript GetScript(string ID)
         {
@@ -153,7 +147,6 @@ namespace Scripting
                 script.Dispose();
             }
             _scripts.Clear();
-        }  
+        }
     }
-
 }

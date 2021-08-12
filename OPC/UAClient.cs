@@ -1,14 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-using Opc.UaFx;
+﻿using Opc.UaFx;
 using Opc.UaFx.Client;
 
 namespace OPC
 {
-    public class UAClient: Client
+    public class UAClient : Client
     {
-
         /// <summary>
         /// Create an OPC UA Client
         /// </summary>
@@ -21,8 +17,6 @@ namespace OPC
             base.RegisterForClientEvents();
         }
 
-     
-
         //public override OpcSubscription Subscribe(Common.DataSubscription subscriptionDef)
         //{
         //    string[] nodes = subscriptionDef.monitored_items.Split("$");
@@ -34,7 +28,7 @@ namespace OPC
         //    foreach (string node in nodes)
         //    {
         //        nodeparts = node.Split(":");
-        //        ns = int.Parse(nodeparts[0]); 
+        //        ns = int.Parse(nodeparts[0]);
         //        path = nodeparts[1];
         //        nodesList.Add(new OpcSubscribeNode(path, ns));
         //    }
@@ -44,9 +38,7 @@ namespace OPC
         //    return sub;
         //}
 
-
-
-        public override OpcValue Read(string node,int ns)
+        public override OpcValue Read(string node, int ns)
         {
             OpcValue value = _client.ReadNode("ns=" + ns + ";s=" + node);
             return value;

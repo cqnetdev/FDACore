@@ -1,13 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
-using System.Reflection;
-using System.Runtime.Versioning;
 using System.Security.Principal;
 using System.ServiceProcess;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Common
 {
@@ -16,8 +10,6 @@ namespace Common
         private static readonly string serviceName = "mosquitto";
         private static readonly string exePath = "C:\\IntricateFDA\\MQTT\\mosquitto.exe";
         private static readonly string workingDir = "C:\\IntricateFDA\\MQTT";
-
-
 
         private static string RunCommand(string command, string args, string workingDir = "")
         {
@@ -36,8 +28,6 @@ namespace Common
 
             Process process = new() { StartInfo = processStartInfo };
 
-
-
             process.Start();
             string output = process.StandardOutput.ReadToEnd();
             string error = process.StandardError.ReadToEnd();
@@ -53,7 +43,7 @@ namespace Common
             {
                 return new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator);
             }
-            
+
             if (OperatingSystem.IsLinux())
             {
                 return Environment.UserName == "root";
@@ -80,7 +70,6 @@ namespace Common
                 string result = RunCommand("systemctl", "status " + serviceName);
 
                 return !(result.Contains("could not be found") || result.Contains(".service is masked")); // 'could not be found' = never installed, '.service is masked' = previously installed, but has been uninstalled
-
             }
 
             return false;
@@ -93,7 +82,7 @@ namespace Common
             if (OperatingSystem.IsWindows())
             {
                 ServiceController sc = new() { ServiceName = serviceName };
-         
+
                 try
                 {
                     starttype = sc.StartType.ToString();
@@ -112,7 +101,6 @@ namespace Common
                 else
                     return "Disabled";
             }
-
 
             return starttype;
         }
@@ -134,7 +122,7 @@ namespace Common
                 // install mosquitto
                 RunCommand("wget", "http://repo.mosquitto.org/debian/mosquitto-repo.gpg.key");
                 RunCommand("apt-key", "add mosquitto-repo.gpg.key");
-                RunCommand("wget","http://repo.mosquitto.org/debian/mosquitto-buster.list", "/etc/apt/sources.list.d/");              
+                RunCommand("wget", "http://repo.mosquitto.org/debian/mosquitto-buster.list", "/etc/apt/sources.list.d/");
                 RunCommand("apt-get", "update");
                 RunCommand("apt-get", "-y install mosquitto");
 
@@ -144,7 +132,7 @@ namespace Common
                 RunCommand("cp", "mosquitto.conf /etc/mosquitto/mosquitto.conf");
 
                 // just in case the service exists from a previous installation but is masked
-                RunCommand("systemctl", "unmask " + serviceName); 
+                RunCommand("systemctl", "unmask " + serviceName);
 
                 // restart the service (load the configuration)
                 RunCommand("systemctl", "restart " + serviceName);
@@ -152,7 +140,6 @@ namespace Common
 
             return error;
         }
-
 
         public static string UnInstallMosquitto()
         {
@@ -162,22 +149,20 @@ namespace Common
                 error = RunMosquittoExecutable("uninstall");
                 if (error != String.Empty)
                     error = "Error while un-installing Mosquitto: " + error;
-
             }
 
             if (OperatingSystem.IsLinux())
             {
-               error = RunCommand("apt-get", "-y remove mosquitto");
+                error = RunCommand("apt-get", "-y remove mosquitto");
             }
 
             return error;
         }
-        
 
         public static bool EnvVarExists(out string value)
         {
             value = null;
-            string mosquittoPath = Environment.GetEnvironmentVariable("MOSQUITTO_DIR",EnvironmentVariableTarget.Machine);
+            string mosquittoPath = Environment.GetEnvironmentVariable("MOSQUITTO_DIR", EnvironmentVariableTarget.Machine);
             if (mosquittoPath != null)
             {
                 value = mosquittoPath;
@@ -188,17 +173,16 @@ namespace Common
         }
 
         public static bool MQTTPathCorrect()
-        {         
-            string mosquittoPath = Environment.GetEnvironmentVariable("MOSQUITTO_DIR",EnvironmentVariableTarget.Machine);
+        {
+            string mosquittoPath = Environment.GetEnvironmentVariable("MOSQUITTO_DIR", EnvironmentVariableTarget.Machine);
             return (mosquittoPath == workingDir);
         }
 
         public static string SetMQTTPath()
         {
-
             try
             {
-                Environment.SetEnvironmentVariable("MOSQUITTO_DIR", workingDir,EnvironmentVariableTarget.Machine);
+                Environment.SetEnvironmentVariable("MOSQUITTO_DIR", workingDir, EnvironmentVariableTarget.Machine);
             }
             catch (Exception ex)
             {
@@ -207,8 +191,6 @@ namespace Common
 
             return string.Empty;
         }
-
-
 
         public static string GetMQTTStatus()
         {
@@ -221,10 +203,7 @@ namespace Common
                     status = sc.Status.ToString();
                 }
                 catch { }
-
-             
             }
-
 
             if (OperatingSystem.IsLinux())
             {
@@ -235,11 +214,8 @@ namespace Common
                     status = "Stopped";
             }
 
-
             return status;
-
         }
-
 
         public static string StopMosquittoService()
         {
@@ -270,7 +246,6 @@ namespace Common
             return "unsupported platform"; // should never see this;
         }
 
-
         public static string StartMosquittoService()
         {
             if (OperatingSystem.IsWindows())
@@ -290,7 +265,7 @@ namespace Common
                 if (sc.Status != ServiceControllerStatus.Running)
                     return "service was started, but it failed to initialize";
                 return string.Empty;
-            }                   
+            }
 
             if (OperatingSystem.IsLinux())
             {
@@ -300,8 +275,6 @@ namespace Common
 
             return "unsupported platform"; // should never see this;
         }
-
-
 
         public static string RepairMQTT()
         {
@@ -354,9 +327,9 @@ namespace Common
                     }
                 }
 
-                // checking that MOSQUITTO_DIR is set to the correct path          
+                // checking that MOSQUITTO_DIR is set to the correct path
                 repaired = false;
-                RecheckPath:
+            RecheckPath:
                 if (!MQTTPathCorrect())
                 {
                     if (!repaired)
@@ -404,9 +377,7 @@ namespace Common
             }
 
             return "";
-           
         }
-
 
         private static string RunMosquittoExecutable(string argument)
         {
@@ -431,6 +402,5 @@ namespace Common
 
             return error;
         }
-
     }
 }

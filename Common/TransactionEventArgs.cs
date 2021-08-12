@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace Common
 {
@@ -18,12 +16,9 @@ namespace Common
             get { return _requestRef; }
         }
 
-
-
         public string Message
         {
             get { return Message; }
         }
-
     }
 }

@@ -1,14 +1,11 @@
-﻿using System;
+﻿using Common;
+using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Common;
 using System.ComponentModel;
 
 namespace FDA
 {
-    class BackfillManager
+    internal class BackfillManager
     {
         private readonly Queue<BackfillItem> _incomingQueue;
         private readonly BackgroundWorker _backfillProcessor;
@@ -18,16 +15,16 @@ namespace FDA
         {
             public List<RequestGroup> BackfillGroups;
             public DataRequest Request;
-     
 
-            public BackfillEventArgs(List<RequestGroup> backfillGroups,DataRequest request)
+            public BackfillEventArgs(List<RequestGroup> backfillGroups, DataRequest request)
             {
                 BackfillGroups = backfillGroups;
-                Request = request; 
+                Request = request;
             }
         }
 
         public delegate void BackFillRequestHandler(object sender, BackfillEventArgs e);
+
         public event BackFillRequestHandler BackfillAnalysisComplete;
 
         public BackfillManager(DBManager dBManager)
@@ -45,7 +42,6 @@ namespace FDA
             // get the backfill time from options (default to 30 minutes)
             TimeSpan backfillLimit = new(0, 30, 0);
 
-
             try
             {
                 FDADataPointDefinitionStructure tagDef;
@@ -53,22 +49,22 @@ namespace FDA
                 // identify any tags with backfill enabled and an elapsed time over the data lapse limit
                 foreach (Tag tag in request.TagList)
                 {
-                   Globals.SystemManager.LogApplicationEvent(this, "BackfillManager", "Examining the tag " + tag.TagID.ToString(),false,true);
+                    Globals.SystemManager.LogApplicationEvent(this, "BackfillManager", "Examining the tag " + tag.TagID.ToString(), false, true);
 
                     // skip any placeholder tags
                     if (tag.TagID == Guid.Empty)
                     {
-                        Globals.SystemManager.LogApplicationEvent(this, "BackfillManager", "Tag " + tag.TagID.ToString() + " is a placeholder tag, skipping it",false,true);
+                        Globals.SystemManager.LogApplicationEvent(this, "BackfillManager", "Tag " + tag.TagID.ToString() + " is a placeholder tag, skipping it", false, true);
                         continue;
                     }
-                    
+
                     // get the tag definition
                     tagDef = _dbManager.GetTagDef(tag.TagID);
 
                     // tag definition not found, move on to the next tag
                     if (tagDef == null)
                     {
-                        Globals.SystemManager.LogApplicationEvent(this, "BackfillManager", "Tag " + tag.TagID.ToString() + " DataPointDefinitionStructure not found",false,true);
+                        Globals.SystemManager.LogApplicationEvent(this, "BackfillManager", "Tag " + tag.TagID.ToString() + " DataPointDefinitionStructure not found", false, true);
                         continue;
                     }
 
@@ -93,20 +89,17 @@ namespace FDA
                         continue;
                     }
 
-                    Globals.SystemManager.LogApplicationEvent(this, "BackfillManager", "Tag " + tag.TagID.ToString() + " BackfillEnabled = " + tagDef.backfill_enabled.ToString(),false,true);
-
+                    Globals.SystemManager.LogApplicationEvent(this, "BackfillManager", "Tag " + tag.TagID.ToString() + " BackfillEnabled = " + tagDef.backfill_enabled.ToString(), false, true);
 
                     if (tagDef.backfill_enabled)
                     {
-      
                         backfillLimit = TimeSpan.FromMinutes(tagDef.backfill_data_lapse_limit);
-                        Globals.SystemManager.LogApplicationEvent(this, "BackfillManager", "The data lapse limit for tag " + tag.TagID.ToString() + " is " + backfillLimit.TotalMinutes + " minutes",false,true);
-
+                        Globals.SystemManager.LogApplicationEvent(this, "BackfillManager", "The data lapse limit for tag " + tag.TagID.ToString() + " is " + backfillLimit.TotalMinutes + " minutes", false, true);
 
                         tag.LastRead = tagDef.LastRead.Timestamp;
 
                         TimeSpan gap = tagDef.LastRead.Timestamp.Subtract(tagDef.PreviousTimestamp);
-                        Globals.SystemManager.LogApplicationEvent(this, "BackfillManager", "Read time is " + tagDef.LastRead.Timestamp + ", previous read time is " + tagDef.PreviousTimestamp + ", a gap of " + gap.TotalMinutes + " minutes",false,true);
+                        Globals.SystemManager.LogApplicationEvent(this, "BackfillManager", "Read time is " + tagDef.LastRead.Timestamp + ", previous read time is " + tagDef.PreviousTimestamp + ", a gap of " + gap.TotalMinutes + " minutes", false, true);
 
                         if (gap >= backfillLimit)
                         {
@@ -150,9 +143,8 @@ namespace FDA
                 {
                     item = _incomingQueue.Dequeue();
                 }
-               
 
-                List<RequestGroup> backfillGroupList = new(); // this is what will be returned to the DataAcqManager 
+                List<RequestGroup> backfillGroupList = new(); // this is what will be returned to the DataAcqManager
                 List<RequestGroup> TagRequestGroupList;
 
                 //-------------------------------- new code --------------------------------------------------------------------------
@@ -177,13 +169,13 @@ namespace FDA
                                 Globals.SystemManager.LogApplicationEvent(this, "", "Tag " + tagDef.DPDUID + " has backfill_data_structure_type = " + tagDef.backfill_data_structure_type + ", which is incompatible with the " + tagDef.DPSType + " protocol. Backfill request cancelled");
                             }
                             break;
-                            
+
                         case 1: // Intricate scadapack backfill (coming later)
 
                             // TO DO - Intricate scadapack backfill logic
 
                             break;
-                            
+
                         default:
                             Globals.SystemManager.LogApplicationEvent(this, "", "Tag " + item.Request.TagList[0].TagID + " Backfill type " + tagDef.backfill_data_structure_type.ToString() + " is not valid.");
                             break;
@@ -194,16 +186,14 @@ namespace FDA
                 BackfillAnalysisComplete?.Invoke(this, new BackfillEventArgs(backfillGroupList, item.Request));
             }
         }
-       
-                
     }
 
-    class BackfillItem
+    internal class BackfillItem
     {
         public DataRequest Request { get; set; }
         public List<Tag> BackfillTagList { get; set; }
 
-        public BackfillItem(DataRequest request,List<Tag> backfillTagList)
+        public BackfillItem(DataRequest request, List<Tag> backfillTagList)
         {
             Request = request;
             BackfillTagList = backfillTagList;

@@ -1,10 +1,10 @@
-﻿using System;
+﻿using Common;
+using FDA;
+using Support;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using Common;
-using FDA;
-using Support;
 
 namespace Modbus
 {
@@ -32,10 +32,10 @@ namespace Modbus
 
         // CreateRequests looks at the requestGroup.dbGroupRequestConfig.DataPointBlockRequestListVals string (which defines the requests that are part of the group)
         // and generates DataRequest objects
-        // the function stores the DataRequest objects in the requestGroup.ProtocolRequestList 
+        // the function stores the DataRequest objects in the requestGroup.ProtocolRequestList
         // if a request is a write, it generates the DataRequest object with just the message header bytes, and sets the MessageType of the DataRequestObject to DataRequest.RequestType.Write
-        // DataAcq will look up the values to be written and call CompleteWriteRequest() for finish request construction 
-        public static void CreateRequests(RequestGroup requestGroup,object protocolOptions=null)
+        // DataAcq will look up the values to be written and call CompleteWriteRequest() for finish request construction
+        public static void CreateRequests(RequestGroup requestGroup, object protocolOptions = null)
         {
             try
             {
@@ -49,7 +49,6 @@ namespace Modbus
 
                 // get the group config string
                 string dbGroupDefinition = requestGroup.DBGroupRequestConfig.DataPointBlockRequestListVals;
-
 
                 string[] requests = dbGroupDefinition.Split('$');
 
@@ -80,7 +79,6 @@ namespace Modbus
                         string[] tags = request.Split('|');
                         string[] header = tags[0].Split(':');
 
-
                         string[] headerElement0 = header[0].Split('^');
                         {
                             if (headerElement0.Length > 1)
@@ -89,7 +87,6 @@ namespace Modbus
                                 deviceSettings = ((DBManager)Globals.DBManager).GetDevice(deviceRef);
                             }
                         }
-
 
                         slave = ushort.Parse(headerElement0[0]);
                         string opCodeString = header[1];
@@ -108,18 +105,15 @@ namespace Modbus
 
                         if (maxDataSize > 245 || maxDataSize < 20)
                         {
-
                             Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "Protocol", "Modbus", "Request group " + requestGroup.ID + " maximum data size " + maxDataSize + " is invalid (must be between 20 and 245 bytes). Using max data size of 245 bytes");
                             maxDataSize = 256;
                         }
-
-                      
 
                         string[] tagInfo;
 
                         // for INT8s and UINT8s
                         Guid lowByteTagID;
-                        Guid highByteTagID; 
+                        Guid highByteTagID;
 
                         for (int i = 1; i < tags.Length; i++) // start at 1 (index 0 is the header)
                         {
@@ -153,14 +147,11 @@ namespace Modbus
                                 if (!swapBytes && !swapWords)
                                     break;
                             }
-                            
 
                             //*************************************************************************************************************
 
-
-
                             if (dataTypeName.StartsWith("MT"))
-                            {                               
+                            {
                                 if (dataTypeName.EndsWith("16"))
                                 {
                                     tagList.Add(new Tag(Guid.Empty) { ProtocolDataType = DataType.INT16 });
@@ -175,9 +166,9 @@ namespace Modbus
                                     }
                                     else
                                         if (dataTypeName.EndsWith("1"))
-                                        {
-                                            tagList.Add(new Tag(Guid.Empty) { ProtocolDataType = DataType.BIN });
-                                        }
+                                    {
+                                        tagList.Add(new Tag(Guid.Empty) { ProtocolDataType = DataType.BIN });
+                                    }
                                     else
                                         throw new Exception("'" + dataTypeName + "' is not a valid MT length, use MT16 or MT32");
                                 }
@@ -198,7 +189,7 @@ namespace Modbus
 
                                     if (highByteTagID != Guid.Empty)
                                     {
-                                        newTag = new Tag(highByteTagID) {ProtocolDataType = DataType.GetType(dataTypeName) };
+                                        newTag = new Tag(highByteTagID) { ProtocolDataType = DataType.GetType(dataTypeName) };
                                         tagConfigsList.Add(requestGroup.TagsRef[highByteTagID]);
                                     }
                                     else
@@ -207,7 +198,6 @@ namespace Modbus
                                         tagConfigsList.Add(new FDADataPointDefinitionStructure()); // dummy tag config, to keep the tag and tagConfig arrays aligned
                                     }
                                     tagList.Add(newTag);
-
 
                                     if (lowByteTagID != Guid.Empty)
                                     {
@@ -221,7 +211,7 @@ namespace Modbus
                                     }
 
                                     tagList.Add(newTag);
-                                    byteCount += 2; // whether we use one byte or the other or both, it's always two bytes of data (1 register)                                    
+                                    byteCount += 2; // whether we use one byte or the other or both, it's always two bytes of data (1 register)
                                 }
                                 else
                                 {
@@ -232,7 +222,7 @@ namespace Modbus
                                             tagID = Guid.Empty;
                                             if (tagInfo[j] != "0")
                                                 tagID = Guid.Parse(tagInfo[j]);
-                                            
+
                                             if (tagID == Guid.Empty)
                                             {
                                                 tagList.Add(new Tag(Guid.Empty) { ProtocolDataType = DataType.BIN });
@@ -245,13 +235,12 @@ namespace Modbus
                                                 tagConfigsList.Add(requestGroup.TagsRef[tagID]);
                                             }
                                         }
-
                                     }
                                     else
                                     {
                                         tagID = Guid.Parse(tagInfo[1]);
                                         tagConfigsList.Add(requestGroup.TagsRef[tagID]);
-                                        newTag = new Tag(tagID) {ProtocolDataType = DataType.GetType(dataTypeName)};
+                                        newTag = new Tag(tagID) { ProtocolDataType = DataType.GetType(dataTypeName) };
 
                                         // new stuff *****************
                                         // set the swap byte/swap word flags if they were specified AND if the make sense for the data type (eg. can't swap words if the data type is less than 2 words)
@@ -263,10 +252,9 @@ namespace Modbus
                                         tagList.Add(newTag);
                                         byteCount += DataType.GetType(dataTypeName).Size; // note, for coils (opcodes 1,2,5,15) this value will be overridden below
                                     }
-                                }                               
+                                }
                             }
                         }
-
 
                         if (opCode == 3 || opCode == 4 || opCode == 6 || opCode == 16)
                             numRegisters = (ushort)(byteCount / 2);
@@ -289,12 +277,11 @@ namespace Modbus
                         continue;
                     }
 
-                  
                     if ((opCode >= 1 && opCode <= 4) || opCode == 7)
-                        subRequestList = GenerateReadRequest(opCode, slave, startReg,requestIdx, tcp, enron,maxDataSize, tagConfigsList,tagList,DataRequest.RequestType.Read);
+                        subRequestList = GenerateReadRequest(opCode, slave, startReg, requestIdx, tcp, enron, maxDataSize, tagConfigsList, tagList, DataRequest.RequestType.Read);
 
                     if (opCode == 5 || opCode == 6 || opCode == 16 || opCode == 15)
-                         subRequestList = GenerateWriteRequest(opCode, slave, startReg, tagConfigsList, tagList, maxDataSize, requestIdx, tcp, enron, requestGroup.writeLookup,requestGroup.ID);
+                        subRequestList = GenerateWriteRequest(opCode, slave, startReg, tagConfigsList, tagList, maxDataSize, requestIdx, tcp, enron, requestGroup.writeLookup, requestGroup.ID);
 
                     if (subRequestList != null)
                     {
@@ -312,7 +299,7 @@ namespace Modbus
                         byte readbackOpCode = 3;
                         if (opCode == 5 || opCode == 15)
                             readbackOpCode = 1;
-                        readbackSubRequestList = GenerateReadRequest(readbackOpCode, slave, startReg,requestIdx+1,tcp,enron,maxDataSize, tagConfigsList, tagList,DataRequest.RequestType.ReadbackAfterWrite);
+                        readbackSubRequestList = GenerateReadRequest(readbackOpCode, slave, startReg, requestIdx + 1, tcp, enron, maxDataSize, tagConfigsList, tagList, DataRequest.RequestType.ReadbackAfterWrite);
 
                         foreach (DataRequest readbackSubRequest in readbackSubRequestList)
                         {
@@ -336,19 +323,14 @@ namespace Modbus
             }
         }
 
- 
-
         // Validate Response takes a completed request and looks at the response bytes to determine if the response is valid
         // it sets the result by calling request.SetStatus() and can put any error messages in request.ErrorMessage
         // it can optionally provide a datarequest to be sent to the device that corrects an error indicated in the response, by creating a Request object for the error correction and placing it in the ErrorCorrectionRequestProperty (also set ErrorCorrectionAttempted=true)
         // if the response is valid, it should then pass the request on to InterpretResponse()
         public static void ValidateResponse(DataRequest request)
         {
- 
-
             byte[] response = request.ResponseBytes;
             bool tcp = (request.Protocol == "MODBUSTCP");
-
 
             if (request.ActualResponseSize != request.ExpectedResponseSize)
             {
@@ -358,17 +340,14 @@ namespace Modbus
                     // check if the response starts with a valid message, but has trailing garbage
                     byte[] initialResponseBytes = request.ResponseBytes.Take(request.ExpectedResponseSize).ToArray();
 
-
-                    if (CRCCheck(initialResponseBytes,tcp) && RespondingDeviceCheck(request.RequestBytes, initialResponseBytes,tcp))
+                    if (CRCCheck(initialResponseBytes, tcp) && RespondingDeviceCheck(request.RequestBytes, initialResponseBytes, tcp))
                     {
                         // it's from the right device, and passes the CRC check, so it looks like a good message. replace the oversized message with these bytes and continue
                         response = initialResponseBytes;
                         Globals.SystemManager.LogCommsEvent(request.ConnectionID, Globals.FDANow(), "MODBUSProtocol: The first " + request.ExpectedResponseSize + " bytes of an unexpectedly long response form a valid message.Using this as the device response and ignoring the remaining bytes");
                         valid = true;
                     }
-
                 }
-
 
                 if (!valid)
                 {
@@ -378,7 +357,6 @@ namespace Modbus
                 }
             }
 
-
             if (response.Length > 255)
             {
                 request.SetStatus(DataRequest.RequestStatus.Error);
@@ -386,10 +364,10 @@ namespace Modbus
             }
 
             // check CRC
- 
+
             if (response.Length >= 2)
             {
-                if (!CRCCheck(response,tcp))
+                if (!CRCCheck(response, tcp))
                 {
                     request.ErrorMessage = "CRC check failed";
                     request.SetStatus(DataRequest.RequestStatus.Error);
@@ -397,25 +375,21 @@ namespace Modbus
                 }
             }
 
-
             // maybe move modbus error response checking to here, instead of in InterpretResponse()?
 
-
             // check that response is from the correct device
-            if (!RespondingDeviceCheck(request.RequestBytes,response,tcp))
+            if (!RespondingDeviceCheck(request.RequestBytes, response, tcp))
             {
                 request.SetStatus(DataRequest.RequestStatus.Error);
                 request.ErrorMessage = "Response from unexpected device";
                 return;
             }
-                   
+
             request.ErrorMessage = "";
-            request.SetStatus(DataRequest.RequestStatus.Success);  
+            request.SetStatus(DataRequest.RequestStatus.Success);
             InterpretResponse(request);
             return;
         }
-
-
 
         public static void CancelDeviceRequests(DataRequest failedReq)
         {
@@ -434,15 +408,14 @@ namespace Modbus
             {
                 if (failedReq.ParentGroup.Protocol == "MODBUSTCP")
                     addressByte = 6;
-                
-                ushort thisReqDeviceAddr; 
+
+                ushort thisReqDeviceAddr;
 
                 foreach (DataRequest req in failedReq.ParentGroup.ProtocolRequestList)
                 {
-                   
                     if (req.RequestBytes.Length < 1 || (req.Protocol == "MODBUSTCP" && req.RequestBytes.Length < 7))
                         continue;
-                    
+
                     thisReqDeviceAddr = req.RequestBytes[addressByte];
                     if (thisReqDeviceAddr == 0xFF)
                         thisReqDeviceAddr = BitConverter.ToUInt16(req.RequestBytes, addressByte);
@@ -455,10 +428,9 @@ namespace Modbus
             }
         }
 
-
-        // Interpret Response takes the Response Bytes from a request, calculates the typed values, 
+        // Interpret Response takes the Response Bytes from a request, calculates the typed values,
         // and puts them with their read timestamps in the request object's ReturnValues list (a list of Tag objects)
-        // also checks for and interprets any error codes in the returned message 
+        // also checks for and interprets any error codes in the returned message
         public static void InterpretResponse(DataRequest request)
         {
             try
@@ -483,13 +455,10 @@ namespace Modbus
                 }
                 else
                     if (response[0] > 254)
-                    {
-                        opCodeByte += 2;
-                        dataBlockIdx += 2;
-                    }
-
-               
-
+                {
+                    opCodeByte += 2;
+                    dataBlockIdx += 2;
+                }
 
                 // check for modbus errors
                 if ((response[opCodeByte] & 0x80) == 0x80)
@@ -509,7 +478,6 @@ namespace Modbus
                     return;
                 }
 
-
                 // extract the data portion of the message
                 ushort numDataBytes = response[dataBlockIdx];
 
@@ -518,11 +486,11 @@ namespace Modbus
                     numDataBytes = 1;
 
                 Byte[] data = new byte[numDataBytes];
-               
+
                 if (response[opCodeByte] != 0x07)
                     Array.Copy(response, dataBlockIdx + 1, data, 0, numDataBytes);
                 else
-                    data[0] = response[dataBlockIdx];        
+                    data[0] = response[dataBlockIdx];
 
                 int byteIndex = 0;
                 int tagIndex = 0;
@@ -535,7 +503,6 @@ namespace Modbus
 
                 if (response[opCodeByte] == 1 || response[opCodeByte] == 2)
                     bitData = new List<byte>();
-
 
                 while (byteIndex < data.Length)
                 {
@@ -573,8 +540,8 @@ namespace Modbus
                             valueBytes = IntHelpers.SwapWords(valueBytes);
 
                         value = MBDatatype.FromBytes(valueBytes);
-                        value = Convert.ChangeType(value, hostDataType); 
-                        
+                        value = Convert.ChangeType(value, hostDataType);
+
                         /* Scaling now handled by DataAcq in TransactionCompleteHandler()
                         FDADataPointDefinitionStructure config = request.DataPointConfig[tagIndex];
 
@@ -611,7 +578,7 @@ namespace Modbus
                             thisTag.Timestamp = request.ResponseTimestamp;
                             thisTag.Quality = 192; // for now (need to figure out how I'm supposed to calculate the Quality)
                         }
-                     }
+                    }
 
                     // increment the byte index (add the number of bytes for one value)
                     byteIndex += dataSize;
@@ -633,7 +600,6 @@ namespace Modbus
             {
                 error = "The group '" + groupID + "', requested by " + requestor + ": " + error + ". This request group will not be processed";
                 Globals.SystemManager.LogApplicationEvent(obj, "", error, true);
-
             }
             else
             {
@@ -643,10 +609,9 @@ namespace Modbus
             }
         }
 
-        public static string[] ValidateRequestString(string request, Dictionary<Guid, FDADataPointDefinitionStructure> tags,ref HashSet<Guid> referencedTags)
+        public static string[] ValidateRequestString(string request, Dictionary<Guid, FDADataPointDefinitionStructure> tags, ref HashSet<Guid> referencedTags)
         {
             validationErrors = new List<string>();
-
 
             // will have to work on the ValidateRequestString function to detect null DataAcq and return a string[] with error data instead of logging to the console and the DB
             ValidateRequestString(validationErrors, "", "DBValidator", request, tags, referencedTags);
@@ -656,7 +621,7 @@ namespace Modbus
 
         // obj is a reference to the DataAcqManager if the requestor is the FDA
         // obj is a reference to the string[] error list if the requestor is the Database Validator tool
-        public static bool ValidateRequestString(object obj, string groupID, string requestor, string request, Dictionary<Guid, FDADataPointDefinitionStructure> pointDefs,HashSet<Guid> referencedTags = null)
+        public static bool ValidateRequestString(object obj, string groupID, string requestor, string request, Dictionary<Guid, FDADataPointDefinitionStructure> pointDefs, HashSet<Guid> referencedTags = null)
         {
             validationErrors = new List<string>();
             bool valid = true;
@@ -673,11 +638,10 @@ namespace Modbus
             // the header has the correct number of elements
             string[] header = headerAndTagList[0].Split(':');
 
-
-            if (header.Length < 3) // header can be 3 or 4 (with the optional max data size paramenter). 
+            if (header.Length < 3) // header can be 3 or 4 (with the optional max data size paramenter).
             {
                 //Globals.SystemManager.LogApplicationEvent(obj, "", "The group '" + groupID + "', reqested by " + requestor + " contains an request with an invalid header (should be 'SlaveAddress:OpCode:MaxDataSize[optional])'. This request group will not be processed",true);
-                RecordValidationError(obj,groupID,requestor,"contains a request with an invalid header (should be 'SlaveAddress:OpCode:MaxDataSize[optional])'");
+                RecordValidationError(obj, groupID, requestor, "contains a request with an invalid header (should be 'SlaveAddress:OpCode:MaxDataSize[optional])'");
                 valid = false;
             }
             else
@@ -709,8 +673,8 @@ namespace Modbus
                 // header element 0 (minus the device reference, if it was present) is numeric
                 if (!int.TryParse(headerElement0[0], out _))
                 {
-                   // Globals.SystemManager.LogApplicationEvent(obj, "", "The group " + groupID + ", reqested by " + requestor + " contains an request with an invalid element in the header (SlaveAddress '" + header[0] + "' is not a number). This request group will not be processed",true);
-                   RecordValidationError(obj,groupID,requestor,"contains a request with an invalid element in the header (SlaveAddress '" + header[0] + "' is not a number)");
+                    // Globals.SystemManager.LogApplicationEvent(obj, "", "The group " + groupID + ", reqested by " + requestor + " contains an request with an invalid element in the header (SlaveAddress '" + header[0] + "' is not a number). This request group will not be processed",true);
+                    RecordValidationError(obj, groupID, requestor, "contains a request with an invalid element in the header (SlaveAddress '" + header[0] + "' is not a number)");
                     valid = false;
                 }
 
@@ -720,7 +684,7 @@ namespace Modbus
                 if (!int.TryParse(opCodewithNoPlus, out _))
                 {
                     //Globals.SystemManager.LogApplicationEvent(obj, "", "The group " + groupID + ", reqested by " + requestor + " contains an request with an invalid element in the header (Opcode '" + header[1] + "' is not a number). This request group will not be processed",true);
-                    RecordValidationError(obj,groupID,requestor,"contains a request with an invalid element in the header (Opcode '" + header[1] + "' is not a number)");
+                    RecordValidationError(obj, groupID, requestor, "contains a request with an invalid element in the header (Opcode '" + header[1] + "' is not a number)");
                     valid = false;
                     opCodeIsNumeric = false;
                 }
@@ -728,7 +692,7 @@ namespace Modbus
                 if (!int.TryParse(header[2], out _))
                 {
                     //Globals.SystemManager.LogApplicationEvent(obj, "", "The group " + groupID + ", reqested by " + requestor + " contains an request with an invalid element in the header (StartingRegister '" + header[2] + "' is not a number). This request group will not be processed",true);
-                   RecordValidationError(obj,groupID,requestor,"contains an request with an invalid element in the header (StartingRegister '" + header[2] + "' is not a number)");
+                    RecordValidationError(obj, groupID, requestor, "contains an request with an invalid element in the header (StartingRegister '" + header[2] + "' is not a number)");
                     valid = false;
                 }
 
@@ -737,7 +701,7 @@ namespace Modbus
                     if (!int.TryParse(header[3], out _))
                     {
                         //Globals.SystemManager.LogApplicationEvent(obj, "", "The group " + groupID + ", reqested by " + requestor + " contains an request with an invalid element in the header (MaxDataSize '" + header[3] + "' is not a number). This request group will not be processed",true);
-                        RecordValidationError(obj,groupID,requestor,"contains an request with an invalid element in the header (MaxDataSize '" + header[3] + "' is not a number)");
+                        RecordValidationError(obj, groupID, requestor, "contains an request with an invalid element in the header (MaxDataSize '" + header[3] + "' is not a number)");
 
                         valid = false;
                     }
@@ -747,10 +711,10 @@ namespace Modbus
                 if (opCodeIsNumeric)
                 {
                     int n = int.Parse(opCodewithNoPlus);
-                    if ( n < 1 || (n > 7 && n!=15 && n!= 16))
+                    if (n < 1 || (n > 7 && n != 15 && n != 16))
                     {
                         //Globals.SystemManager.LogApplicationEvent(obj, "", "The group " + groupID + ", reqested by " + requestor + " contains an request with an invalid element in the header (Opcode '" + header[1] + "' is not supported). This request group will not be processed",true);
-                        RecordValidationError(obj,groupID,requestor,"contains an request with an invalid element in the header (Opcode '" + header[1] + "' is not supported)");
+                        RecordValidationError(obj, groupID, requestor, "contains an request with an invalid element in the header (Opcode '" + header[1] + "' is not supported)");
                         valid = false;
                     }
                 }
@@ -766,16 +730,16 @@ namespace Modbus
                     if (tagInfo[0] != "MT16" && tagInfo[0] != "MT32" && tagInfo[0] != "MT1")
                     {
                         //Globals.SystemManager.LogApplicationEvent(obj, "", "The group " + groupID + ", reqested by " + requestor + " contains an request with invalid tag information, should be 'DataType:DataPointID' or 'MT16' or 'MT32'. This request group will not be processed",true);
-                        RecordValidationError(obj,groupID,requestor, "contains an request with invalid tag information, should be 'DataType:DataPointID' or 'MT16/MT32/MT1'");
+                        RecordValidationError(obj, groupID, requestor, "contains an request with invalid tag information, should be 'DataType:DataPointID' or 'MT16/MT32/MT1'");
                         valid = false;
                     }
                 }
-                  
+
                 // element 0 is a valid data type
                 if (!DataType.IsValidType(tagInfo[0].ToUpper()))
                 {
                     //Globals.SystemManager.LogApplicationEvent(obj, "", "The group " + groupID + ", reqested by " + requestor + " contains an request with invalid tag information (the data type '" + tagInfo[0] + "' is not recognized). This request group will not be processed",true);
-                    RecordValidationError(obj,groupID,requestor, "contains an request with invalid tag information (the data type '" + tagInfo[0] + "' is not recognized)");
+                    RecordValidationError(obj, groupID, requestor, "contains an request with invalid tag information (the data type '" + tagInfo[0] + "' is not recognized)");
                     valid = false;
                 }
 
@@ -785,7 +749,7 @@ namespace Modbus
                     if (!ValidationHelpers.IsValidGuid(tagInfo[1]))
                     {
                         //Globals.SystemManager.LogApplicationEvent(obj, "", "The group " + groupID + ", reqested by " + requestor + " contains an request with invalid tag information (the tag ID '" + tagInfo[1] + "' is not a valid UID, should be in the format xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx). This request group will not be processed",true);
-                        RecordValidationError(obj,groupID,requestor,"contains an request with invalid tag information (the tag ID '" + tagInfo[1] + "' is not a valid UID, should be in the format xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)");
+                        RecordValidationError(obj, groupID, requestor, "contains an request with invalid tag information (the tag ID '" + tagInfo[1] + "' is not a valid UID, should be in the format xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)");
                         valid = false;
                     }
                     else  // element 1 references an existing tag
@@ -797,7 +761,7 @@ namespace Modbus
                             valid = false;
                         }
                         else
-                        {                
+                        {
                             referencedTags?.Add(Guid.Parse(tagInfo[1]));
                             FDADataPointDefinitionStructure tag = pointDefs[Guid.Parse(tagInfo[1])];
                             string tagDPSType = tag.DPSType.ToUpper();
@@ -808,18 +772,17 @@ namespace Modbus
 
                             if (!tag.DPDSEnabled)
                             {
-                                RecordValidationError(obj, groupID, requestor, "contains a reference to a disabled tag '" + tagInfo[1],true);
+                                RecordValidationError(obj, groupID, requestor, "contains a reference to a disabled tag '" + tagInfo[1], true);
                             }
-
                         }
                     }
-                }             
+                }
             }
 
             return valid;
         }
 
-        #endregion
+        #endregion Interface Functions
 
         private static void InsertMBAPHeader(List<byte> bytes)
         {
@@ -837,7 +800,7 @@ namespace Modbus
             bytes.Add(0);
         }
 
-        private static void InsertSlaveAddress(List<byte> bytes,ushort slave)
+        private static void InsertSlaveAddress(List<byte> bytes, ushort slave)
         {
             // CMS Extended Addressing for addresses > 254
             if (slave > 254)
@@ -851,6 +814,7 @@ namespace Modbus
                 bytes.Add(IntHelpers.GetLowByte(slave));
             }
         }
+
         private static bool RespondingDeviceCheck(byte[] request, byte[] response, bool tcp)
         {
             int requestedDevice;
@@ -889,24 +853,23 @@ namespace Modbus
 
             ushort responseCRC = IntHelpers.ToUInt16(data[data.Length - 2], data[data.Length - 1]);
 
-            byte[] msgBytes = new byte[data.Length-2];
-            Array.Copy(data,0,msgBytes, 0, data.Length-2);
+            byte[] msgBytes = new byte[data.Length - 2];
+            Array.Copy(data, 0, msgBytes, 0, data.Length - 2);
 
             ushort calcdCRC = CRCHelpers.CalcCRC16(msgBytes, CRCInitial, CRCPoly, CRCSwapOutputBytes);
 
             return (responseCRC == calcdCRC);
         }
 
-
         // generate a read request (Opcodes 1,2,3,4,7)
         //       private static List<DataRequest> GenerateReadRequest(string reqID, byte group, byte unit,byte hostGroup,byte hostUnit, TLP[] TLPs,List<FDADataPointDefinitionStructure> tagsconfigList,List<Tag> tagList,int groupIdx, int maxDataSize, DataRequest.RequestType requestType)
 
-        private static List<DataRequest> GenerateReadRequest(byte opCode, ushort slave, ushort startRegister, int groupIndex, bool tcp,bool enron, int maxDataSize, List<FDADataPointDefinitionStructure> tagconfigs, List<Tag> tagList, DataRequest.RequestType requestType)
+        private static List<DataRequest> GenerateReadRequest(byte opCode, ushort slave, ushort startRegister, int groupIndex, bool tcp, bool enron, int maxDataSize, List<FDADataPointDefinitionStructure> tagconfigs, List<Tag> tagList, DataRequest.RequestType requestType)
         {
             List<DataRequest> subRequestList = new();
             List<byte> requestBytes = new();
             List<Tag> subRequestTagList = new();
-            List <FDADataPointDefinitionStructure> subRequestTagConfigList = new();
+            List<FDADataPointDefinitionStructure> subRequestTagConfigList = new();
             try
             {
                 // special case opcode 7 - this will never be oversized, so let's just get that out of the way
@@ -957,8 +920,6 @@ namespace Modbus
 
                     return subRequestList;
                 }
-
-
 
                 // find the max number of bytes we can read while keeping the response under the message size limit
                 byte responseOverhead = 5;
@@ -1055,7 +1016,6 @@ namespace Modbus
                         requestBytes[5] = IntHelpers.GetLowByte(msgLength);
                     }
 
-
                     // protocol name for the request object
                     string protocolName = "MODBUS";
 
@@ -1068,7 +1028,6 @@ namespace Modbus
                     {
                         protocolName = "MODBUSTCP";
                     }
-
 
                     string groupIdx;
                     if (subRequestList.Count > 1)
@@ -1124,7 +1083,6 @@ namespace Modbus
             return null;
         }
 
-
         public static void IdentifyWrites(RequestGroup requestGroup)
         {
             string[] request;
@@ -1139,23 +1097,21 @@ namespace Modbus
                 OpcodeStr = header[1];
                 OpcodeStr = OpcodeStr.Replace("+", "");
 
-                
-                if (OpcodeStr=="5" || OpcodeStr=="6" || OpcodeStr =="15" || OpcodeStr== "16")
-                {                     
+                if (OpcodeStr == "5" || OpcodeStr == "6" || OpcodeStr == "15" || OpcodeStr == "16")
+                {
                     if (requestGroup.writeLookup == null)
                     {
                         requestGroup.writeLookup = new Dictionary<Guid, double>();
                     }
 
                     lock (requestGroup.writeLookup)
-                    { 
+                    {
                         // we need to identify the tags that are being written so the values to be written can be looked up from the database
                         for (int tagidx = 1; tagidx < request.Length; tagidx++)
                         {
                             taginfo = request[tagidx].Split(':');
                             if (!taginfo[0].Contains("MT"))
                                 requestGroup.writeLookup.Add(Guid.Parse(taginfo[1]), double.NaN);
-
                         }
                     }
                 }
@@ -1176,14 +1132,12 @@ namespace Modbus
                 return requestString;
             string tag;
 
-
             StringBuilder sb = new();
 
             string[] tagdetails;
             bool MTMode = true;
             for (int tagIdx = 1; tagIdx < parsed.Length; tagIdx++)
             {
-
                 tag = parsed[tagIdx];
                 tagdetails = tag.Split(':');
 
@@ -1207,7 +1161,7 @@ namespace Modbus
                 }
                 else
                 {
-                    MTMode = true;         // MT tag, skip it         
+                    MTMode = true;         // MT tag, skip it
                 }
                 register += 1;
             }
@@ -1215,7 +1169,7 @@ namespace Modbus
             return sb.ToString();
         }
 
-        private static List<DataRequest> GenerateWriteRequest(byte opCode, ushort slave, ushort startReg, List<FDADataPointDefinitionStructure> TagsConfigList, List<Tag> tagsList, int maxDataBlockSize, int groupIdx, bool tcp, bool enron, Dictionary<Guid, double> valuesToWrite,Guid groupID)
+        private static List<DataRequest> GenerateWriteRequest(byte opCode, ushort slave, ushort startReg, List<FDADataPointDefinitionStructure> TagsConfigList, List<Tag> tagsList, int maxDataBlockSize, int groupIdx, bool tcp, bool enron, Dictionary<Guid, double> valuesToWrite, Guid groupID)
         {
             try
             {
@@ -1243,7 +1197,7 @@ namespace Modbus
                     List<byte> requestBytes = new();
                     dataBytecount = 0;
 
-                    // build the message header                             
+                    // build the message header
                     if (tcp)
                         InsertMBAPHeader(requestBytes);
 
@@ -1283,7 +1237,6 @@ namespace Modbus
                     else
                         groupIdxstring = groupIdx.ToString();
 
-
                     // build a datarequest object
                     DataRequest subRequest = new()
                     {
@@ -1301,7 +1254,6 @@ namespace Modbus
                     adjStartReg = registerIdx;
                 }
 
-
                 foreach (DataRequest writeRequest in subRequestList)
                 {
                     // bring in the previously generated header bytes
@@ -1312,7 +1264,6 @@ namespace Modbus
                     enron = (writeRequest.Protocol == "ENRONMODBUS");
 
                     startReg = (ushort)writeRequest.ProtocolSpecificParams;
-
 
                     object value;
                     Tag thisTag;
@@ -1379,10 +1330,10 @@ namespace Modbus
                                 if (thisTag.SwapWords)
                                     valueBytes = IntHelpers.SwapWords(valueBytes);
 
-
                                 requestBytes.AddRange(valueBytes);
                             }
                             break;
+
                         case 5: // (function code 5 - write single coil)
                             thisTag = writeRequest.TagList[0];
                             requestBytes.Add(IntHelpers.GetHighByte(startReg));
@@ -1399,9 +1350,9 @@ namespace Modbus
                             }
                             catch
                             {
-
                             }
                             break;
+
                         case 15: // (function code 15 - write multiple coils)
                             dataBytes = new List<byte>(); // using byte to store 1's and 0's, boolean evaluates to 0 and -1
 
@@ -1443,7 +1394,7 @@ namespace Modbus
                                 bitIdx++;
                             }
 
-                            // add the last byte to the datablock                    
+                            // add the last byte to the datablock
                             dataBytes.Add(currentByte);
 
                             // add the byte count to the message
@@ -1452,10 +1403,10 @@ namespace Modbus
                             // add the data bytes to the message
                             requestBytes.AddRange(dataBytes);
                             break;
+
                         default:
                             Globals.SystemManager.LogApplicationEvent(Globals.FDANow(), "Modbus Protocol", "", "unsupported Opcode " + requestBytes.Last() + " in request " + writeRequest.GroupIdxNumber + " of group " + writeRequest.GroupID);
                             return null;
-
                     }
 
                     // add CRC if not using modbus tcp
@@ -1476,8 +1427,6 @@ namespace Modbus
 
                     writeRequest.RequestBytes = requestBytes.ToArray();
 
-
-
                     if (tcp)
                         writeRequest.ExpectedResponseSize = 12;
                     else
@@ -1487,8 +1436,6 @@ namespace Modbus
                         else
                             writeRequest.ExpectedResponseSize = writeRequest.RequestBytes.Length;
                     }
-                        
-                   
                 }
 
                 return subRequestList;
@@ -1498,18 +1445,16 @@ namespace Modbus
                 Globals.SystemManager.LogApplicationError(Globals.FDANow(), ex, "Error occurred while generating a write request: Group " + groupID + ", request " + groupIdx);
                 return null;
             }
-
-            
         }
-
- 
 
         public sealed class DataType : DataTypeBase
         {
             public static readonly DataType BIN = new("BIN", 1, typeof(byte));
             public static readonly DataType FL = new("FL", 4, typeof(float));
+
             //public static readonly DataType AC = new DataType("AC",???, typeof(string)); // doesn't have a fixed size....
             public static readonly DataType INT8 = new("INT8", 1, typeof(sbyte));
+
             public static readonly DataType INT16 = new("INT16", 2, typeof(Int16));
             public static readonly DataType INT32 = new("INT32", 4, typeof(Int32));
             public static readonly DataType UINT8 = new("UINT8", 1, typeof(byte));
@@ -1553,8 +1498,6 @@ namespace Modbus
                     bytes = BitConverter.GetBytes(Convert.ToSByte(IntHelpers.GetLowByte((ushort)value)));
                 }
 
-        
-
                 if (this == INT16)
                 {
                     bytes = BitConverter.GetBytes(Convert.ToInt16(value));
@@ -1571,11 +1514,8 @@ namespace Modbus
 
                 if (this == UINT8)
                 {
-                    
                     bytes = new byte[1] { Convert.ToByte(value) };
                 }
-
-   
 
                 if (this == UINT16)
                 {
@@ -1590,8 +1530,6 @@ namespace Modbus
                     if (BitConverter.IsLittleEndian)
                         Array.Reverse(bytes);
                 }
-
-
 
                 // 16 bit unpacked BCD
                 if (this.Name == "BCD16")
@@ -1612,7 +1550,7 @@ namespace Modbus
                     long intValue = Convert.ToUInt32(value);
                     bytes = new byte[4];
 
-                    for (int i = 3; i>=0 ;i--)
+                    for (int i = 3; i >= 0; i--)
                     {
                         bytes[i] = (byte)(intValue % 10);
                         intValue /= 10;
@@ -1627,15 +1565,14 @@ namespace Modbus
 
                     // get the individual numerals
                     byte[] numerals = new byte[4];
-                    for (int i=3; i>=0; i--)
+                    for (int i = 3; i >= 0; i--)
                     {
                         numerals[i] = (byte)(intValue % 10);
                         intValue /= 10;
                     }
 
-                    bytes[0] = (byte)( (numerals[0] << 4) | numerals[1]);
-                    bytes[1] = (byte)( (numerals[2] << 4) | numerals[3]);
-
+                    bytes[0] = (byte)((numerals[0] << 4) | numerals[1]);
+                    bytes[1] = (byte)((numerals[2] << 4) | numerals[3]);
                 }
 
                 // 32 bit packed BCD
@@ -1666,7 +1603,6 @@ namespace Modbus
                 //if (bytes.Length != this.Size && this.Size != 0)
                 //    return null;
 
-
                 if (this == BIN)
                 {
                     return (byte)bytes[0];
@@ -1679,33 +1615,30 @@ namespace Modbus
                     return BitConverter.ToSingle(reordered, 0);
                 }
 
- 
-                if (this.Name == "INT8") 
-                {                                   
+                if (this.Name == "INT8")
+                {
                     return (SByte)bytes[0];
                 }
 
- 
-                
                 // interpret 2 bytes as a signed integer
                 if (this.Name == "INT16")
                 {
                     Byte highByte = bytes[0];
                     Byte lowByte = bytes[1];
-                    Int16 value = (Int16)((highByte << 8) | lowByte); 
-   
+                    Int16 value = (Int16)((highByte << 8) | lowByte);
+
                     return value;
                 }
 
                 if (this.Name == "INT32")
                 {
-                    // highest byte A,B,C,D lowest byte  
+                    // highest byte A,B,C,D lowest byte
                     Byte A = bytes[0];
                     Byte B = bytes[1];
                     Byte C = bytes[2];
                     Byte D = bytes[3];
 
-                    Int32 value = (Int32)((A<<24)|(B<<16)|(C<<8)|D);
+                    Int32 value = (Int32)((A << 24) | (B << 16) | (C << 8) | D);
 
                     return value;
                 }
@@ -1716,7 +1649,6 @@ namespace Modbus
                     return (byte)bytes[0];
                 }
 
-       
                 if (this.Name == "UINT16")
                 {
                     Byte highByte = bytes[0];
@@ -1726,7 +1658,6 @@ namespace Modbus
 
                     return value;
                 }
-
 
                 if (this.Name == "UINT32")
                 {
@@ -1739,7 +1670,6 @@ namespace Modbus
 
                     return value;
                 }
-
 
                 // 16 bit unpacked BCD
                 if (this.Name == "BCD16")
@@ -1762,7 +1692,6 @@ namespace Modbus
                 // 16 bit packed BCD
                 if (this.Name == "BCDP16")
                 {
-                    
                     byte[] numerals = new byte[4];
 
                     numerals[0] = IntHelpers.GetHighNibble(bytes[0]);
@@ -1777,7 +1706,6 @@ namespace Modbus
                 // 32 bit packed BCD
                 if (this.Name == "BCDP32")
                 {
-
                     byte[] numerals = new byte[8];
 
                     numerals[0] = IntHelpers.GetHighNibble(bytes[0]);
@@ -1792,10 +1720,8 @@ namespace Modbus
                     numerals[6] = IntHelpers.GetHighNibble(bytes[3]);
                     numerals[7] = IntHelpers.GetLowNibble(bytes[3]);
 
-                    return (UInt32)(numerals[0] * 10000000 + numerals[1] * 1000000 + numerals[2] * 100000 + numerals[3] * 10000 + numerals[4]*1000 + numerals[5]*100 + numerals[6]*10 + numerals[7]);
+                    return (UInt32)(numerals[0] * 10000000 + numerals[1] * 1000000 + numerals[2] * 100000 + numerals[3] * 10000 + numerals[4] * 1000 + numerals[5] * 100 + numerals[6] * 10 + numerals[7]);
                 }
-
-
 
                 // interpert a variable number of byes as an ASCII string
                 /*
@@ -1805,14 +1731,12 @@ namespace Modbus
                 }
                 */
 
-
-            // shouldn't be possible to get here, but all paths must return a value so...return null
-            return null;
+                // shouldn't be possible to get here, but all paths must return a value so...return null
+                return null;
             }
 
             public static DataType GetType(string typeName)
             {
-
                 switch (typeName.ToUpper())
                 {
                     case "BIN": return BIN;
@@ -1865,10 +1789,10 @@ namespace Modbus
                 typeName = typeName.ToUpper();
 
                 if (typeName.EndsWith("SBSW") || typeName.EndsWith("SWSB"))
-                    typeName = typeName.Substring(0,typeName.Length - 4);
+                    typeName = typeName.Substring(0, typeName.Length - 4);
 
                 if (typeName.EndsWith("SB") || typeName.EndsWith("SW"))
-                    typeName = typeName.Substring(0,typeName.Length - 2);
+                    typeName = typeName.Substring(0, typeName.Length - 2);
 
                 switch (typeName.ToUpper())
                 {
@@ -1893,5 +1817,4 @@ namespace Modbus
             }
         }
     }
-
 }

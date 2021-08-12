@@ -1,22 +1,20 @@
-﻿using System;
+﻿using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.ComponentModel;
+using System.Diagnostics;
+using System.IO;
+using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
 using System.Security.Cryptography;
-using System.IO;
-using System.ComponentModel;
+using System.Text;
 using uPLibrary.Networking.M2Mqtt;
-using System.Runtime.CompilerServices;
-using Newtonsoft.Json;
-using System.Diagnostics;
 
 namespace Common
 {
-
-//disable warning about non-readonly static fields (that's the whole purpose of this class)
+    //disable warning about non-readonly static fields (that's the whole purpose of this class)
 #pragma warning disable CA2211
+
     public static class Globals
     {
         /* not .NET Core compatible
@@ -30,14 +28,14 @@ namespace Common
             public const long FILETIME_TO_DATETIMETICKS = 504911232000000000;   // 146097 = days in 400 year Gregorian calendar cycle. 504911232000000000 = 4 * 146097 * 86400 * 1E7
             public uint TimeLow;    // least significant digits
             public uint TimeHigh;   // most significant digits
-            public long TimeStamp_FileTimeTicks { get{return TimeHigh * 4294967296 + TimeLow; } }     // ticks since 1-Jan-1601 (1 tick = 100 nanosecs). 4294967296 = 2^32
-            public DateTime Timestamp {get{ return new DateTime(TimeStamp_FileTimeTicks + FILETIME_TO_DATETIMETICKS); } }
+            public long TimeStamp_FileTimeTicks { get { return TimeHigh * 4294967296 + TimeLow; } }     // ticks since 1-Jan-1601 (1 tick = 100 nanosecs). 4294967296 = 2^32
+            public DateTime Timestamp { get { return new DateTime(TimeStamp_FileTimeTicks + FILETIME_TO_DATETIMETICKS); } }
         }
 
         public enum ConnStatus { Disconnected, ConnectionRetry_Delay, Connected_Ready, Connecting, Connected_Delayed }
 
+        public readonly static List<string> SupportedProtocols = new(new string[] { "ROC", "MODBUS", "MODBUSTCP", "ENRONMODBUS", "BSAP", "BSAPUDP", "OPC" });
 
-        public readonly static List<string> SupportedProtocols = new(new string[] { "ROC", "MODBUS","MODBUSTCP","ENRONMODBUS","BSAP","BSAPUDP","OPC"});
         public static bool RunConsoleCommand(string command, string args, string workingDir = "")
         {
             try
@@ -60,7 +58,6 @@ namespace Common
                     StartInfo = processStartInfo
                 };
 
-
                 process.Start();
                 //string output = process.StandardOutput.ReadToEnd();
                 //string error = process.StandardError.ReadToEnd();
@@ -76,6 +73,7 @@ namespace Common
             //if (string.IsNullOrEmpty(error)) { return output; }
             //else { return error; }
         }
+
         public static DateTime FDANow()
         {
             /* not .NET Core Compatible
@@ -139,33 +137,30 @@ namespace Common
             private int _idleDisconnectTime;
             private string _description;
             private DateTime _lastCommsDT;
-           
 
-
-            public string ID {get { return _ID; } set { _ID = value; NotifyPropertyChanged(); } }
-            public bool ConnectionEnabled {get{ return _connEnabled; } set { _connEnabled = value; NotifyPropertyChanged(); } }
-            public bool CommunicationsEnabled {get{ return _commsEnabled; } set { _commsEnabled = value; NotifyPropertyChanged(); } }
-            public string ConnectionType { get{return _connectionType; } set { _connectionType = value; NotifyPropertyChanged(); } }
-            public long LastCommsTime { get{ return _lastComms; } set { _lastComms = value;  NotifyPropertyChanged(); } }
-            public int RequestRetryDelay { get{ return _requestRetryDelay; } set { _requestRetryDelay = value; NotifyPropertyChanged(); } }
-            public int SocketConnectionAttemptTimeout {get{ return _socketConnectionAttemptTimeout; } set { _socketConnectionAttemptTimeout = value; NotifyPropertyChanged(); } }
-            public int MaxSocketConnectionAttempts { get{ return _maxSocketConnectionAttempts; } set { _maxSocketConnectionAttempts = value; NotifyPropertyChanged(); } }
-            public int SocketConnectionRetryDelay { get{ return _socketConnectionRetryDelay; } set { _socketConnectionRetryDelay = value; NotifyPropertyChanged(); } }
-            public int PostConnectionCommsDelay { get{ return _postConnectionCommsDelay; } set { _postConnectionCommsDelay = value; NotifyPropertyChanged(); } }
-            public int InterRequestDelay {get{ return _interRequestDelay; } set { _interRequestDelay = value; NotifyPropertyChanged(); } }
-            public int MaxRequestAttempts{ get{ return _maxRequestAttempts; } set { _maxRequestAttempts = value; NotifyPropertyChanged(); } }
-            public int RequestResponseTimeout{ get{return _requestResponseTimeout; } set { _requestResponseTimeout = value; NotifyPropertyChanged(); } }
-            public String ConnectionStatus { get{ return _connectionStatus; } set { _connectionStatus = value; NotifyPropertyChanged(); } }
-            public bool IdleDisconnect {get {return _idleDisconnect; } set { _idleDisconnect = value; NotifyPropertyChanged(); } }
-            public int IdleDisconnectTime { get{ return _idleDisconnectTime; } set { _idleDisconnectTime = value; NotifyPropertyChanged(); } }
-            public string Description {get {return _description; } set { _description = value; NotifyPropertyChanged(); } }
-            public DateTime LastCommsDT {get { return _lastCommsDT; } set { _lastCommsDT = value; NotifyPropertyChanged(); } }
+            public string ID { get { return _ID; } set { _ID = value; NotifyPropertyChanged(); } }
+            public bool ConnectionEnabled { get { return _connEnabled; } set { _connEnabled = value; NotifyPropertyChanged(); } }
+            public bool CommunicationsEnabled { get { return _commsEnabled; } set { _commsEnabled = value; NotifyPropertyChanged(); } }
+            public string ConnectionType { get { return _connectionType; } set { _connectionType = value; NotifyPropertyChanged(); } }
+            public long LastCommsTime { get { return _lastComms; } set { _lastComms = value; NotifyPropertyChanged(); } }
+            public int RequestRetryDelay { get { return _requestRetryDelay; } set { _requestRetryDelay = value; NotifyPropertyChanged(); } }
+            public int SocketConnectionAttemptTimeout { get { return _socketConnectionAttemptTimeout; } set { _socketConnectionAttemptTimeout = value; NotifyPropertyChanged(); } }
+            public int MaxSocketConnectionAttempts { get { return _maxSocketConnectionAttempts; } set { _maxSocketConnectionAttempts = value; NotifyPropertyChanged(); } }
+            public int SocketConnectionRetryDelay { get { return _socketConnectionRetryDelay; } set { _socketConnectionRetryDelay = value; NotifyPropertyChanged(); } }
+            public int PostConnectionCommsDelay { get { return _postConnectionCommsDelay; } set { _postConnectionCommsDelay = value; NotifyPropertyChanged(); } }
+            public int InterRequestDelay { get { return _interRequestDelay; } set { _interRequestDelay = value; NotifyPropertyChanged(); } }
+            public int MaxRequestAttempts { get { return _maxRequestAttempts; } set { _maxRequestAttempts = value; NotifyPropertyChanged(); } }
+            public int RequestResponseTimeout { get { return _requestResponseTimeout; } set { _requestResponseTimeout = value; NotifyPropertyChanged(); } }
+            public String ConnectionStatus { get { return _connectionStatus; } set { _connectionStatus = value; NotifyPropertyChanged(); } }
+            public bool IdleDisconnect { get { return _idleDisconnect; } set { _idleDisconnect = value; NotifyPropertyChanged(); } }
+            public int IdleDisconnectTime { get { return _idleDisconnectTime; } set { _idleDisconnectTime = value; NotifyPropertyChanged(); } }
+            public string Description { get { return _description; } set { _description = value; NotifyPropertyChanged(); } }
+            public DateTime LastCommsDT { get { return _lastCommsDT; } set { _lastCommsDT = value; NotifyPropertyChanged(); } }
 
             public event PropertyChangedEventHandler PropertyChanged;
 
             public ConnDetails()
             {
-
             }
 
             protected void NotifyPropertyChanged([CallerMemberName] String propertyName = "")
@@ -173,7 +168,7 @@ namespace Common
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
             }
 
-            public void Update(string propertyName,byte[] valueBytes)
+            public void Update(string propertyName, byte[] valueBytes)
             {
                 switch (propertyName)
                 {
@@ -195,7 +190,6 @@ namespace Common
                     case "idledisconnecttime": IdleDisconnectTime = BitConverter.ToInt32(valueBytes, 0); break;
                     case "description": Description = Encoding.UTF8.GetString(valueBytes); break;
                 }
-                
             }
 
             protected ConnDetails(SerializationInfo info, StreamingContext context)
@@ -221,7 +215,6 @@ namespace Common
                 Description = info.GetString("Description");
             }
 
-            
             public void GetObjectData(SerializationInfo info, StreamingContext context)
             {
                 // serializer
@@ -244,7 +237,6 @@ namespace Common
                 info.AddValue("Description", Description);
             }
         }
-        
     }
 
     public class CustomJsonConvert : JsonConverter
@@ -281,6 +273,7 @@ namespace Common
                 case "y":
                 case "1":
                     return true;
+
                 case "false":
                 case "no":
                 case "n":
@@ -311,8 +304,10 @@ namespace Common
         // This size of the IV (in bytes) must = (keysize / 8).  Default keysize is 256, so the IV must be
         // 32 bytes long.  Using a 16 character string here gives us 32 bytes when converted to a byte array.
         private const string initVector = "p1MggfiEgGfqvVgz";
+
         // This constant is used to determine the keysize of the encryption algorithm
         private const int keysize = 256;
+
         //Encrypt
         public static string EncryptString(string plainText, string passPhrase)
         {
@@ -333,12 +328,13 @@ namespace Common
                 memoryStream.Close();
                 cryptoStream.Close();
                 return Convert.ToBase64String(cipherTextBytes);
-            } catch
+            }
+            catch
             {
                 return string.Empty;
             }
-
         }
+
         //Decrypt
         public static string DecryptString(string cipherText, string passPhrase)
         {
