@@ -35,7 +35,7 @@ namespace BSAP
         private static UInt32 LastSeqRcvd = 0;
         private static ushort SerialSeqNumber = 1;
         private const byte SRCFuncCode = 3;
-        private const int absoluteMaxMessageLength = 245;
+        private const int absoluteMaxMessageLength = 200; // really 245 but let's set it to 200 for safety
         private const int MaxSignalsPerMessage = 38; // prevent responses that go over the message size limit
         private static List<string> validationErrors;
 
@@ -185,6 +185,11 @@ namespace BSAP
                         {
                             RecordValidationError(obj, groupID, requestor, "contains a request with an invalid element in the header (Maximum packet size '" + header[6] + "' is too low, minimum of 30).");
                             valid = false;
+                        }
+
+                        if (n > 200)
+                        {
+                            RecordValidationError(obj, groupID, requestor, "contains a request with maximum message size over the limit of 200, maximum message size set to 200", true);
                         }
                     }
                 }
@@ -513,7 +518,7 @@ namespace BSAP
                             MSDRequests = SerialWriteValuesByMSD(localAddress, MSDRequestList.ToArray(), types.ToArray(), values.ToArray(), VER);
                             if (doReadback)
                             {
-                                List<DataRequest> readback = SerialReadValuesByMSD(localAddress, MSDRequestList.ToArray(), VER);
+                                List<DataRequest> readback = SerialReadValuesByMSD(localAddress, MSDRequestList.ToArray(), VER,maxRequestLength);
                                 ConfigureReadback(MSDTagList, allTagConfigs, ref readback);
                                 MSDRequests.AddRange(readback);
                             }
@@ -521,10 +526,10 @@ namespace BSAP
 
                         if (requestGroup.Protocol.ToUpper() == "BSAPUDP")
                         {
-                            MSDRequests = UDPWriteValuesByMSD(ip, deviceSettings, MSDRequestList.ToArray(), types.ToArray(), values.ToArray(), VER);
+                            MSDRequests = UDPWriteValuesByMSD(ip, deviceSettings, MSDRequestList.ToArray(), types.ToArray(), values.ToArray(), VER,maxRequestLength);
                             if (doReadback)
                             {
-                                List<DataRequest> readback = UDPReadValuesByMSD(ip, deviceSettings, MSDRequestList.ToArray(), VER);
+                                List<DataRequest> readback = UDPReadValuesByMSD(ip, deviceSettings, MSDRequestList.ToArray(), VER,maxRequestLength);
                                 ConfigureReadback(MSDTagList, allTagConfigs, ref readback);
                                 MSDRequests.AddRange(readback);
                             }
@@ -588,7 +593,7 @@ namespace BSAP
                             SignalNameRequests = SerialWriteValuesByName(localAddress, SignalNameRequestList.ToArray(), types.ToArray(), values.ToArray());
                             if (doReadback)
                             {
-                                List<DataRequest> readback = SerialReadValuesByName(localAddress, SignalNameRequestList.ToArray());
+                                List<DataRequest> readback = SerialReadValuesByName(localAddress, SignalNameRequestList.ToArray(),maxRequestLength);
                                 ConfigureReadback(SignalNameTagList, allTagConfigs, ref readback);
                                 SignalNameRequests.AddRange(readback);
 
@@ -596,7 +601,7 @@ namespace BSAP
                         }
                         if (requestGroup.Protocol.ToUpper() == "BSAPUDP")
                         {
-                            SignalNameRequests = UDPWriteValuesByName(ip, deviceSettings, SignalNameRequestList.ToArray(), types.ToArray(), values.ToArray());
+                            SignalNameRequests = UDPWriteValuesByName(ip, deviceSettings, SignalNameRequestList.ToArray(), types.ToArray(), values.ToArray(), maxRequestLength);
                             
                             if (doReadback)
                             {
@@ -621,7 +626,7 @@ namespace BSAP
                 req.ParentGroup = requestGroup;
                 req.ExpectedResponseSize = CalculateExpectedResponseSize(req);
                 req.DeviceSettings = deviceSettings;
-                req.GroupIdxNumber = idx.ToString();
+                req.GroupIdxNumber = (idx+1).ToString();
                 req.GroupSize = requestGroup.ProtocolRequestList.Count;
                 idx++;
             }
@@ -1551,8 +1556,10 @@ namespace BSAP
 
                     request = CreateDataRequestObject(thisMessage.ToArray());
                     request.Protocol = "BSAPUDP";
-                    request.ExpectedResponseSize = CalculateExpectedResponseSize(request);
+                    //request.ExpectedResponseSize = CalculateExpectedResponseSize(request);
                     request.TagList = new List<Tag>(thisMessageSignalCount);
+                    request.DeviceSettings = deviceSettings;
+                    request.UDPIPAddr = ip;
 
                     // add it to the list (if signal count > 0)
                     if (thisMessageSignalCount > 0)
